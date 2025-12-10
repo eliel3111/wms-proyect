@@ -1,0 +1,66 @@
+/* ================================
+   SIDEBAR (SOLO MÓVIL)
+================================ */
+
+/* Estado base: sidebar oculto en móvil */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 80%;
+  background: #ffffff;
+  z-index: 1100;
+
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+/* Sidebar abierto */
+.sidebar.open {
+  transform: translateX(0);
+}
+
+/* Contenido */
+.sidebar-content {
+  padding: 0 20px;
+}
+
+.sidebar-content-tittle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  line-height: 1; 
+
+  transition: transform 0.2s;
+}
+
+.close-btn:active {
+  transform: scale(0.9);
+}
+
+
+/* ================================
+   DESKTOP – NO SE VE NADA
+================================ */
+@media (min-width: 768px) {
+  .sidebar {
+    display: none;      /* 🔥 sidebar totalmente oculto */
+    width: 0 !important;
+    transform: none !important;
+    position: static;
+  }
+}

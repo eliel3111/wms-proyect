@@ -1,0 +1,125 @@
+/* ============================
+   HEADER BASE — ESCRITORIO Y GENERAL
+============================ */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;               /* 🔥 AGREGA ESTO */
+  width: 100%;
+  background: #1E88E5;
+  height: 56px;
+  border-bottom: 1px solid #e6e6e6;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 12px;       /* 🔥 QUITAMOS PADDING DUPLICADO */
+  box-sizing: border-box; /* 🔥 IMPORTANTE */
+  z-index: 1000;
+}
+
+.app-header.hidden {
+  transform: translateY(-100%);
+}
+
+.header-container-right {
+    display: flex;
+    align-items: center;
+    gap: 20px
+    ;
+}
+
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.header-center {
+  text-align: center;
+  flex-grow: 0;  /* 🔥 No estires el header */
+}
+
+.header-username {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.menu-btn {
+  background: transparent;
+  font-size: 24px;
+  border: none;
+  cursor: pointer;
+  display: none; /* solo móvil la activa */
+}
+
+.logout-btn {
+  background: #007aff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background: #005fcc;
+}
+
+/* ============================
+   MOBILE — SOLO CAMBIOS PARA MÓVIL
+============================ */
+@media (max-width: 768px) {
+  
+  /* Header más compacto */
+  .app-header {
+    height: 40px;
+    padding: 0;
+  }
+
+  /* Logo más pequeño */
+  .header-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Username más pequeño */
+  .header-username {
+    display: none;
+  }
+
+  /* Menos separación entre elementos */
+  .header-left,
+  .header-right {
+    gap: 8px;
+  }
+
+  .header-left {
+    margin-left: 15PX;
+  }
+
+  .header-right {
+    margin-right: 10px;
+  }
+
+  /* Botón menú visible en móvil */
+  .menu-btn {
+    display: block;
+    font-size: 22px;
+    padding: 4px;
+  }
+
+  /* Logout oculto en móvil */
+  .logout-btn {
+    display: none;
+  }
+}

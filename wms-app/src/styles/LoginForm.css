@@ -1,0 +1,207 @@
+/* Fondo general de la página */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2764cc, #a5cdf2);
+  /*padding: 1rem;*/
+}
+
+
+/* Tarjeta del login */
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+  box-sizing: border-box;
+}
+
+/* Títulos */
+.login-title {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+}
+
+.login-subtitle {
+  margin-top: 0.5rem;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* Formulario */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Grupo label + input */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Input */
+.input {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.65rem;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.input::placeholder {
+  color: #9ca3af;
+}
+
+.input:focus {
+  border-color: #2764cc;
+  box-shadow: 0 0 0 3px rgba(39, 100, 204, 0.18);
+  background-color: #f9fafb;
+}
+
+/* Error */
+.error-message {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Botón principal */
+.btn-primary {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #2764cc;
+  color: #ffffff;
+  transition: transform 0.1s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: #1f4da0;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* Texto debajo del botón */
+.login-footer-text {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.link {
+  color: #2764cc;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* ================================
+   📱 MEDIA QUERY ESPECIAL PARA PDA
+   ================================ */
+@media (max-width: 480px) {
+  
+  /* Contenedor centrado */
+  .login-page {
+    padding: 1rem;
+    background: #2764cc; /* Puedes ajustar */
+  }
+
+  /* Tarjeta compacta */
+  .login-card {
+    padding: 1.4rem 1rem;
+    border-radius: 14px;
+    max-width: 100%;
+  }
+
+  /* Títulos más grandes y legibles */
+  .login-title {
+    font-size: 1.7rem;
+  }
+
+  .login-subtitle {
+    font-size: 1.05rem;
+    margin-bottom: 1.2rem;
+  }
+
+  /* Inputs más altos (tocables con dedo) */
+  .input {
+    height: 56px;  
+    padding: 0.9rem 1rem;
+    font-size: 1.15rem;
+    border-radius: 12px;
+  }
+
+  /* Labels más grandes */
+  .form-group label {
+    font-size: 1.1rem;
+  }
+
+  /* Error message más visible */
+  .error-message {
+    font-size: 1.05rem;
+    padding: 0.8rem;
+  }
+
+  /* Botón grande estilo PDA */
+  .btn-primary {
+    height: 60px;
+    font-size: 1.3rem;
+    border-radius: 40px;
+    margin-top: 0.5rem;
+  }
+
+  /* Footer más grande */
+  .login-footer-text {
+    font-size: 1.05rem;
+  }
+  .login-h {
+    display: none;
+  }
+
+  .link {
+    font-size: 1.1rem;
+  }
+
+  .login-page {
+    justify-content: start;
+    padding-top: 40px;
+  }
+
+}

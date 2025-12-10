@@ -1,0 +1,60 @@
+/* ======== LAYOUT GENERAL ======== */
+
+.layout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f5f6fa;
+}
+
+/* ======== BODY CON SIDEBAR + CONTENT ======== */
+
+.layout-body {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+
+
+/* ======== OVERLAY (CUANDO EL SIDEBAR ESTÁ ABIERTO EN MÓVIL) ======== */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 15;
+}
+
+/* ======== CONTENT ======== */
+
+.layout-content {
+  flex: 1;
+  padding: 20px;
+  margin-left: 0;
+  margin-top: 60px; /* espacio para header fijo */
+  overflow-y: auto;
+  height: calc(100vh - 60px);
+}
+
+/* En desktop, deja espacio para el sidebar */
+@media (min-width: 768px) {
+  .layout-content {
+    margin-left: 260px;
+  }
+}
+
+
+
+/* ======== ANIMACIÓN HEADER HIDE EN MÓVIL ======== */
+
+@media (max-width: 768px) {
+  .header.hidden {
+    transform: translateY(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .header.visible {
+    transform: translateY(0);
+    transition: transform 0.25s ease;
+  }
+}
