@@ -5,6 +5,7 @@
   flex-direction: column;
   height: 100vh;
   background: #f5f6fa;
+  width: 100%;
 }
 
 /* ======== BODY CON SIDEBAR + CONTENT ======== */
@@ -29,19 +30,14 @@
 
 .layout-content {
   flex: 1;
-  padding: 20px;
   margin-left: 0;
-  margin-top: 60px; /* espacio para header fijo */
   overflow-y: auto;
-  height: calc(100vh - 60px);
+  padding-top: 56px; /* 👈 MISMA altura del header */
+  min-height: calc(100vh - 56px);
+  overflow: hidden;
 }
 
-/* En desktop, deja espacio para el sidebar */
-@media (min-width: 768px) {
-  .layout-content {
-    margin-left: 260px;
-  }
-}
+
 
 
 
@@ -56,5 +52,10 @@
   .header.visible {
     transform: translateY(0);
     transition: transform 0.25s ease;
+  }
+
+  .layout-content {
+    padding-top: 40px; /* 👈 MISMA altura del header */
+    min-height: calc(100vh - 40px);
   }
 }

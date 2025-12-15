@@ -14,6 +14,13 @@ export type User = {
   id: number;
   email: string;
   full_name: string;
+  permissions: PermissionMap;
+};
+
+export type PermissionMap = {
+  [module: string]: {
+    [action: string]: boolean;
+  };
 };
 
 export type AuthContextType = {
@@ -24,6 +31,7 @@ export type AuthContextType = {
   loading: boolean;
   getToken: () => string | null;
   refreshToken: () => Promise<string | null>;
+  can: (permission: string) => boolean;
 };
 
 export type LoginCredentials = {
@@ -59,7 +67,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const getToken = () => accessToken;
 
 
-
+  
 
 
   // ----------------------------
@@ -74,11 +82,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAccessToken(data.accessToken);
     localStorage.setItem("accessToken", data.accessToken);
 
-    
+
+
     if (data.refreshToken) {
       localStorage.setItem("refreshToken", data.refreshToken);
     }
   }
+
+
+  // Definir funcion para los permisos:
+
+  const can = (permission: string): boolean => {
+    console.log("ALERTA", user);
+    if (!user?.permissions) return false;
+
+    const parts = permission.split(".");
+    if (parts.length !== 2) return false;
+
+    const [module, action] = parts;
+
+    return user.permissions[module]?.[action] === true;
+  };
 
   // ----------------------------
   // LOGOUT
@@ -149,7 +173,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log("CHECK 5: Llamando getUserProfile()…");
     const data = await authService.getUserProfile();  
     console.log("CHECK 6: getUserProfile() respondió:", data);
-
     setUser(data.user);
     console.log("CHECK 7: user seteado:", data.user);
 
@@ -180,6 +203,12 @@ useEffect(() => {
   checkSession();
 }, []);
 
+useEffect(() => {
+  console.log("AUTH USER:", user);
+  console.log("AUTH PERMISSIONS:", user?.permissions);
+}, [user]);
+
+
 
   const value: AuthContextType = {
     user,
@@ -189,6 +218,7 @@ useEffect(() => {
     loading,
     getToken,      // <-- AÑADIR ESTO AQUÍ
     refreshToken,  // <-- YA EXISTE
+    can,
   };
 
   return (
@@ -208,6 +238,8 @@ export function useAuth() {
   }
   return ctx;
 }
+
+
 
 // Marca el hook como "usado" para TS
 export const __useAuthMarker = useAuth;

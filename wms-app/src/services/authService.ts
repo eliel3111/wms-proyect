@@ -9,11 +9,18 @@ export type LoginCredentials = {
   password: string;
 };
 
+export type PermissionMap = {
+  [module: string]: {
+    [action: string]: boolean;
+  };
+};
+
 export type User = {
   id: number;
   email: string;
   full_name: string;
-  role: string;   // <-- añadir esto
+  role: string;
+  permissions: PermissionMap;   // <-- añadir esto
 };
 
 
@@ -36,6 +43,9 @@ export async function loginUser(
   credentials: LoginCredentials
 ): Promise<LoginResponse> {
   const res = await apiClient.post("/auth/login", credentials);
+  console.log("USER FROM API:", res.data.user);
+  console.log("PERMISSIONS:", "USER FROM API:", res.data.user.permissions);
+
   return res.data as LoginResponse;
 }
 

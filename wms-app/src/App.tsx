@@ -3,7 +3,9 @@ import Home from "./pages/home.tsx";
 import LoginPage from "./pages/login.tsx";
 import MainLayout from "./components/MainLayout";
 import PrivateRoute from "./components/PrivateRoute.tsx";
-import Dashboard from "./pages/Dashboard";
+import Menu from "./pages/Menu.tsx";
+import ReceivingSearch from "./pages/ReceivingSearch.tsx";
+
 
 function App() {
   return (
@@ -22,7 +24,10 @@ function App() {
           </PrivateRoute>
         }
       >
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/menu" element={<Menu />} />
+          <Route path="/receiving" element={<ReceivingSearch />} />
+
+
 
       </Route>
 

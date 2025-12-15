@@ -1,0 +1,55 @@
+.menu-button {
+  background-color: #ffffff;
+  border-radius: 18px;
+  padding: 20px;
+  min-height: 130px;
+  max-width: 160px;
+  min-width: 130px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 14px;
+
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.menu-button:hover {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  transform: scale(1.05);
+}
+
+.menu-button:active {
+  transform: scale(0.96);
+  background-color: #f5f7fa;
+}
+
+.menu-button__icon {
+  color: #1e88e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-button__icon svg {
+  width: 90px;
+  height: 90px;
+}
+
+.menu-button__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+  text-align: center;
+}

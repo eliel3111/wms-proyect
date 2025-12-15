@@ -29,7 +29,7 @@ export default function LoginForm() {
       console.log("Eliel");
 
       // ⬇️ Redirigir al dashboard
-      navigate("/dashboard", { replace: true });
+      navigate("/menu", { replace: true });
 
     } catch (err) {
       console.error(err);

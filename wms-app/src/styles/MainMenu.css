@@ -1,0 +1,31 @@
+
+.menu-page {
+    margin-left: 100px;
+    margin-right: 100px;
+}
+
+.menu-tittle {
+    text-align: center;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 📱 móvil */
+  gap: 16px;
+  padding: 16px;
+  justify-items: center;
+}
+
+/* 📲 Tablet */
+@media (min-width: 768px) {
+  .menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* 🖥️ Desktop */
+@media (min-width: 1024px) {
+  .menu-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

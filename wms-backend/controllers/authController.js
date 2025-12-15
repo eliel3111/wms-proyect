@@ -112,11 +112,18 @@ export async function login(req, res) {
 
     // 3️⃣ Buscar usuario por email
     const userResult = await db.query(
-      `SELECT id, email, full_name, role, password_hash
+      `SELECT 
+        id,
+        email,
+        full_name,
+        role,
+        password_hash,
+        permissions
       FROM users
       WHERE email = $1`,
       [normalizedEmail]
     );
+
 
 
     if (userResult.rows.length === 0) {
@@ -198,7 +205,7 @@ export async function login(req, res) {
 export async function registerUser(req, res) {
   try {
     const { email, password, full_name, role, phone, warehouse_id } = req.body;
-
+    console.log(req.body);
     // 1️⃣ Validaciones
     if (!email || !password || !full_name || !role) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -206,7 +213,7 @@ export async function registerUser(req, res) {
 
     // 2️⃣ Normalizar email
     const normalizedEmail = email.trim().toLowerCase();
-
+    
     // 3️⃣ Verificar si el email ya existe
     const existingUser = await db.query(
       "SELECT id FROM users WHERE email = $1",

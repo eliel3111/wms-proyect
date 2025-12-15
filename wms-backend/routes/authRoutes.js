@@ -20,11 +20,23 @@ router.get("/me", authMiddleware, async (req, res) => {
     const userId = req.user.id; // viene del middleware
 
     const result = await db.query(
-      `SELECT id, email, full_name, role, phone, warehouse_id, created_at, last_login
-       FROM users
-       WHERE id = $1`,
+      `
+      SELECT
+        id,
+        email,
+        full_name,
+        role,
+        phone,
+        warehouse_id,
+        permissions,
+        created_at,
+        last_login
+      FROM users
+      WHERE id = $1
+      `,
       [userId]
     );
+
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });

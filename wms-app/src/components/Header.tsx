@@ -1,6 +1,7 @@
 import { useAuth } from "../context/AuthProvider";
 import { useEffect, useState } from "react";
 import "../styles/Header.css";
+import { useNavigate } from "react-router-dom";
 
 export default function Header({ logo, onMenuClick }) {
   const { user, logout } = useAuth();
@@ -20,15 +21,22 @@ export default function Header({ logo, onMenuClick }) {
       lastScroll = current;
     }
 
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const navigate = useNavigate();
+
+    function goToMenu() {
+      navigate("/menu");
+    };
+
   return (
     <header className={`app-header ${hidden ? "hidden" : ""}`}>
       {/* Div A: LOGO */}
-      <div className="header-left">
-        <img src={logo} alt="Logo" className="header-logo" />
+      <div className="header-left" onClick={goToMenu} >
+        <svg className="menu-icon-svg"  enable-background="new 0 0 24 24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" id="fi_3603178"><path d="m5 0h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m5 9h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m5 18h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m14 0h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m14 9h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m14 18h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m23 0h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m23 9h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path><path d="m23 18h-4c-.552 0-1 .448-1 1v4c0 .552.448 1 1 1h4c.552 0 1-.448 1-1v-4c0-.552-.448-1-1-1z"></path></svg>
       </div>
 
       <div className="header-container-right">
