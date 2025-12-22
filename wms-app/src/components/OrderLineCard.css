@@ -1,0 +1,164 @@
+.order-lines-header {
+    display: grid;
+    grid-template-columns:
+        140px
+        /* Código */
+        120px
+        /* Cantidad recibida */
+        1fr
+        /* Descripción */
+        120px;
+    /* Diferencia */
+
+    gap: 12px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    margin-top: 10px;
+
+    font-size: 13px;
+    font-weight: 700;
+    color: #374151;
+
+
+    align-items: center;
+    /* 👈 alineación vertical */
+    justify-content: flex-start;
+    /* 👈 alineación horizontal */
+
+    background-color: #D3D3D3;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+
+
+
+.lines-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 5px;
+}
+
+.order-line {
+
+    display: grid;
+    grid-template-columns:
+        140px
+        /* SKU */
+        120px
+        /* qty */
+        1fr
+        /* descripción */
+        120px;
+    /* diferencia */
+    align-items: center;
+    /* 👈 alineación vertical */
+    justify-content: flex-start;
+    /* 👈 alineación horizontal */
+    gap: 12px;
+
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+
+
+.line-default {
+    background: #ffffff;
+}
+
+.line-ok {
+    background: #eaffea;
+    /* verde suave */
+    border-color: rgba(34, 197, 94, .35);
+}
+
+.line-error {
+    background: #ffecec;
+    /* rojo suave */
+    border-color: rgba(239, 68, 68, .35);
+}
+
+.line-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.line-sku {
+    font-weight: 700;
+    text-align: left;
+}
+
+.line-qty {
+    font-weight: 600;
+    opacity: 0.85;
+    text-align: left;
+}
+
+.line-desc {
+    margin-top: 6px;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.line-bottom {
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.line-warning {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.filter-bar button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: white;
+    cursor: pointer;
+}
+
+.filter-bar button.active {
+    border-color: rgba(59, 130, 246, .6);
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+
+    .order-lines-header {
+        grid-template-columns:
+            70px
+            /* Código */
+            70px
+            /* Cantidad recibida */
+            1fr
+            /* Descripción */
+            80px;
+        /* Diferencia */
+    }
+
+    .order-line {
+        grid-template-columns:
+            70px
+            /* SKU */
+            70px
+            /* qty */
+            1fr
+            /* descripción */
+            60px;
+        /* diferencia */
+    }
+}

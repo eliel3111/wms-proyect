@@ -1,4 +1,139 @@
-.receiving-search-page {
-    background-color: red;
-    height: 100vh;
+/* PAGE */
+.page {
+  min-height: 100vh;
+  width: 100%;
+  background-color: #f4f0fa;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* MAIN CONTAINER */
+.container {
+  width: 100%;
+  max-width: 1000px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: lightgray;
+  transform: translateY(16px);
+  border-radius: 15px;
+}
+
+/* SECTIONS */
+.section {
+  display: flex;
+  gap: 16px;
+}
+
+/* BOXES (COMMON) */
+.box {
+  flex: 1;
+  padding: 32px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  color: #222;
+}
+
+/* COLORS */
+.div-a {
+/*background-color: aqua;*/
+}
+
+.div-b {
+/*background-color: lightcoral;*/
+}
+
+.div-c {
+
+}
+
+.div-d {
+
+  padding-top: 50px;
+}
+
+/*BOTON*/
+.btn-primary {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+
+  padding: 12px 20px;
+  min-height: 44px;
+
+  background-color: #1a73e8; /* Google Blue */
+  color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+
+  cursor: pointer;
+  transition: 
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.05s ease;
+
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Hover */
+.btn-primary:hover {
+  background-color: #1558c0;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+/* Active (click) */
+.btn-primary:active {
+  transform: scale(0.98);
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Focus (accesibilidad) */
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 
+    0 0 0 3px rgba(26, 115, 232, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Disabled */
+.btn-primary:disabled {
+  background-color: #c7d3f3;
+  color: #ffffff;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+
+/* 📱 MOBILE */
+@media (max-width: 768px) {
+  .section {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .box {
+    padding-bottom: 0;
+  }
+  .container {
+    gap: 0;
+  }
+
+    .page {
+        min-height: 70vh;
+    }
+
+    .div-d {
+      padding-top: 15px;
+    }
 }

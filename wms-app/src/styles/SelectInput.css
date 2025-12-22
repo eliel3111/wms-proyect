@@ -1,0 +1,35 @@
+.rs__control {
+  height: 52px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 18px;
+  outline: none;
+}
+.input-label {
+  font-size: 20px;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+.rs__control--is-focused {
+  border-color: #4c8bf5;
+  box-shadow: none;
+}
+
+.rs__menu {
+  z-index: 20; /* importante para overlays */
+}
+
+.rs__option--is-selected {
+  background-color: #4c8bf5;
+}
+
+.rs__option--is-focused {
+  background-color: #eef3fd;
+}
+.rs__placeholder {
+  color: #8b8b8b;
+  font-size: 16px;
+  font-weight: 400;
+  text-align: left;
+}
