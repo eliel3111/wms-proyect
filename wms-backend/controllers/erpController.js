@@ -6,6 +6,7 @@ export async function createPurchaseOrder(req, res) {
   try {
     // 🔹 Payload del ERP
     const erpPayload = req.body;
+    
 
     // 🔹 MAPEO ERP → WMS (solo aquí dependes del ERP)
     const poNumber = typeof erpPayload.purchase_order_number === "string"
@@ -93,17 +94,17 @@ export async function createPurchaseOrder(req, res) {
         //id de la orden de compra recien creada
         const purchaseOrderId = poResult.rows[0].id;
 
-
+        console.log("Va a comenzar a verificar productos");
         //Verificar productos
 
         const skus = lines.map(l => String(l.sku || "").trim()).filter(Boolean);
 
         const productsFound = await db.query(
-        `SELECT sku FROM products WHERE sku = ANY($1)`,
+        `SELECT product_sku FROM product_barcodes WHERE product_sku = ANY($1)`,
         [skus]
         );
 
-        const productMap = new Set(productsFound.rows.map(r => r.sku));
+        const productMap = new Set(productsFound.rows.map(r => r.product_sku));
 
         console.log("SKUS:", skus);
         console.log("FOUND:", [...productMap]);

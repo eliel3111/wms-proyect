@@ -50,13 +50,49 @@ export async function getReceivingByPoId(req, res) {
       [purchaseOrder.id]
     );
 
-    /* 3️⃣ Responder */
+    console.log(linesResult.rows);
+
+    /* 3️⃣ Obtener SKUs válidos */
+    const validSkus = linesResult.rows
+      .filter(line => line.product_exists)
+      .map(line => line.sku);
+
+    /* 4️⃣ Buscar barcodes */
+    let barcodeMap = new Map();
+
+    if (validSkus.length > 0) {
+      const barcodeResult = await db.query(
+        `
+        SELECT product_sku, barcode
+        FROM product_barcodes
+        WHERE product_sku = ANY($1)
+        `,
+        [validSkus]
+      );
+
+      barcodeResult.rows.forEach(row => {
+        if (!barcodeMap.has(row.product_sku)) {
+          barcodeMap.set(row.product_sku, []);
+        }
+        barcodeMap.get(row.product_sku).push(row.barcode);
+      });
+    }
+
+    /* 5️⃣ Enriquecer líneas */
+    const enrichedLines = linesResult.rows.map(line => ({
+      ...line,
+      barcodes: line.product_exists
+        ? barcodeMap.get(line.sku) || []
+        : []
+    }));
+
+    /* 6️⃣ Responder */
     return res.status(200).json({
       success: true,
       data: {
         id: purchaseOrder.id,
         purchase_order_number: purchaseOrder.purchase_order_number,
-        lines: linesResult.rows,
+        lines: enrichedLines,
       },
     });
   } catch (error) {

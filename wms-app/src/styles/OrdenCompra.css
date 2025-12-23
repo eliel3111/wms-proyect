@@ -161,6 +161,51 @@
   box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.2);
 }
 
+
+.filter-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+
+  display: flex;
+  justify-content: center; /* 👈 centra horizontalmente */
+  align-items: center;
+
+
+  gap: 12px;
+
+  background-color: transparent;
+ 
+
+  z-index: 1000; /* 👈 siempre encima */
+}
+
+.filter-bar-inner {
+  width: 100%;
+  max-width: 1000px; /* ajusta a tu layout */
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.filter-bar-inner button {
+    padding: 8px 25px;
+    height: 48px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+}
+
+.filter-bar button.active {
+    border-color: rgba(59, 130, 246, .6);
+    font-weight: 700;
+    font-size: 16px;
+}
+
+
+
+
 /* HOVER (desktop) */
 @media (hover: hover) {
   .pill-btn:hover {
@@ -217,4 +262,6 @@
 .order-number-title {
   font-size: 14px;
 }
+
+
 }

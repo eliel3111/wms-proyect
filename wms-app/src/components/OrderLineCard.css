@@ -37,6 +37,7 @@
     flex-direction: column;
     gap: 12px;
     padding: 0 5px;
+    padding-bottom: 70px;
 }
 
 .order-line {
@@ -123,18 +124,7 @@
     margin-bottom: 12px;
 }
 
-.filter-bar button {
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    background: white;
-    cursor: pointer;
-}
 
-.filter-bar button.active {
-    border-color: rgba(59, 130, 246, .6);
-    font-weight: 700;
-}
 
 @media (max-width: 768px) {
 

@@ -8,6 +8,7 @@ type Product = {
     ordered_qty: number;
     received_qty: number;
     product_exists: boolean;
+    barcodes: string[];
 };
 
 type Props = {

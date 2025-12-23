@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getReceptionByPOId, saveReceptionIDB } from "../services/receptionIDB.helpers.ts";
 import apiClient from "../services/apiClient.ts";
 import "../styles/OrdenCompra.css"
@@ -13,6 +13,7 @@ type Product = {
     ordered_qty: number;
     received_qty: number;
     product_exists: boolean;
+    barcodes: string[];
 };
 
 type Filter = "all" | "read" | "unread";
@@ -34,6 +35,11 @@ export default function OrdenCompra() {
     const [poNumber, setPoNumber] = useState<string>("");
     const [purchaseOrderId, setPurchaseOrderId] = useState<number | null>(null);
     const [filter, setFilter] = useState<Filter>("all");
+    const [lastCode, setLastCode] = useState<string>("");
+
+
+    const scanBufferRef = useRef("");
+    const scanTimerRef = useRef<number | null>(null);
 
 
     useEffect(() => {
@@ -78,7 +84,9 @@ export default function OrdenCompra() {
                 const data = result.data;
 
                 setPoNumber(data.purchase_order_number);
-                setProducts(data.lines);
+                setProducts(
+                    prioritizeMissingProducts(data.lines)
+                );
 
                 // 3️⃣ Guardar en IndexedDB
                 if (!local?.lines || local.lines.length === 0) {
@@ -138,6 +146,57 @@ export default function OrdenCompra() {
 
 
 
+    useEffect(() => {
+        if (!isScannerMode) return;
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            console.log(e.key);
+            if (
+                e.key === "Shift" ||
+                e.key === "Control" ||
+                e.key === "Alt" ||
+                e.key === "Meta"
+            ) return;
+
+            // FIN DEL SCAN
+            if (e.key === "Enter") {
+                const code = scanBufferRef.current;
+                console.log(scanBufferRef.current);
+                scanBufferRef.current = "";
+
+                if (scanTimerRef.current) {
+                    clearTimeout(scanTimerRef.current);
+                    scanTimerRef.current = null;
+                }
+                console.log(code);
+                handleScannedCode(code);
+                return;
+            }
+
+            // Caracter válido
+            if (e.key.length === 1) {
+                scanBufferRef.current += e.key;
+
+                if (scanTimerRef.current) {
+                    clearTimeout(scanTimerRef.current);
+                }
+
+                scanTimerRef.current = window.setTimeout(() => {
+                    scanBufferRef.current = "";
+                    scanTimerRef.current = null;
+                }, 2000  );
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+        };
+    }, [isScannerMode]);
+
+
 
     const EPS = 0.000001; // tolerancia para “casi cero”
 
@@ -153,6 +212,35 @@ export default function OrdenCompra() {
 
 
 
+    //FUNCTION TO SEARCH PRODUCT BARCODES
+    function handleScannedCode(code: string) {
+        const barcode = code.trim();
+        if (!barcode) return;
+
+        // 1️⃣ Ignorar si es el mismo código
+        if (barcode === lastCode) return;
+
+        setLastCode(barcode);
+
+        // 2️⃣ Cerrar modal primero
+        setIsModalOpen(false);
+
+        // 3️⃣ Buscar producto cuyo barcodes[] incluya el código
+        const foundProduct = products.find((product) =>
+            Array.isArray(product.barcodes) &&
+            product.barcodes.length > 0 &&
+            product.barcodes.includes(barcode)
+        );
+
+        if (foundProduct) {
+            setSelectedProduct(foundProduct);
+            setIsModalOpen(true);
+        } else {
+            // ❌ No existe en la orden
+            setSelectedProduct(null);
+            setIsModalOpen(true);
+        }
+    }
 
 
 
@@ -213,7 +301,7 @@ export default function OrdenCompra() {
 
     return (
         <div className="page-orden-compra">
-
+            <div>{scanBufferRef.current}</div>
             <div className="container-title">
                 <div className="order-div-a">
                     {/* SVG */}
@@ -268,26 +356,28 @@ export default function OrdenCompra() {
             </div>
 
             <div className="filter-bar">
-                <button
-                    className={filter === "all" ? "active" : ""}
-                    onClick={() => setFilter("all")}
-                >
-                    Todas
-                </button>
+                <div className="filter-bar-inner">
+                    <button
+                        className={filter === "all" ? "active" : ""}
+                        onClick={() => setFilter("all")}
+                    >
+                        Todas
+                    </button>
 
-                <button
-                    className={filter === "unread" ? "active" : ""}
-                    onClick={() => setFilter("unread")}
-                >
-                    Pendientes (0)
-                </button>
+                    <button
+                        className={filter === "unread" ? "active" : ""}
+                        onClick={() => setFilter("unread")}
+                    >
+                        Pendientes
+                    </button>
 
-                <button
-                    className={filter === "read" ? "active" : ""}
-                    onClick={() => setFilter("read")}
-                >
-                    Contadas (&gt;0)
-                </button>
+                    <button
+                        className={filter === "read" ? "active" : ""}
+                        onClick={() => setFilter("read")}
+                    >
+                        Contadas
+                    </button>
+                </div>
             </div>
 
 
