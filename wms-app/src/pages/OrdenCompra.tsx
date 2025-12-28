@@ -1,9 +1,14 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { getReceptionByPOId, saveReceptionIDB } from "../services/receptionIDB.helpers.ts";
+import { getReceptionByPOId, saveReceptionIDB, deleteReceptionByPOId } from "../services/receptionIDB.helpers.ts";
 import apiClient from "../services/apiClient.ts";
 import "../styles/OrdenCompra.css"
 import OrderLineCard from "../components/OrderLineCard.tsx"
+import ScanModal from "../components/ScanModal.tsx";
+import { useNavigate } from "react-router-dom";
+
+
+
 
 /* Tipos base */
 type Product = {
@@ -25,26 +30,32 @@ export default function OrdenCompra() {
     /* 2️⃣ Estados principales */
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isScannerMode, setIsScannerMode] = useState(true);
-    const [scanInput, setScanInput] = useState("");
+    /*const [scanInput, setScanInput] = useState<number>(0);*/
     const [products, setProducts] = useState<Product[]>([]);
     const [idbProducts, setIdbProducts] = useState<Product[]>([]);
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    const [countQty, setCountQty] = useState<number>(0);
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    /*const [countQty, setCountQty] = useState<number>(0);*/
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [poNumber, setPoNumber] = useState<string>("");
     const [purchaseOrderId, setPurchaseOrderId] = useState<number | null>(null);
     const [filter, setFilter] = useState<Filter>("all");
     const [lastCode, setLastCode] = useState<string>("");
+    const [quantityError, setQuantityError] = useState(false);
+    const [shakeKey, setShakeKey] = useState(0);
 
 
     const scanBufferRef = useRef("");
     const scanTimerRef = useRef<number | null>(null);
+    const productsRef = useRef<Product[]>([]);
+    const lastCodeRef = useRef<string>("");
+    const selectedIndexRef = useRef<number | null>(null);
 
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (!id) return;
-
+        console.log("CHECK 1")
         const poId = Number(id);
         if (isNaN(poId)) return;
         //fetchPurchaseOrderById(poId);
@@ -52,17 +63,41 @@ export default function OrdenCompra() {
 
     }, [id]);
 
+    useEffect(() => {
+        console.log("CHECK 2")
+        // mantener el ref sincronizado con el state
+        productsRef.current = products;
+    }, [products]);
 
+    useEffect(() => {
+        selectedIndexRef.current = selectedIndex;
+    }, [selectedIndex]);
+
+    useEffect(() => {
+        if (!purchaseOrderId) return;
+
+        const timeout = setTimeout(() => {
+            saveReceptionIDB({
+                id: purchaseOrderId,
+                purchase_order_number: poNumber,
+                lines: products,
+            });
+            console.log("💾 Guardado automático en IndexedDB");
+        }, 2000); // ⏱️ ideal para scanner + input manual
+
+        return () => clearTimeout(timeout);
+    }, [products, purchaseOrderId, poNumber]);
 
 
 
 
     useEffect(() => {
+        console.log("CHECK 3")
         if (!purchaseOrderId) return;
         console.log(products);
         const loadData = async () => {
             setLoading(true);
-
+            console.log("CHECK 4")
             try {
                 // 1️⃣ IndexedDB
                 const local = await getReceptionByPOId(purchaseOrderId);
@@ -76,7 +111,7 @@ export default function OrdenCompra() {
                 const response = await apiClient.get(`/receiving/${purchaseOrderId}`);
                 console.log("RESPUESTA BASE DE DATOS", response.data);
                 const result = response.data;
-
+                console.log("CHECK 5")
                 if (!result.success) {
                     throw new Error(result.message || "Error cargando la orden de compra");
                 }
@@ -90,6 +125,7 @@ export default function OrdenCompra() {
 
                 // 3️⃣ Guardar en IndexedDB
                 if (!local?.lines || local.lines.length === 0) {
+                    console.log("CHECK 6")
                     await saveReceptionIDB({
                         id: purchaseOrderId,
                         purchase_order_number: data.purchase_order_number,
@@ -116,6 +152,7 @@ export default function OrdenCompra() {
         if (!poNumber || products.length === 0 || idbProducts.length === 0) return;
 
         // 3️⃣ Crear diccionario sku → received_qty
+        console.log("CHECK 7")
         const receivedMap = new Map(
             idbProducts.map((p: Product) => [p.sku, p.received_qty])
         );
@@ -148,9 +185,9 @@ export default function OrdenCompra() {
 
     useEffect(() => {
         if (!isScannerMode) return;
-
+        console.log(products);
+        console.log("CHECK 8")
         const onKeyDown = (e: KeyboardEvent) => {
-            console.log(e.key);
             if (
                 e.key === "Shift" ||
                 e.key === "Control" ||
@@ -161,14 +198,13 @@ export default function OrdenCompra() {
             // FIN DEL SCAN
             if (e.key === "Enter") {
                 const code = scanBufferRef.current;
-                console.log(scanBufferRef.current);
                 scanBufferRef.current = "";
-
+                console.log("CHECK 9")
                 if (scanTimerRef.current) {
                     clearTimeout(scanTimerRef.current);
                     scanTimerRef.current = null;
                 }
-                console.log(code);
+
                 handleScannedCode(code);
                 return;
             }
@@ -184,7 +220,7 @@ export default function OrdenCompra() {
                 scanTimerRef.current = window.setTimeout(() => {
                     scanBufferRef.current = "";
                     scanTimerRef.current = null;
-                }, 2000  );
+                }, 200);
             }
         };
 
@@ -196,7 +232,10 @@ export default function OrdenCompra() {
         };
     }, [isScannerMode]);
 
-
+    // AFTER INDEX OBTAINED, SAVE SELECTED PRODUCT
+    /* ---------- DERIVED VALUE (AQUÍ) ---------- */
+    const selectedProduct =
+        selectedIndex !== null ? products[selectedIndex] : null;
 
     const EPS = 0.000001; // tolerancia para “casi cero”
 
@@ -209,6 +248,13 @@ export default function OrdenCompra() {
         if (filter === "unread") return Math.abs(qty) <= EPS; // 0, 0.000, etc.
         return true;
     });
+    // FUNCION PARA CERRAR MODAL
+    function closeModal() {
+        setIsModalOpen(false);
+        setSelectedIndex(null);
+        lastCodeRef.current = "";
+        setIsScannerMode(true); // opcional: reactivar scanner
+    }
 
 
 
@@ -216,32 +262,53 @@ export default function OrdenCompra() {
     function handleScannedCode(code: string) {
         const barcode = code.trim();
         if (!barcode) return;
+        console.log("CHECK 10")
+        console.log("RECIBIDO:", barcode);
+        console.log("LAST REF:", lastCodeRef.current);
 
-        // 1️⃣ Ignorar si es el mismo código
-        if (barcode === lastCode) return;
+        // 🔒 bloqueo de repetidos
+        if (barcode === lastCodeRef.current) {
+            console.log("CODIGO REPETIDO, IGNORADO");
+            incrementReceivedQty();
+            return;
+        }
 
-        setLastCode(barcode);
-
+        // actualizar ref (INMEDIATO)
+        lastCodeRef.current = barcode;
+        setQuantityError(false);
+        setLastCode(barcode); // opcional (solo UI/debug)
+        console.log("CHECK 12")
         // 2️⃣ Cerrar modal primero
         setIsModalOpen(false);
 
         // 3️⃣ Buscar producto cuyo barcodes[] incluya el código
-        const foundProduct = products.find((product) =>
+        const foundProduct = productsRef.current.find((product) =>
             Array.isArray(product.barcodes) &&
             product.barcodes.length > 0 &&
             product.barcodes.includes(barcode)
         );
-
-        if (foundProduct) {
-            setSelectedProduct(foundProduct);
+        const index = productsRef.current.findIndex((product) =>
+            Array.isArray(product.barcodes) &&
+            product.barcodes.length > 0 &&
+            product.barcodes.includes(barcode)
+        );
+        console.log(productsRef.current);
+        console.log("Producto encontrado:", foundProduct);
+        if (index === -1) {
+            // ❌ Producto NO existe
+            setSelectedIndex(null);
             setIsModalOpen(true);
         } else {
-            // ❌ No existe en la orden
-            setSelectedProduct(null);
+            // ✅ Producto encontrado
+            setSelectedIndex(index);
+            selectedIndexRef.current = index;
             setIsModalOpen(true);
         }
     }
 
+    useEffect(() => {
+        console.log("PRODUCTS ACTUALIZADO:", products);
+    }, [products]);
 
 
     //FUNCTION TO MOVE MISSING PRODUCTS TO 1ST PLACE
@@ -251,6 +318,123 @@ export default function OrdenCompra() {
 
         return [...missing, ...existing];
     }
+
+    function handleReceivedQtyChange(e: React.ChangeEvent<HTMLInputElement>) {
+        if (selectedIndex === null) return;
+
+        const value = e.target.value;
+
+        if (value !== "" && !/^\d+$/.test(value)) return;
+
+        setProducts(prev => {
+            setQuantityError(false);
+            const currentProduct = prev[selectedIndex];
+
+            const numericValue =
+                value === ""
+                    ? 0
+                    : Math.min(Number(value), currentProduct.ordered_qty);
+
+            const updated = [...prev];
+
+            if (Number(value) > currentProduct.ordered_qty) {
+                setQuantityError(true);
+                setShakeKey(prev => prev + 1); // 🔥 fuerza re-render
+            } else {
+                setQuantityError(false);
+            }
+
+            const updatedProduct = {
+                ...currentProduct,
+                received_qty: numericValue,
+            };
+
+            updated.splice(selectedIndex, 1);
+            updated.unshift(updatedProduct);
+
+            return updated;
+        });
+
+        setSelectedIndex(0);
+    }
+
+
+    // FUNCTION TO ADD +1 TO THE PRODUCT USING SCANNER
+    function incrementReceivedQty() {
+        const index = selectedIndexRef.current;
+        if (index === null) return;
+
+        setProducts(prev => {
+            setQuantityError(false);
+            const updated = [...prev];
+            const current = updated[index];
+
+            const nextQty = current.received_qty + 1;
+            const safeQty = Math.min(nextQty, current.ordered_qty);
+
+            const updatedProduct = {
+                ...current,
+                received_qty: safeQty,
+            };
+            console.log("NEXTQTY ", nextQty);
+            console.log("ORDERED ", current.ordered_qty);
+            if (nextQty > current.ordered_qty) {
+                setQuantityError(true);
+                setShakeKey(prev => prev + 1); // 🔥 fuerza re-render
+            } else {
+                setQuantityError(false);
+            }
+
+
+            updated.splice(index, 1);
+            updated.unshift(updatedProduct);
+
+            return updated;
+        });
+
+        // actualizar ambos
+        setSelectedIndex(0);
+        selectedIndexRef.current = 0;
+    }
+
+    // FUNCTION TO SAVE RECEPTION TO BACK END
+
+    async function saveReceptionToBackend() {
+        if (!purchaseOrderId) {
+            console.error("❌ purchaseOrderId no existe");
+            return;
+        }
+
+        try {
+            const response = await apiClient.post("/receiving/save", {
+                purchase_order_id: purchaseOrderId,
+                purchase_order_number: poNumber,
+                lines: products.map(p => ({
+                    id: Number(p.id),
+                    received_qty: Number(p.received_qty),
+                })),
+            });
+
+
+            const result = response.data;
+            console.log("✅ RESPUESTA BACKEND:", result);
+
+            if (!result.success) {
+                throw new Error(result.message || "Error guardando recepción");
+            }
+
+            // 🧹 BORRAR INDEXEDDB SOLO SI EL BACKEND CONFIRMA
+            await deleteReceptionByPOId(purchaseOrderId);
+
+            console.log("🗑️ IndexedDB limpiado correctamente");
+
+
+        } catch (error: any) {
+            console.error("❌ Error guardando recepción:", error);
+            alert("Ocurrió un error al guardar la recepción");
+        }
+    }
+
 
 
     //Function to call the back end to request the order data:
@@ -317,7 +501,10 @@ export default function OrdenCompra() {
                 </div>
                 <div className="order-div-b">
                     {/* ⏸️ PAUSAR */}
-                    <button className="pill-btn pause-btn">
+                    <button onClick={async () => {
+                        await saveReceptionToBackend();
+                        navigate("/menu");
+                    }} className="pill-btn pause-btn">
                         <span className="icon">
                             {/* ICONO PAUSA */}
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -329,7 +516,10 @@ export default function OrdenCompra() {
                     </button>
 
                     {/* ✅ FINALIZAR */}
-                    <button className="pill-btn finish-btn">
+                    <button onClick={async () => {
+                        await saveReceptionToBackend();
+                        navigate(`/validation/${purchaseOrderId}`);
+                    }} className="pill-btn finish-btn">
                         <span className="icon">
                             {/* ICONO CHECK */}
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -341,19 +531,21 @@ export default function OrdenCompra() {
                 </div>
             </div>
 
+            <div className="order-container-table">
+                <div className="order-lines-header">
+                    <div>Código</div>
+                    <div>Descripción</div>
+                    <div>Recibida</div>
+                    <div>Diferencia</div>
+                </div>
 
-            <div className="order-lines-header">
-                <div>Código</div>
-                <div>Recibida</div>
-                <div>Descripción</div>
-                <div>Diferencia</div>
+                <div className="lines-list">
+                    {filteredProducts.map((line) => (
+                        <OrderLineCard key={line.id} line={line} />
+                    ))}
+                </div>
             </div>
 
-            <div className="lines-list">
-                {filteredProducts.map((line) => (
-                    <OrderLineCard key={line.id} line={line} />
-                ))}
-            </div>
 
             <div className="filter-bar">
                 <div className="filter-bar-inner">
@@ -380,7 +572,75 @@ export default function OrdenCompra() {
                 </div>
             </div>
 
+            <ScanModal
+                open={isModalOpen}
+                title={selectedProduct ? "Producto encontrado" : "Producto no existe"}
+                onClose={closeModal}
+            >
+                {selectedProduct ? (
+                    <div className="modal-container">
+                        <div className={`modal-sku ${selectedProduct.received_qty === selectedProduct.ordered_qty
+                            ? "confirmed"
+                            : ""
+                            }`}>{selectedProduct.sku}</div>
 
+                        <div className="modal-description">{selectedProduct.description}</div>
+
+                        <div className="qty-row">
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={selectedProduct.received_qty}
+                                onChange={handleReceivedQtyChange}
+                                className="quantity-input"
+                            />
+
+                            <span className="qty-separator">|</span>
+
+                            <div className="ordered-qty">
+                                {selectedProduct.ordered_qty}
+                            </div>
+                        </div>
+                        {quantityError && (
+                            <div key={shakeKey} className={`quantity-error-alert ${quantityError ? "shake" : ""}`}>
+                                ⚠️ CANTIDAD MAYOR A LA ORDEN DE COMPRA
+                            </div>
+                        )}
+
+
+
+                        <div className="modal-footer">
+                            <button className="btn-close-green" onClick={closeModal}>
+                                Cerrar
+                            </button>
+                        </div>
+
+                    </div>
+                ) : (
+                    <div className="modal-container">
+                        <div className="modal-error">
+                            <svg fill="white" id="fi_2976286" enable-background="new 0 0 320.591 320.591" height="40" viewBox="0 0 320.591 320.591" width="40" xmlns="http://www.w3.org/2000/svg"><g><g id="close_1_"><path d="m30.391 318.583c-7.86.457-15.59-2.156-21.56-7.288-11.774-11.844-11.774-30.973 0-42.817l257.812-257.813c12.246-11.459 31.462-10.822 42.921 1.424 10.362 11.074 10.966 28.095 1.414 39.875l-259.331 259.331c-5.893 5.058-13.499 7.666-21.256 7.288z"></path><path d="m287.9 318.583c-7.966-.034-15.601-3.196-21.257-8.806l-257.813-257.814c-10.908-12.738-9.425-31.908 3.313-42.817 11.369-9.736 28.136-9.736 39.504 0l259.331 257.813c12.243 11.462 12.876 30.679 1.414 42.922-.456.487-.927.958-1.414 1.414-6.35 5.522-14.707 8.161-23.078 7.288z"></path></g></g></svg>
+                        </div>
+
+                        <div className="modal-description">
+                            <p>El producto no esta en la orden de compra.</p>
+                        </div>
+
+                        <div className="modal-error-action">
+                            Por favor, verifica el codigo ingresado.
+                        </div>
+
+                        <div className="modal-footer">
+                            <button className="btn-close-green" onClick={closeModal}>
+                                Cerrar
+                            </button>
+                        </div>
+
+                    </div>
+
+                )}
+            </ScanModal>
 
 
 

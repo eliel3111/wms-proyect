@@ -1,5 +1,131 @@
 import { db } from "../db.js";
 
+// Save received quantities in the data base
+
+
+export async function savingReception(req, res) {
+ 
+console.log("🚀 HIT /receiving/save");
+console.log("HEADERS:", req.headers);
+console.log("BODY:", req.body);
+
+  const client = await db.connect();
+
+  try {
+    const {
+      purchase_order_id,
+      purchase_order_number,
+      lines,
+    } = req.body;
+
+    /* ---------------- VALIDACIONES ---------------- */
+
+    if (!purchase_order_id || !purchase_order_number || !Array.isArray(lines)) {
+      return res.status(400).json({
+        success: false,
+        message: "Datos incompletos",
+      });
+    }
+
+    if (lines.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No hay líneas para actualizar",
+      });
+    }
+
+    for (const line of lines) {
+      if (
+        typeof line.id !== "number" ||
+        typeof line.received_qty !== "number" ||
+        line.received_qty < 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Formato inválido en líneas",
+        });
+      }
+    }
+
+    /* ---------------- INICIO TRANSACCIÓN ---------------- */
+
+    await client.query("BEGIN");
+
+    /* ---------------- VALIDAR ORDEN ---------------- */
+
+    const poResult = await client.query(
+      `
+      SELECT id, status
+      FROM purchase_orders
+      WHERE id = $1 AND purchase_order_number = $2
+      FOR UPDATE
+      `,
+      [purchase_order_id, purchase_order_number]
+    );
+
+    if (poResult.rowCount === 0) {
+      throw new Error("Orden de compra no encontrada");
+    }
+
+    /* ---------------- ACTUALIZAR STATUS ---------------- */
+    if (poResult.rows[0].status !== "partial") {
+      await client.query(
+        `
+      UPDATE purchase_orders
+      SET status = 'partial'
+      WHERE id = $1
+      `,
+        [purchase_order_id]
+      );
+    }
+    /* ---------------- UPDATE MASIVO DE LÍNEAS ---------------- */
+
+    /**
+     * Construimos arrays para un solo UPDATE usando UNNEST
+     */
+    const lineIds = lines.map(l => l.id);
+    const receivedQtys = lines.map(l => l.received_qty);
+
+    await client.query(
+      `
+      UPDATE purchase_order_lines pol
+      SET received_qty = data.received_qty
+      FROM (
+        SELECT
+          UNNEST($1::BIGINT[]) AS id,
+          UNNEST($2::NUMERIC[]) AS received_qty
+      ) AS data
+      WHERE pol.id = data.id
+        AND pol.purchase_order_id = $3
+      `,
+      [lineIds, receivedQtys, purchase_order_id]
+    );
+
+    /* ---------------- COMMIT ---------------- */
+
+    await client.query("COMMIT");
+
+    return res.json({
+      success: true,
+      message: "Recepción guardada correctamente",
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error("❌ Error confirmando recepción:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Error interno del servidor",
+    });
+  } finally {
+    client.release();
+  }
+}
+
+
+
 // Get all purchase order data using its id:
 
 export async function getReceivingByPoId(req, res) {
@@ -85,6 +211,8 @@ export async function getReceivingByPoId(req, res) {
         ? barcodeMap.get(line.sku) || []
         : []
     }));
+
+
 
     /* 6️⃣ Responder */
     return res.status(200).json({

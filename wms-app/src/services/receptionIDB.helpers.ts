@@ -47,3 +47,29 @@ export async function getReceptionByPOId(poId: number) {
     };
   });
 }
+
+export async function deleteReceptionByPOId(poId: number): Promise<void> {
+  const db = await openReceptionDB();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(RECEPCION_STORE, "readwrite");
+    const store = tx.objectStore(RECEPCION_STORE);
+
+    const request = store.delete(poId);
+
+    request.onsuccess = () => {
+      console.log(`🗑️ Reception ${poId} deleted from IndexedDB`);
+      resolve();
+    };
+
+    request.onerror = () => {
+      console.error("❌ Error deleting reception:", request.error);
+      reject(request.error);
+    };
+
+    tx.oncomplete = () => {
+      db.close(); // buena práctica
+    };
+  });
+}
+

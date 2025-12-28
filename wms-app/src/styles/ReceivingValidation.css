@@ -1,0 +1,11 @@
+.page-validation {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.page-validation-content {
+  width: 100%;
+  max-width: 900px;      /* controla el ancho en desktop */
+  padding: 0 16px;        /* espacio lateral en móvil */
+}

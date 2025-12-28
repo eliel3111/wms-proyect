@@ -1,12 +1,12 @@
 .order-lines-header {
     display: grid;
     grid-template-columns:
-        140px
+        150px
         /* Código */
-        120px
-        /* Cantidad recibida */
         1fr
         /* Descripción */
+        140px
+        /* Cantidad recibida */
         120px;
     /* Diferencia */
 
@@ -46,10 +46,10 @@
     grid-template-columns:
         140px
         /* SKU */
-        120px
-        /* qty */
         1fr
         /* descripción */
+        120px
+        /* qty */
         120px;
     /* diferencia */
     align-items: center;
@@ -132,10 +132,10 @@
         grid-template-columns:
             70px
             /* Código */
-            70px
-            /* Cantidad recibida */
             1fr
             /* Descripción */
+            70px
+            /* Cantidad recibida */
             80px;
         /* Diferencia */
     }
@@ -144,10 +144,10 @@
         grid-template-columns:
             70px
             /* SKU */
-            70px
-            /* qty */
             1fr
             /* descripción */
+            70px
+            /* qty */
             60px;
         /* diferencia */
     }

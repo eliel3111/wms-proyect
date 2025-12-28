@@ -6,6 +6,7 @@ import PrivateRoute from "./components/PrivateRoute.tsx";
 import Menu from "./pages/Menu.tsx";
 import ReceivingSearch from "./pages/ReceivingSearch.tsx";
 import OrdenCompra from "./pages/OrdenCompra.tsx";
+import ReceivingValidation from "./pages/ReceivingValidation.tsx";
 
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
           <Route path="/menu" element={<Menu />} />
           <Route path="/receiving" element={<ReceivingSearch />} />
           <Route path="/ordencompra/:id" element={<OrdenCompra />} />
+          <Route path="/validation/:id" element={<ReceivingValidation />} />
 
 
       </Route>

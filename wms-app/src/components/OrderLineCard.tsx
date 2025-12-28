@@ -16,7 +16,7 @@ type Props = {
 };
 
 export default function OrderLineCard({ line }: Props) {
-  const differenceQty = line.ordered_qty - line.received_qty;
+  const differenceQty = line.received_qty - line.ordered_qty;
 
   const statusClass =
     line.product_exists === false
@@ -28,11 +28,12 @@ export default function OrderLineCard({ line }: Props) {
   return (
     <div className={`order-line ${statusClass}`}>
         <div className="line-sku">{line.sku}</div>
+        <div className="line-desc">{line.description}</div>
         <div className="line-qty">
           {Math.trunc(line.received_qty)} / {Math.trunc(line.ordered_qty)}
         </div>
 
-      <div className="line-desc">{line.description}</div>
+      
 
 
         <div className="line-diff">

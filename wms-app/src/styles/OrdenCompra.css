@@ -11,6 +11,10 @@
   margin: 0 auto;      /* centra horizontalmente */
 }
 
+.order-container-table {
+  width: 100%;
+  box-sizing: border-box;
+}
 
 
 /* ===== CONTAINER ===== */
@@ -195,12 +199,15 @@
     border-radius: 8px;
     border: 1px solid rgba(0, 0, 0, 0.12);
     cursor: pointer;
+  background-color: #D3D3D3;   
 }
 
 .filter-bar button.active {
     border-color: rgba(59, 130, 246, .6);
     font-weight: 700;
     font-size: 16px;
+    color: #FFFFFF;
+    background-color: #1E88E5;
 }
 
 
@@ -261,6 +268,10 @@
 /* TÍTULO */
 .order-number-title {
   font-size: 14px;
+}
+
+.order-container-table {
+  padding: 0;
 }
 
 

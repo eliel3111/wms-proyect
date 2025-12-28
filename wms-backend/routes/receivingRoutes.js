@@ -1,5 +1,5 @@
 import express from "express";
-import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId} from "../controllers/receivingController.js"
+import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId, savingReception } from "../controllers/receivingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -13,6 +13,9 @@ router.post("/by-number", confirmingIdOrder);
 
 // Search all the data related to an purschase order.
 router.get("/:poId", getReceivingByPoId);
+
+// Save received quantity in the back end
+router.post("/save", savingReception);
 
 
 
