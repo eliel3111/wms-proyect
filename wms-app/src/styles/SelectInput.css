@@ -33,3 +33,10 @@
   font-weight: 400;
   text-align: left;
 }
+
+/* 📱 MOBILE */
+@media (max-width: 768px) {
+  .rs__control {
+    height: 58px;
+  }
+}

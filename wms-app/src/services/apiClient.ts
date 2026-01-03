@@ -44,7 +44,10 @@ apiClient.interceptors.request.use(
     console.log("REQ INTERCEPTOR → entrando…");
 
     if (store?.getToken) {
-      const token = store.getToken();   // ⬅️ YA NO HAY await
+      let token = store.getToken();   // ⬅️ YA NO HAY await
+      if (!token) {
+        token = localStorage.getItem("accessToken");
+      }
       console.log("REQ INTERCEPTOR → token obtenido:", token);
 
       if (token) {

@@ -3,9 +3,11 @@ import { useEffect, useState, useRef } from "react";
 import { getReceptionByPOId, saveReceptionIDB, deleteReceptionByPOId } from "../services/receptionIDB.helpers.ts";
 import apiClient from "../services/apiClient.ts";
 import "../styles/OrdenCompra.css"
-import OrderLineCard from "../components/OrderLineCard.tsx"
+import OrderLineCard from "../components/OrderLineCard.tsx";
 import ScanModal from "../components/ScanModal.tsx";
 import { useNavigate } from "react-router-dom";
+import { LoadingScreen } from "../components/LoadingScreen.tsx";
+
 
 
 
@@ -399,7 +401,7 @@ export default function OrdenCompra() {
 
     // FUNCTION TO SAVE RECEPTION TO BACK END
 
-    async function saveReceptionToBackend() {
+    async function saveReceptionToBackend(receptionStatus: string) {
         if (!purchaseOrderId) {
             console.error("❌ purchaseOrderId no existe");
             return;
@@ -409,6 +411,7 @@ export default function OrdenCompra() {
             const response = await apiClient.post("/receiving/save", {
                 purchase_order_id: purchaseOrderId,
                 purchase_order_number: poNumber,
+                reception_status: receptionStatus,
                 lines: products.map(p => ({
                     id: Number(p.id),
                     received_qty: Number(p.received_qty),
@@ -437,39 +440,10 @@ export default function OrdenCompra() {
 
 
 
-    //Function to call the back end to request the order data:
-    /*async function fetchPurchaseOrderById(poId: number) {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const response = await apiClient.get(`/receiving/${encodeURIComponent(poId)}`);
-
-            
-
-            const result = response.data;
-
-            if (!result.success) {
-                throw new Error(result.message || "Error cargando la orden de compra");
-            }
-
-            // Ajusta estos nombres según tu backend:
-            // result.data.purchase_order_number
-            // result.data.lines
-            const data = result.data;
-
-            setPoNumber(data.purchase_order_number);
-            setProducts(data.lines); // aquí guardas los lines en el state
-
-        } catch (err: any) {
-            setError(err.message || "Error desconocido");
-        } finally {
-            setLoading(false);
-        }
-    }*/
+    
 
     if (loading) {
-        return <div style={{ padding: 20 }}>Loading...</div>;
+        return <LoadingScreen />;
     }
 
 
@@ -502,7 +476,7 @@ export default function OrdenCompra() {
                 <div className="order-div-b">
                     {/* ⏸️ PAUSAR */}
                     <button onClick={async () => {
-                        await saveReceptionToBackend();
+                        await saveReceptionToBackend("paused");
                         navigate("/menu");
                     }} className="pill-btn pause-btn">
                         <span className="icon">
@@ -517,7 +491,7 @@ export default function OrdenCompra() {
 
                     {/* ✅ FINALIZAR */}
                     <button onClick={async () => {
-                        await saveReceptionToBackend();
+                        await saveReceptionToBackend("in_progress");
                         navigate(`/validation/${purchaseOrderId}`);
                     }} className="pill-btn finish-btn">
                         <span className="icon">
@@ -588,7 +562,7 @@ export default function OrdenCompra() {
 
                         <div className="qty-row">
                             <input
-                                type="text"
+                                type="number"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 value={selectedProduct.received_qty}
@@ -642,26 +616,6 @@ export default function OrdenCompra() {
                 )}
             </ScanModal>
 
-
-
-            {/*<h1>Orden de Compra</h1>
-            <p>ID: {id}</p>*/}
-
-            {/* Debug temporal 
-            <pre>
-                {JSON.stringify(
-                    {
-                        isModalOpen,
-                        isScannerMode,
-                        scanInput,
-                        selectedProduct,
-                        countQty,
-                        productsLength: products.length,
-                    },
-                    null,
-                    2
-                )}
-            </pre>*/}
         </div>
     );
 }

@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 
 
 // Tiempo de expiración
-const ACCESS_TOKEN_EXPIRES_IN = "10s";
+const ACCESS_TOKEN_EXPIRES_IN = "15m";
 const REFRESH_TOKEN_EXPIRES_IN_DAYS = 7;
 
 
@@ -52,13 +52,6 @@ export async function logoutUser(req, res) {
     return res.status(500).json({ message: "Server error" });
   }
 }
-
-
-
-
-
-
-
 
 
 
@@ -194,10 +187,6 @@ export async function login(req, res) {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 }
-
-
-
-
 
 /**
  * Register new user

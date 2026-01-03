@@ -7,6 +7,7 @@ import Menu from "./pages/Menu.tsx";
 import ReceivingSearch from "./pages/ReceivingSearch.tsx";
 import OrdenCompra from "./pages/OrdenCompra.tsx";
 import ReceivingValidation from "./pages/ReceivingValidation.tsx";
+import ReceivingFinal from "./pages/ReceivingFinal.tsx";
 
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
           <Route path="/receiving" element={<ReceivingSearch />} />
           <Route path="/ordencompra/:id" element={<OrdenCompra />} />
           <Route path="/validation/:id" element={<ReceivingValidation />} />
+          <Route path="/final/:id" element={<ReceivingFinal />} />
 
 
       </Route>

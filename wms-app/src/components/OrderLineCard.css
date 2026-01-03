@@ -29,7 +29,16 @@
     border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-
+.red-text {
+    color: #b91c1c;
+    font-size: 18px;
+    font-weight: 700;
+    border: 1px solid #b91c1c;
+    padding: 5px;
+    background-color: #ffecec;
+    border-radius: 4px;
+    text-align: center;
+}
 
 
 .lines-list {

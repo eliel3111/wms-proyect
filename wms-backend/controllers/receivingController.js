@@ -1,13 +1,152 @@
 import { db } from "../db.js";
 
+
+// Search all the reception information for reception
+export async function gettingReceptionLocation(req, res) {
+  console.log("ENTRÉ AL ENDPOINT /receiving/locations");
+  try {
+    // 1️⃣ Buscar ubicaciones RECEIVING activas
+    const locationsResult = await db.query(
+      `
+      SELECT id, code
+      FROM locations
+      WHERE location_type = 'RECEIVING'
+        AND is_active = true
+      ORDER BY code
+      `
+    );
+
+    // 2️⃣ Si no existe ninguna → ERROR CONTROLADO
+    if (locationsResult.rowCount === 0) {
+      return res.status(400).json({
+        success: false,
+        code: "UBICACION_NO_EXISTE",
+        message: "Ubicación de recepción no existe",
+      });
+    }
+
+    console.log("RESULTADO:", locationsResult.rows);
+
+
+    // 3️⃣ Respuesta OK
+    return res.json({
+      success: true,
+      data: locationsResult.rows,
+    });
+
+  } catch (error) {
+    console.error("Error buscando ubicaciones RECEIVING", error);
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Error interno del servidor",
+    });
+  }
+};
+
+
+// Get all purchase order lines with differences in an order
+export async function getReceivingDifferences(req, res) {
+  const { poId } = req.params;
+
+  if (!poId) {
+    return res.status(400).json({
+      success: false,
+      message: "PURCHASE_ORDER_ID_REQUIRED",
+    });
+  }
+
+  const purchaseOrderId = Number(poId);
+
+  if (isNaN(purchaseOrderId)) {
+    return res.status(400).json({
+      success: false,
+      message: "INVALID_PURCHASE_ORDER_ID",
+    });
+  }
+
+  try {
+    /* 1️⃣ Validar orden de compra */
+    const poResult = await db.query(
+      `
+            SELECT id, purchase_order_number, status
+            FROM purchase_orders
+            WHERE id = $1
+            LIMIT 1
+            `,
+      [purchaseOrderId]
+    );
+
+    if (poResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "PURCHASE_ORDER_NOT_FOUND",
+      });
+    }
+
+    const purchaseOrder = poResult.rows[0];
+
+    /* 2️⃣ Validar status = 'partial' */
+    if (purchaseOrder.status !== "partial") {
+      return res.status(409).json({
+        success: false,
+        message: "PURCHASE_ORDER_NOT_PARTIAL",
+      });
+    }
+
+    /* 3️⃣ Buscar líneas con diferencias */
+    const linesResult = await db.query(
+      `
+            SELECT
+                id,
+                sku,
+                description,
+                ordered_qty,
+                received_qty,
+                difference_qty,
+                product_exists
+            FROM purchase_order_lines
+            WHERE purchase_order_id = $1
+              AND ordered_qty <> received_qty
+            ORDER BY id ASC
+            `,
+      [purchaseOrderId]
+    );
+
+    /* 5️⃣ Enriquecer líneas */
+    const enrichedLines = linesResult.rows.map(line => ({
+      ...line,
+      barcodes: "NO-NEEDED"
+    }));
+
+    /* 4️⃣ Respuesta */
+    return res.status(200).json({
+      success: true,
+      data: {
+        purchase_order_id: purchaseOrder.id,
+        purchase_order_number: purchaseOrder.purchase_order_number,
+        lines: enrichedLines,
+      },
+    });
+
+  } catch (error) {
+    console.error("Error validating receiving:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "ERROR_VALIDATING_RECEIVING",
+    });
+  }
+}
+
+
+
 // Save received quantities in the data base
-
-
 export async function savingReception(req, res) {
- 
-console.log("🚀 HIT /receiving/save");
-console.log("HEADERS:", req.headers);
-console.log("BODY:", req.body);
+
+  console.log("🚀 HIT /receiving/save");
+  console.log("HEADERS:", req.headers);
+  console.log("BODY:", req.body);
 
   const client = await db.connect();
 
@@ -15,6 +154,7 @@ console.log("BODY:", req.body);
     const {
       purchase_order_id,
       purchase_order_number,
+      reception_status,
       lines,
     } = req.body;
 
@@ -26,6 +166,8 @@ console.log("BODY:", req.body);
         message: "Datos incompletos",
       });
     }
+
+    console.log(reception_status);
 
     if (lines.length === 0) {
       return res.status(400).json({
@@ -78,6 +220,20 @@ console.log("BODY:", req.body);
         [purchase_order_id]
       );
     }
+
+    if (reception_status === "paused") {
+      await db.query(
+        `
+        UPDATE receipts
+        SET status = 'paused'
+        WHERE purchase_order_id = $1
+          AND status = 'in_progress'
+        `,
+        [purchase_order_id]
+      );
+    }
+
+
     /* ---------------- UPDATE MASIVO DE LÍNEAS ---------------- */
 
     /**
@@ -122,27 +278,28 @@ console.log("BODY:", req.body);
   } finally {
     client.release();
   }
-}
-
+};
 
 
 // Get all purchase order data using its id:
-
 export async function getReceivingByPoId(req, res) {
   const { poId } = req.params;
+  const operatorId = req.user?.id; // asumiendo auth middleware
+  console.log(operatorId);
+  console.log(req.user);
 
   if (!poId) {
     return res.status(400).json({
       success: false,
       message: "PO_ID_REQUIRED",
     });
-  }
+  };
 
   try {
     /* 1️⃣ Buscar la orden de compra */
     const poResult = await db.query(
       `
-      SELECT id, purchase_order_number
+      SELECT id, purchase_order_number, status
       FROM purchase_orders
       WHERE id = $1
       LIMIT 1
@@ -158,6 +315,51 @@ export async function getReceivingByPoId(req, res) {
     }
 
     const purchaseOrder = poResult.rows[0];
+
+    /* ⛔ PO cancelada → no permitir recepción */
+    if (purchaseOrder.status === "cancelled") {
+      return res.status(409).json({
+        success: false,
+        message: "PURCHASE_ORDER_CANCELLED",
+      });
+    }
+
+    /* 2️⃣ Buscar recepción activa */
+    let receiptResult = await db.query(
+      `
+      SELECT id, status
+      FROM receipts
+      WHERE purchase_order_id = $1
+        AND status NOT IN ('completed', 'abandoned')
+      LIMIT 1
+      `,
+      [purchaseOrder.id]
+    );
+
+    let receiptId;
+
+    /* 3️⃣ Si NO existe recepción → crearla */
+    if (receiptResult.rowCount === 0) {
+      const createReceipt = await db.query(
+        `
+        INSERT INTO receipts (
+          purchase_order_id,
+          operator_id,
+          status,
+          started_at
+        )
+        VALUES ($1, $2, 'in_progress', NOW())
+        RETURNING id
+        `,
+        [purchaseOrder.id, operatorId]
+      );
+
+      receiptId = createReceipt.rows[0].id;
+    } else {
+      receiptId = receiptResult.rows[0].id;
+    }
+
+
 
     /* 2️⃣ Buscar las líneas */
     const linesResult = await db.query(
@@ -231,7 +433,7 @@ export async function getReceivingByPoId(req, res) {
       message: "ERROR_FETCHING_RECEIVING",
     });
   }
-}
+};
 
 
 // Confirm than especific id exist

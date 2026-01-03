@@ -1,8 +1,8 @@
 /* PAGE */
 .page {
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
-  background-color: #f4f0fa;
+  background-color: lightgray;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -12,7 +12,8 @@
 .container {
   width: 100%;
   max-width: 1000px;
-  padding: 24px;
+  
+
   display: flex;
   flex-direction: column;
   gap: 24px;

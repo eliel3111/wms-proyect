@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/ReceivingSearch.css";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { openReceptionDB } from "../services/indexeddb.ts";
 import TextInput from "../components/TextInput.tsx";
 import SelectInput from "../components/SelectInput.tsx";
 import apiClient from "../services/apiClient.ts";
 
 export default function ReceivingSearch() {
+
+
+  const poRef = useRef<HTMLDivElement>(null);
+  const invoiceInputRef = useRef<HTMLInputElement | null>(null);
+  const supplierInputRef = useRef<HTMLInputElement>(null);
+
+
   useEffect(() => {
     const initDB = async () => {
       try {
@@ -109,7 +116,23 @@ export default function ReceivingSearch() {
     }
   };
 
+  function handleInvoiceFocus() {
+    setTimeout(() => {
+      invoiceInputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",   // 👈 lo pone arriba
+      });
+    }, 300); // ⏱️ espera a que el teclado aparezca
+  }
 
+  function scrollToSupplierInput() {
+    setTimeout(() => {
+      supplierInputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 300);
+  }
 
 
 
@@ -120,7 +143,7 @@ export default function ReceivingSearch() {
       <div className="container">
         {/* TOP SECTION */}
         <div className="section top">
-          <div className="box div-a">
+          <div ref={poRef} className="box div-a">
             <SelectInput
               label="Orden de Compra"
               options={poOptions}
@@ -132,16 +155,24 @@ export default function ReceivingSearch() {
               placeholder="Seleccione una orden"
               required
               error={errors.po}
+              onFocus={() => {
+                poRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }}
             />
           </div>
           <div className="box div-b">
             <TextInput
+              ref={invoiceInputRef}
               label="No. de Factura"
               value={invoiceNo}
               onChange={setInvoiceNo}
-              //required
+              //required 
               error={errors.invoiceNo}
               placeholder="Ej: FAC-2025-001"
+              onFocus={handleInvoiceFocus}
             />
           </div>
         </div>
@@ -154,6 +185,8 @@ export default function ReceivingSearch() {
               value={supplier}
               onChange={setSupplier}
               placeholder="Nombre del proveedor"
+              ref={supplierInputRef}
+              onFocus={scrollToSupplierInput}
             />
           </div>
           <div className="box div-d">

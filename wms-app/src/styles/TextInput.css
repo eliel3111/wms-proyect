@@ -39,3 +39,11 @@
   font-size: 12px;
   color: #d93025;
 }
+
+
+/* 📱 MOBILE */
+@media (max-width: 768px) {
+  .input {
+  height: 52px;
+  }
+}

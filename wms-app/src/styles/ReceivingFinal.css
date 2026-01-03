@@ -1,0 +1,124 @@
+.page-receiving-final {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.page-receiving-final-content {
+    width: 100%;
+    max-width: 900px;
+    /* controla el ancho en desktop */
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 50px;
+}
+
+/* CARD PRINCIPAL */
+.barcode-card {
+    background-color: #ffffff;
+    border-radius: 20px;
+    padding: 24px 20px;
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+/* SVG */
+.barcode-svg {
+    display: flex;
+    justify-content: center;
+}
+
+/* INFO BARCODE */
+.barcode-info {
+
+    background-color: #FFECB3; /* light purple */
+    border-radius: 14px;
+    padding: 14px 16px;
+
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.barcode-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: #2e2e2e;
+}
+
+.barcode-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ef9401; /* morado elegante */
+}
+
+/* INPUT DE SCAN*/
+
+.scan-input-wrapper {
+    background-color: #ffffff;
+    border-radius: 20px;
+    padding: 24px 30px;
+
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.scan-input {
+  width: 100%;
+  padding: 20px 16px;
+    max-width: 250px;
+  /* Tipografía */
+  font-size: 16px;
+  font-weight: 500;
+    
+  /* Colores estilo Google */
+  color: #1f1f1f;
+  background-color: #e8f0fe;       /* azul claro Google */
+  border: 2px solid #1a73e8;       /* azul confirmación */
+  border-radius: 12px;
+
+  /* UX */
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Focus */
+.scan-input:focus {
+  border-color: #174ea6;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.25);
+}
+
+/* Placeholder */
+.scan-input::placeholder {
+  color: #5f6368;
+  font-weight: 400;
+}
+
+/* Deshabilitado */
+.scan-input:disabled {
+  background-color: #f1f3f4;
+  border-color: #dadce0;
+  color: #9aa0a6;
+}
+
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+
+    .page-receiving-final-content {
+        
+    }
+    .barcode-info {
+        text-align: center;
+    }
+
+}
