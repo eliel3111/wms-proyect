@@ -3,9 +3,12 @@ import { useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import "../styles/MainLayout.css";
-import { Outlet } from "react-router-dom"; 
+import { Outlet } from "react-router-dom";
+import ModalError from "../components/ModalError.tsx"
+
 
 export default function MainLayout() {
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   function openSidebar() {
@@ -18,7 +21,11 @@ export default function MainLayout() {
 
   return (
     <div className="layout-container">
-      <Header 
+
+      {/* 🔥 Modal global */}
+      <ModalError />
+
+      <Header
         logo="/logo.png"
         onMenuClick={openSidebar}
       />

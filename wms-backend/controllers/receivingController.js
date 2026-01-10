@@ -1,4 +1,445 @@
 import { db } from "../db.js";
+import { buildReceiptHtml } from "../templates/build-nota-recepcion.js";
+import { generatePdf } from "../templates/generate-nota-recepcion.js";
+import { randomUUID } from "crypto";
+import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
+import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
+
+export async function CloseReception(req, res) {
+  console.log("END END END END POINT POINT");
+  const { purchaseOrderId, receivingLocationId } = req.body;
+
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    //----------------------------
+
+    // 1️⃣ Verificar que la PO existe
+    const poResult = await client.query(
+      `
+      SELECT id
+      FROM purchase_orders
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [purchaseOrderId]
+    );
+
+    if (poResult.rowCount === 0) {
+      throw new Error("PO_NO_EXISTE");
+    }
+
+    //--------------------------------------
+
+    /* 2️⃣ Cerrar la orden de compra
+    await client.query(
+      `
+      UPDATE purchase_orders
+      SET status = 'closed'
+      WHERE id = $1
+      `,
+      [purchaseOrderId]
+    );*/
+    //-----------------------------------------------
+    // 3️⃣ Buscar la recepción activa de esa PO
+    const receiptResult = await client.query(
+      `
+      SELECT id, receipt_code
+      FROM receipts
+      WHERE purchase_order_id = $1
+        AND status NOT IN ('completed', 'abandoned')
+      FOR UPDATE
+      `,
+      [purchaseOrderId]
+    );
+
+    if (receiptResult.rowCount === 0) {
+      throw new Error("RECEIPT_NO_EXISTE");
+    }
+
+    const receiptId = receiptResult.rows[0].id;
+    const receipt_code = receiptResult.rows[0].receipt_code;
+    //-------------------------------------------------
+    // 4️⃣ Marcar la recepción como completed
+    await client.query(
+      `
+      UPDATE receipts
+      SET status = 'completed',
+          finished_at = NOW()
+      WHERE id = $1
+      `,
+      [receiptId]
+    );
+    //------------------------------------------------------
+    // 5️⃣ Obtener líneas de la orden de compra
+    const poLinesResult = await client.query(
+      `
+      SELECT
+        id,
+        sku,
+        ordered_qty,
+        received_qty
+      FROM purchase_order_lines
+      WHERE purchase_order_id = $1
+      `,
+      [purchaseOrderId]
+    );
+
+    if (poLinesResult.rowCount === 0) {
+      throw new Error("PO_LINES_NO_EXISTE");
+    }
+
+    const lines = poLinesResult.rows;
+    const skus = lines.map(l => l.sku);
+    console.log(lines);
+    //-----------------------------------------------------
+    // BUSCAR LA DESCRIPCION DE LOS PRODUCTOS DE LA ORDEN
+    const productsResult = await client.query(
+      `
+  SELECT sku, description
+  FROM products
+  WHERE sku = ANY($1)
+  `,
+      [skus]
+    );
+    const productMap = {};
+    for (const p of productsResult.rows) {
+      productMap[p.sku] = p.description;
+    }
+
+    //------------------------------------------------
+    // 1️⃣ Traer encabezado completo
+    const headerResult = await client.query(
+      `
+  SELECT
+  r.id AS receipt_id,
+  r.receipt_code,
+  r.started_at,
+  r.finished_at,
+  r.invoice,
+  r.status,
+
+  po.id AS purchase_order_id,
+  po.purchase_order_number,
+  po.supplier_name,
+
+  u.id AS user_id,
+  u.full_name AS user_name,
+
+  c.slug AS company_slug,
+  c.receipt_email AS company_receipt_email
+
+FROM receipts r
+
+JOIN purchase_orders po 
+  ON po.id = r.purchase_order_id
+
+JOIN users u 
+  ON u.id = r.operator_id
+
+JOIN companies c 
+  ON c.id = 1
+
+WHERE r.id = $1;
+
+  `,
+      [receiptId]
+    );
+
+    // 2️⃣ Validar existencia
+    if (headerResult.rowCount === 0) {
+      throw new Error("RECEIPT_HEADER_NOT_FOUND");
+    }
+
+    const header = headerResult.rows[0];
+    console.log(header);
+    // 3️⃣ Validaciones mínimas
+    if (!header.receipt_code) throw new Error("RECEIPT_CODE_MISSING");
+    if (!header.purchase_order_number) throw new Error("PO_NUMBER_MISSING");
+    if (!header.user_name) throw new Error("USER_NAME_MISSING");
+    //---------------------------------------------------
+    // 4️⃣ Preparar objeto limpio para PDF
+    const headerPDF = {
+      receiptId: header.receipt_id,
+      receiptCode: header.receipt_code,
+      startedAt: header.started_at,
+      finishedAt: header.finished_at,
+      invoice: header.invoice,
+      status: header.status,
+
+      purchaseOrderId: header.purchase_order_id,
+      poNumber: header.purchase_order_number,
+      supplierName: header.supplier_name,
+
+      userId: header.user_id,
+      userName: header.user_name,
+      company_receipt_email: header.user_email,
+      company_slug: header.company_slug,
+    };
+
+    console.log("📄 HEADER PDF:", headerPDF);
+    console.log("📄 HEADER PDF:", headerPDF);
+    //---------------------------------------------------
+    // 6️⃣ Insertar líneas en receipt_lines
+    for (const line of poLinesResult.rows) {
+      await client.query(
+        `
+        INSERT INTO receipt_lines
+        (
+          receipt_id,
+          purchase_order_line_id,
+          sku,
+          ordered_qty,
+          received_qty
+        )
+        VALUES
+        ($1, $2, $3, $4, $5)
+        `,
+        [
+          receiptId,
+          line.id,
+          line.sku,
+          line.ordered_qty,
+          line.received_qty,
+        ]
+      );
+    }
+    //---------------------------------------------------
+    await client.query("COMMIT");
+    // AGREGAR TODAS LAS DESCRIPCIONES PARA LAS LINES PDF
+    const enrichedLines = lines.map((line, index) => {
+      const difference_qty = line.received_qty - line.ordered_qty;
+
+      return {
+        line_no: index + 1,                // 🔢 1,2,3...
+        sku: line.sku,
+        description: productMap[line.sku] || "SIN DESCRIPCIÓN",
+        ordered_qty: line.ordered_qty,
+        received_qty: line.received_qty,
+        difference_qty,                    // ➖ calculado
+      };
+    });
+
+    console.log("LINES FINAL", enrichedLines);
+    //--------------------------------------------------
+    // CREAR EL PDF CON LA INFORMACION
+
+    const html = buildReceiptHtml(headerPDF, enrichedLines);
+    const pdf = await generatePdf(html);
+
+    //--------------------------------------------------
+    //GENERAR NOMBRE DEL FILE:
+    const tenantSlug = header.company_slug;
+    // headerPDF.receiptId
+    const year = new Date().getFullYear();  // 2026
+    const uuid = randomUUID();
+
+    // 📄 nombre del archivo
+    const fileName = `receipt_${year}_${receiptId}_${uuid}.pdf`;
+
+    // 🗂 ruta en S3 (multi-tenant)
+    const s3Key = `${tenantSlug}/receipts/${fileName}`;
+
+    // ☁️ subir a S3
+    await uploadPdfToS3({
+      buffer: pdf,
+      key: s3Key,
+    });
+
+    console.log("✅ PDF subido a S3:", s3Key);
+
+
+    // Guardar en la base de datos el s3Key
+    await client.query(
+      `
+      UPDATE receipts
+      SET pdf_s3_key = $1
+      WHERE id = $2
+      `,
+      [s3Key, headerPDF.receiptId]
+    );
+    //----------------------------------------------------
+    //BUSCAR LA INFORMACION DE LA UBICACION
+
+    const locationResult = await db.query(
+      `
+      SELECT id, warehouse_id, code, location_type
+      FROM locations
+      WHERE id = $1
+        AND is_active = true
+      LIMIT 1
+      `,
+      [receivingLocationId]
+    );
+
+    if (locationResult.rowCount === 0) {
+      throw new Error("RECEIVING_LOCATION_NOT_FOUND");
+    }
+
+    const receivingLocation = locationResult.rows[0];
+
+    const locationId = receivingLocation.id;
+    const warehouseId = receivingLocation.warehouse_id;
+
+    console.log("📍 Location ID:", locationId);
+    console.log("🏬 Warehouse ID:", warehouseId);
+
+    // 🔹 Solo líneas con cantidad > 0
+    const stockLines = enrichedLines.filter(l => Number(l.received_qty) > 0);
+
+    if (stockLines.length > 0) {
+
+      const values = [];
+      const params = [];
+
+      stockLines.forEach((line, i) => {
+        const base = i * 4; // 👈 ahora son 4 columnas
+
+        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+
+        params.push(
+          warehouseId,          // ✅ warehouse_id
+          locationId,           // ✅ location_id
+          line.sku,             // product_sku
+          line.received_qty     // qty
+        );
+      });
+
+      const upsertInventorySQL = `
+    INSERT INTO inventory_by_location
+      (warehouse_id, location_id, product_sku, qty_on_hand)
+    VALUES
+      ${values.join(",")}
+    ON CONFLICT (warehouse_id, location_id, product_sku)
+    DO UPDATE SET
+      qty_on_hand = inventory_by_location.qty_on_hand
+                  + EXCLUDED.qty_on_hand
+  `;
+
+      await db.query(upsertInventorySQL, params);
+    }
+
+
+    //------------------------------------------------
+// REGISTRAR MOVIMIENTOS DE INVENTARIO (HISTORIAL)
+
+if (stockLines.length > 0) {
+
+  const moveValues = [];
+  const moveParams = [];
+
+  stockLines.forEach((line, i) => {
+    const base = i * 7;
+
+    moveValues.push(`
+      ($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4},
+       $${base + 5}, $${base + 6}, $${base + 7})
+    `);
+
+    moveParams.push(
+      line.sku,              // ✅ product_sku
+      null,                  // from_location_id (entra al almacén)
+      locationId,            // to_location_id
+      line.received_qty,     // qty
+      "RECEIPT",             // movement_type
+      "RECEPTION",           // reference_type
+      receiptId.toString()   // reference_id
+    );
+  });
+
+  const insertMovementsSQL = `
+    INSERT INTO inventory_movements
+    (
+      product_sku,
+      from_location_id,
+      to_location_id,
+      qty,
+      movement_type,
+      reference_type,
+      reference_id
+    )
+    VALUES
+    ${moveValues.join(",")}
+  `;
+
+  await db.query(insertMovementsSQL, moveParams);
+}
+
+
+
+
+    //------------------------------------------------
+    //MANDAR PDF POR CORREO
+
+    // después de generar el PDF
+    await sendReceiptEmail({
+      to: header.company_receipt_email,
+      pdfBuffer: pdf,
+      receiptCode: header.receipt_code,
+      companyName: header.company_slug,
+    });
+
+
+    console.log("PDF size:", pdf.length);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "inline; filename=receipt.pdf");
+    res.end(pdf);
+
+
+    /*return res.json({
+      success: true,
+      receiptId,
+    });*/
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error("Error cerrando recepción:", error.message);
+
+    return res.status(400).json({
+      success: false,
+      code: error.message,
+      message: "Error cerrando la recepción",
+    });
+
+  } finally {
+    client.release();
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // Search all the reception information for reception
@@ -337,24 +778,36 @@ export async function getReceivingByPoId(req, res) {
     );
 
     let receiptId;
+    const seqResult = await db.query(
+      `SELECT nextval('receipt_code_seq') AS seq`
+    );
+
+    const nextNumber = seqResult.rows[0].seq;
+    const yearReceipt = new Date().getFullYear();
+
+    const receiptCodeGenerated = `${yearReceipt}-${nextNumber}`;
+    console.log("NEXTNUMBER", nextNumber);
+    console.log("YEAR", yearReceipt);
 
     /* 3️⃣ Si NO existe recepción → crearla */
     if (receiptResult.rowCount === 0) {
       const createReceipt = await db.query(
         `
         INSERT INTO receipts (
+          receipt_code,
           purchase_order_id,
           operator_id,
           status,
           started_at
         )
-        VALUES ($1, $2, 'in_progress', NOW())
+        VALUES ($1, $2, $3, 'in_progress', NOW())
         RETURNING id
         `,
-        [purchaseOrder.id, operatorId]
+        [receiptCodeGenerated, purchaseOrder.id, operatorId]
       );
 
       receiptId = createReceipt.rows[0].id;
+
     } else {
       receiptId = receiptResult.rows[0].id;
     }
@@ -436,10 +889,31 @@ export async function getReceivingByPoId(req, res) {
 };
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Confirm than especific id exist
 export async function confirmingIdOrder(req, res) {
   const { poNumber, invoiceNo, supplier } = req.body;
-  // 1️⃣ Validación mínima
+  const userId = req.user.id;
+  let purchaseOrderId;
+
+  console.log("ALERTA ALERTA", poNumber);
+
   if (!poNumber) {
     return res.status(400).json({
       success: false,
@@ -448,19 +922,16 @@ export async function confirmingIdOrder(req, res) {
   }
 
   try {
-    // 2️⃣ Construcción dinámica del UPDATE
     const fields = [];
     const values = [];
     let idx = 1;
 
-    // supplier (opcional)
     if (supplier) {
       fields.push(`supplier_name = TRIM(UPPER($${idx}))`);
       values.push(supplier);
       idx++;
     }
 
-    // invoiceNo (opcional)
     if (invoiceNo) {
       fields.push(`
         invoice_numbers =
@@ -476,10 +947,10 @@ export async function confirmingIdOrder(req, res) {
     if (fields.length === 0) {
       const selectResult = await db.query(
         `
-    SELECT id, purchase_order_number
-    FROM purchase_orders
-    WHERE purchase_order_number = TRIM($1)
-    `,
+        SELECT id, purchase_order_number, supplier_name
+        FROM purchase_orders
+        WHERE purchase_order_number = TRIM($1)
+        `,
         [poNumber]
       );
 
@@ -490,13 +961,14 @@ export async function confirmingIdOrder(req, res) {
         });
       }
 
+      purchaseOrderId = selectResult.rows[0].id;
+
       return res.status(200).json({
         success: true,
         data: selectResult.rows[0],
       });
     }
 
-    // 3️⃣ Query final
     const query = `
       UPDATE purchase_orders
       SET ${fields.join(", ")}
@@ -508,7 +980,6 @@ export async function confirmingIdOrder(req, res) {
 
     const result = await db.query(query, values);
 
-    // PO no encontrada
     if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
@@ -516,10 +987,73 @@ export async function confirmingIdOrder(req, res) {
       });
     }
 
+    purchaseOrderId = result.rows[0].id;
+
+    /* 🔎 Buscar recepción activa */
+    let receiptResult = await db.query(
+      `
+      SELECT id, status
+      FROM receipts
+      WHERE purchase_order_id = $1
+        AND status NOT IN ('completed', 'abandoned')
+      LIMIT 1
+      `,
+      [purchaseOrderId]
+    );
+
+    let receiptId;
+
+    /* ✅ SI NO EXISTE → CREARLA CON SEQUENCE */
+    if (receiptResult.rowCount === 0) {
+
+      // 👉 AQUÍ ESTABA EL PROBLEMA (se arregla aquí)
+      const seqResult = await db.query(
+        `SELECT nextval('receipt_code_seq') AS seq`
+      );
+
+      const nextNumber = seqResult.rows[0].seq;
+      const year = new Date().getFullYear();
+      const receiptCode = `${year}-${nextNumber}`;
+
+      const createReceipt = await db.query(
+        `
+        INSERT INTO receipts (
+          receipt_code,
+          purchase_order_id,
+          operator_id,
+          status,
+          started_at,
+          invoice
+        )
+        VALUES ($1, $2, $3, 'in_progress', NOW(), $4)
+        RETURNING id
+        `,
+        [receiptCode, purchaseOrderId, userId, invoiceNo]
+      );
+
+      receiptId = createReceipt.rows[0].id;
+
+    } else {
+
+      receiptId = receiptResult.rows[0].id;
+
+      if (invoiceNo) {
+        await db.query(
+          `
+          UPDATE receipts
+          SET invoice = $1
+          WHERE id = $2
+          `,
+          [invoiceNo, receiptId]
+        );
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: result.rows[0],
     });
+
   } catch (error) {
     console.error("Error confirming order:", error);
     return res.status(500).json({
@@ -527,7 +1061,8 @@ export async function confirmingIdOrder(req, res) {
       message: "ERROR_CONFIRMING_ORDER",
     });
   }
-};
+}
+
 
 
 

@@ -2,6 +2,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import "../styles/ReceivingFinal.css"
 import apiClient from "../services/apiClient";
+import { useModal } from "../context/ModalContext";
+import { LoadingScreen } from "../components/LoadingScreen.tsx";
 
 
 type ReceivingLocation = {
@@ -9,13 +11,20 @@ type ReceivingLocation = {
     code: string;
 };
 
+type CloseReceivingPayload = {
+    purchaseOrderId: number;
+    receivingLocationId: string;
+};
+
 export default function ReceivingFinal() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement>(null);
-
+    const [loading, setLoading] = useState(true);
     const [locations, setLocations] = useState<ReceivingLocation[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const { openModal } = useModal();
+
 
     // Dar Focus al input de la paguina
     useEffect(() => {
@@ -49,6 +58,9 @@ export default function ReceivingFinal() {
                 // Error de red o 500
                 setError("Error consultando ubicaciones de recepción");
                 console.error(err);
+            } finally {
+                setLoading(false);
+                focusScannerInput();
             }
         };
 
@@ -56,31 +68,57 @@ export default function ReceivingFinal() {
     }, []);
 
     //FUNCTION: To verify the location code scanned exists.
-    function handleScanKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-  if (e.key !== "Enter") return;
+    async function handleScanKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        if (e.key !== "Enter") return;
 
-  const scannedCode = e.currentTarget.value.trim();
+        const scannedCode = e.currentTarget.value.trim();
 
-  if (!scannedCode) return;
+        if (!scannedCode) return;
 
-  console.log("📟 Código leído:", scannedCode);
+        console.log("📟 Código leído:", scannedCode);
 
-  // 🔍 Buscar en locations
-  const locationFound = locations.find(
-    (loc) => loc.code === scannedCode
-  );
+        // 🔍 Buscar en locations
+        const locationFound = locations.find(
+            (loc) => loc.code === scannedCode
+        );
 
-  if (locationFound) {
-    alert(`✅ Ubicación encontrada: ${locationFound.code}`);
-  } else {
-    alert("❌ Ubicación NO existe");
-  }
+        if (locationFound) {
+            setLoading(true);
+            const result = await closeReceiving({
+                purchaseOrderId: Number(id),
+                receivingLocationId: locationFound.code,
+            });
+            setLoading(false);
+        } else {
 
-  // 🧹 limpiar input para el próximo scan
-  e.currentTarget.value = "";
-}
+            openModal({
+                title: "Ubicación inválida",
+                message: "El código escaneado NO es una ubicacion valida",
+                onCloseCallback: focusScannerInput, // 👈 AQUÍ
+            });
 
+        }
 
+        // 🧹 limpiar input para el próximo scan
+        e.currentTarget.value = "";
+        
+    }
+
+    // FUNCTION: To save reception
+    async function closeReceiving(payload: CloseReceivingPayload) {
+        const response = await apiClient.post("/receiving/close", payload);
+        return response.data;
+    }
+
+    function focusScannerInput() {
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 50); // ⏱️ pequeño delay para mobile
+    }
+
+    if (loading) {
+        return <LoadingScreen />;
+    }
 
     return (
         <div className="page-receiving-final">

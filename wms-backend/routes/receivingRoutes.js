@@ -1,9 +1,14 @@
 import express from "express";
-import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId, savingReception, getReceivingDifferences, gettingReceptionLocation } from "../controllers/receivingController.js"
+import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId, savingReception, getReceivingDifferences, gettingReceptionLocation, CloseReception } from "../controllers/receivingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { log } from "console";
 
 
 const router = express.Router();
+
+// Close a reception process
+router.post("/close", CloseReception);
+
 
 // Search ALL open or patial purchase orders
 router.get("/open", authMiddleware, gettingOpenOrders);

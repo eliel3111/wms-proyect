@@ -8,11 +8,13 @@ import ReceivingSearch from "./pages/ReceivingSearch.tsx";
 import OrdenCompra from "./pages/OrdenCompra.tsx";
 import ReceivingValidation from "./pages/ReceivingValidation.tsx";
 import ReceivingFinal from "./pages/ReceivingFinal.tsx";
+import { ModalProvider } from "./context/ModalContext";
+
 
 
 function App() {
   return (
-     <>
+    <>
 
       {/* RUTAS */}
       <Routes>
@@ -20,13 +22,15 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
 
         {/* Ruta protegida */}
-        <Route 
-        element={
-          <PrivateRoute>
-            <MainLayout />
-          </PrivateRoute>
-        }
-      >
+        <Route
+          element={
+            <PrivateRoute>
+              <ModalProvider>
+                <MainLayout />
+              </ModalProvider>
+            </PrivateRoute>
+          }
+        >
           <Route path="/menu" element={<Menu />} />
           <Route path="/receiving" element={<ReceivingSearch />} />
           <Route path="/ordencompra/:id" element={<OrdenCompra />} />
@@ -34,9 +38,9 @@ function App() {
           <Route path="/final/:id" element={<ReceivingFinal />} />
 
 
-      </Route>
+        </Route>
 
-        
+
       </Routes>
     </>
   );
