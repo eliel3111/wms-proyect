@@ -1,0 +1,58 @@
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.confirm-container {
+  text-align: center;
+  animation: fadeInScale 0.3s ease-out;
+  padding: 24px;
+}
+
+.confirm-icon {
+  margin-bottom: 24px;
+}
+
+.confirm-icon circle {
+  stroke: #22c55e;
+  stroke-width: 2;
+  fill: none;
+}
+
+.confirm-icon path {
+  stroke: #22c55e;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.confirm-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #0f172a;
+}
+
+.confirm-message {
+  font-size: 18px;
+  color: #475569;
+  margin: 0;
+}
+
+/* 🎬 Animación */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

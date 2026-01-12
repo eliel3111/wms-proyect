@@ -1,0 +1,18 @@
+.page-putaway {
+  padding: 16px;
+  text-align: center;
+}
+
+.page-putaway h1,
+.page-putaway h2 {
+  margin-bottom: 8px;
+}
+
+.scan-input {
+  margin-top: 20px;
+  width: 100%;
+  padding: 16px;
+  font-size: 18px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}

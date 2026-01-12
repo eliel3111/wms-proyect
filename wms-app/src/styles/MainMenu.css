@@ -1,19 +1,37 @@
-
 .menu-page {
-    margin-left: 100px;
-    margin-right: 100px;
+  width: 100%;
+  padding: 12px;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .menu-tittle {
-    text-align: center;
+  text-align: center;
+  margin-bottom: 12px;
 }
 
+.menu-image-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 15px;
+}
+
+.menu-image {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+}
+
+/* GRID */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr); /* 📱 móvil */
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
+  padding: 4px;
   justify-items: center;
+  box-sizing: border-box;
 }
 
 /* 📲 Tablet */
@@ -25,7 +43,13 @@
 
 /* 🖥️ Desktop */
 @media (min-width: 1024px) {
+  .menu-page {
+    padding-left: 100px;
+    padding-right: 100px;
+  }
+
   .menu-grid {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+ 

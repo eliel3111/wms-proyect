@@ -8,7 +8,8 @@ import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 export async function CloseReception(req, res) {
   console.log("END END END END POINT POINT");
   const { purchaseOrderId, receivingLocationId } = req.body;
-
+  console.log("ID DE LA ORDEN DE COMPRA: ", purchaseOrderId);
+  console.log("ID LA UBICACION: ", receivingLocationId);
   const client = await db.connect();
 
   try {
@@ -61,17 +62,7 @@ export async function CloseReception(req, res) {
 
     const receiptId = receiptResult.rows[0].id;
     const receipt_code = receiptResult.rows[0].receipt_code;
-    //-------------------------------------------------
-    // 4️⃣ Marcar la recepción como completed
-    await client.query(
-      `
-      UPDATE receipts
-      SET status = 'completed',
-          finished_at = NOW()
-      WHERE id = $1
-      `,
-      [receiptId]
-    );
+
     //------------------------------------------------------
     // 5️⃣ Obtener líneas de la orden de compra
     const poLinesResult = await client.query(
@@ -98,10 +89,10 @@ export async function CloseReception(req, res) {
     // BUSCAR LA DESCRIPCION DE LOS PRODUCTOS DE LA ORDEN
     const productsResult = await client.query(
       `
-  SELECT sku, description
-  FROM products
-  WHERE sku = ANY($1)
-  `,
+      SELECT sku, description
+      FROM products
+      WHERE sku = ANY($1)
+      `,
       [skus]
     );
     const productMap = {};
@@ -159,6 +150,54 @@ WHERE r.id = $1;
     if (!header.receipt_code) throw new Error("RECEIPT_CODE_MISSING");
     if (!header.purchase_order_number) throw new Error("PO_NUMBER_MISSING");
     if (!header.user_name) throw new Error("USER_NAME_MISSING");
+
+    //----------------------------------------------------
+    //BUSCAR LA INFORMACION DE LA UBICACION
+
+    const locationResult = await client.query(
+      `
+      SELECT id, warehouse_id, code, location_type
+      FROM locations
+      WHERE id = $1
+        AND is_active = true
+      LIMIT 1
+      `,
+      [receivingLocationId]
+    );
+
+    if (locationResult.rowCount === 0) {
+      throw new Error("RECEIVING_LOCATION_NOT_FOUND");
+    }
+
+    const receivingLocation = locationResult.rows[0];
+
+    const locationId = receivingLocation.id;
+    const warehouseId = receivingLocation.warehouse_id;
+
+    console.log("📍 Location ID:", locationId);
+    console.log("🏬 Warehouse ID:", warehouseId);
+
+    // AGREGAR TODAS LAS DESCRIPCIONES PARA LAS LINES PDF
+    const enrichedLines = lines.map((line, index) => {
+      const difference_qty = line.received_qty - line.ordered_qty;
+
+      return {
+        line_no: index + 1,                // 🔢 1,2,3...
+        sku: line.sku,
+        description: productMap[line.sku] || "SIN DESCRIPCIÓN",
+        ordered_qty: line.ordered_qty,
+        received_qty: line.received_qty,
+        difference_qty,                    // ➖ calculado
+      };
+    });
+
+    console.log("LINES FINAL", enrichedLines);
+
+    //CREAR STOCKLINES
+
+    // 🔹 Solo líneas con cantidad > 0
+    const stockLines = enrichedLines.filter(l => Number(l.received_qty) > 0);
+
     //---------------------------------------------------
     // 4️⃣ Preparar objeto limpio para PDF
     const headerPDF = {
@@ -175,12 +214,24 @@ WHERE r.id = $1;
 
       userId: header.user_id,
       userName: header.user_name,
-      company_receipt_email: header.user_email,
+      company_receipt_email: header.company_receipt_email,
       company_slug: header.company_slug,
     };
 
     console.log("📄 HEADER PDF:", headerPDF);
     console.log("📄 HEADER PDF:", headerPDF);
+
+    //-------------------------------------------------
+    // 4️⃣ Marcar la recepción como completed
+    await client.query(
+      `
+      UPDATE receipts
+      SET status = 'completed',
+          finished_at = NOW()
+      WHERE id = $1
+      `,
+      [receiptId]
+    );
     //---------------------------------------------------
     // 6️⃣ Insertar líneas en receipt_lines
     for (const line of poLinesResult.rows) {
@@ -206,23 +257,92 @@ WHERE r.id = $1;
         ]
       );
     }
+
+    //----------------------------------------------------
+    //PONER LA CANTIDAD POR UBICACION POR CADA PRODUCTO
+    if (stockLines.length > 0) {
+
+      const values = [];
+      const params = [];
+
+      stockLines.forEach((line, i) => {
+        const base = i * 4; // 👈 ahora son 4 columnas
+
+        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+
+        params.push(
+          warehouseId,          // ✅ warehouse_id
+          locationId,           // ✅ location_id
+          line.sku,             // product_sku
+          line.received_qty     // qty
+        );
+      });
+
+      const upsertInventorySQL = `
+    INSERT INTO inventory_by_location
+      (warehouse_id, location_id, product_sku, qty_on_hand)
+    VALUES
+      ${values.join(",")}
+    ON CONFLICT (warehouse_id, location_id, product_sku)
+    DO UPDATE SET
+      qty_on_hand = inventory_by_location.qty_on_hand
+                  + EXCLUDED.qty_on_hand
+  `;
+
+      await client.query(upsertInventorySQL, params);
+    }
+
+
+    //------------------------------------------------
+    // REGISTRAR MOVIMIENTOS DE INVENTARIO (HISTORIAL)
+
+    if (stockLines.length > 0) {
+
+      const moveValues = [];
+      const moveParams = [];
+
+      stockLines.forEach((line, i) => {
+        const base = i * 7;
+
+        moveValues.push(`
+      ($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4},
+       $${base + 5}, $${base + 6}, $${base + 7})
+    `);
+
+        moveParams.push(
+          line.sku,              // ✅ product_sku
+          null,                  // from_location_id (entra al almacén)
+          locationId,            // to_location_id
+          line.received_qty,     // qty
+          "RECEIPT",             // movement_type
+          "RECEPTION",           // reference_type
+          receiptId.toString()   // reference_id
+        );
+      });
+
+      const insertMovementsSQL = `
+        INSERT INTO inventory_movements
+        (
+          product_sku,
+          from_location_id,
+          to_location_id,
+          qty,
+          movement_type,
+          reference_type,
+          reference_id
+        )
+        VALUES
+        ${moveValues.join(",")}
+      `;
+
+      await client.query(insertMovementsSQL, moveParams);
+    }
+
+
+
     //---------------------------------------------------
     await client.query("COMMIT");
-    // AGREGAR TODAS LAS DESCRIPCIONES PARA LAS LINES PDF
-    const enrichedLines = lines.map((line, index) => {
-      const difference_qty = line.received_qty - line.ordered_qty;
 
-      return {
-        line_no: index + 1,                // 🔢 1,2,3...
-        sku: line.sku,
-        description: productMap[line.sku] || "SIN DESCRIPCIÓN",
-        ordered_qty: line.ordered_qty,
-        received_qty: line.received_qty,
-        difference_qty,                    // ➖ calculado
-      };
-    });
-
-    console.log("LINES FINAL", enrichedLines);
     //--------------------------------------------------
     // CREAR EL PDF CON LA INFORMACION
 
@@ -260,115 +380,6 @@ WHERE r.id = $1;
       `,
       [s3Key, headerPDF.receiptId]
     );
-    //----------------------------------------------------
-    //BUSCAR LA INFORMACION DE LA UBICACION
-
-    const locationResult = await db.query(
-      `
-      SELECT id, warehouse_id, code, location_type
-      FROM locations
-      WHERE id = $1
-        AND is_active = true
-      LIMIT 1
-      `,
-      [receivingLocationId]
-    );
-
-    if (locationResult.rowCount === 0) {
-      throw new Error("RECEIVING_LOCATION_NOT_FOUND");
-    }
-
-    const receivingLocation = locationResult.rows[0];
-
-    const locationId = receivingLocation.id;
-    const warehouseId = receivingLocation.warehouse_id;
-
-    console.log("📍 Location ID:", locationId);
-    console.log("🏬 Warehouse ID:", warehouseId);
-
-    // 🔹 Solo líneas con cantidad > 0
-    const stockLines = enrichedLines.filter(l => Number(l.received_qty) > 0);
-
-    if (stockLines.length > 0) {
-
-      const values = [];
-      const params = [];
-
-      stockLines.forEach((line, i) => {
-        const base = i * 4; // 👈 ahora son 4 columnas
-
-        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
-
-        params.push(
-          warehouseId,          // ✅ warehouse_id
-          locationId,           // ✅ location_id
-          line.sku,             // product_sku
-          line.received_qty     // qty
-        );
-      });
-
-      const upsertInventorySQL = `
-    INSERT INTO inventory_by_location
-      (warehouse_id, location_id, product_sku, qty_on_hand)
-    VALUES
-      ${values.join(",")}
-    ON CONFLICT (warehouse_id, location_id, product_sku)
-    DO UPDATE SET
-      qty_on_hand = inventory_by_location.qty_on_hand
-                  + EXCLUDED.qty_on_hand
-  `;
-
-      await db.query(upsertInventorySQL, params);
-    }
-
-
-    //------------------------------------------------
-// REGISTRAR MOVIMIENTOS DE INVENTARIO (HISTORIAL)
-
-if (stockLines.length > 0) {
-
-  const moveValues = [];
-  const moveParams = [];
-
-  stockLines.forEach((line, i) => {
-    const base = i * 7;
-
-    moveValues.push(`
-      ($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4},
-       $${base + 5}, $${base + 6}, $${base + 7})
-    `);
-
-    moveParams.push(
-      line.sku,              // ✅ product_sku
-      null,                  // from_location_id (entra al almacén)
-      locationId,            // to_location_id
-      line.received_qty,     // qty
-      "RECEIPT",             // movement_type
-      "RECEPTION",           // reference_type
-      receiptId.toString()   // reference_id
-    );
-  });
-
-  const insertMovementsSQL = `
-    INSERT INTO inventory_movements
-    (
-      product_sku,
-      from_location_id,
-      to_location_id,
-      qty,
-      movement_type,
-      reference_type,
-      reference_id
-    )
-    VALUES
-    ${moveValues.join(",")}
-  `;
-
-  await db.query(insertMovementsSQL, moveParams);
-}
-
-
-
 
     //------------------------------------------------
     //MANDAR PDF POR CORREO
@@ -382,18 +393,13 @@ if (stockLines.length > 0) {
     });
 
 
-    console.log("PDF size:", pdf.length);
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "inline; filename=receipt.pdf");
-    res.end(pdf);
-
-
-    /*return res.json({
+    return res.status(200).json({
       success: true,
+      message: "Recepción cerrada correctamente",
       receiptId,
-    });*/
-
+      receiptCode: header.receipt_code,
+      pdfKey: s3Key
+    });
   } catch (error) {
     await client.query("ROLLBACK");
 
@@ -409,36 +415,6 @@ if (stockLines.length > 0) {
     client.release();
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -887,22 +863,6 @@ export async function getReceivingByPoId(req, res) {
     });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -8,6 +8,10 @@ import ReceivingSearch from "./pages/ReceivingSearch.tsx";
 import OrdenCompra from "./pages/OrdenCompra.tsx";
 import ReceivingValidation from "./pages/ReceivingValidation.tsx";
 import ReceivingFinal from "./pages/ReceivingFinal.tsx";
+import PutawayMenu from "./pages/PutawayMenu";
+import PutawayPick from "./pages/PutawayPick";
+import PutawayDrop from "./pages/PutawayDrop";
+
 import { ModalProvider } from "./context/ModalContext";
 
 
@@ -32,12 +36,17 @@ function App() {
           }
         >
           <Route path="/menu" element={<Menu />} />
+
+          {/* RECEIVING */}
           <Route path="/receiving" element={<ReceivingSearch />} />
           <Route path="/ordencompra/:id" element={<OrdenCompra />} />
           <Route path="/validation/:id" element={<ReceivingValidation />} />
           <Route path="/final/:id" element={<ReceivingFinal />} />
 
-
+          {/* PUTAWAY */}
+          <Route path="/putaway" element={<PutawayMenu />} />
+          <Route path="/putaway/pick" element={<PutawayPick />} />
+          <Route path="/putaway/drop" element={<PutawayDrop />} />
         </Route>
 
 

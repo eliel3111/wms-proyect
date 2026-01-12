@@ -4,7 +4,7 @@ import "../styles/ReceivingFinal.css"
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
-
+import ConfirmationScreen from "../components/ConfirmationScreen.tsx"
 
 type ReceivingLocation = {
     id: number;
@@ -13,7 +13,7 @@ type ReceivingLocation = {
 
 type CloseReceivingPayload = {
     purchaseOrderId: number;
-    receivingLocationId: string;
+    receivingLocationId: number;
 };
 
 export default function ReceivingFinal() {
@@ -23,6 +23,16 @@ export default function ReceivingFinal() {
     const [loading, setLoading] = useState(true);
     const [locations, setLocations] = useState<ReceivingLocation[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [confirmation, setConfirmation] = useState<{
+        show: boolean;
+        receiptCode: string;
+    }>({
+        show: false,
+        receiptCode: ""
+    });
+
+    const [receipt, setReceipt] = useState<string | null>(null);
+
     const { openModal } = useModal();
 
 
@@ -84,11 +94,21 @@ export default function ReceivingFinal() {
 
         if (locationFound) {
             setLoading(true);
+            console.log(locationFound.code);
+            console.log(typeof (locationFound.code));
             const result = await closeReceiving({
                 purchaseOrderId: Number(id),
-                receivingLocationId: locationFound.code,
+                receivingLocationId: Number(locationFound.id),
             });
-            setLoading(false);
+            console.log("RESULTADO: ", result.success);
+            if (result.success) {
+                console.log("FUNCIONO")
+                setConfirmation({
+                    show: true,
+                    receiptCode: result.receiptCode
+                });
+                setLoading(false);
+            }
         } else {
 
             openModal({
@@ -97,11 +117,11 @@ export default function ReceivingFinal() {
                 onCloseCallback: focusScannerInput, // 👈 AQUÍ
             });
 
-        }
+        } 
 
         // 🧹 limpiar input para el próximo scan
         e.currentTarget.value = "";
-        
+
     }
 
     // FUNCTION: To save reception
@@ -116,9 +136,24 @@ export default function ReceivingFinal() {
         }, 50); // ⏱️ pequeño delay para mobile
     }
 
+
+
     if (loading) {
         return <LoadingScreen />;
     }
+
+    
+    if (confirmation.show) {
+           return <ConfirmationScreen
+                title="¡RECEPCIÓN CERRADA!"
+                message={`Recepción ${confirmation.receiptCode} completada`}
+                autoCloseMs={3000}
+                onFinish={() => {
+                    navigate("/menu");
+                }}
+            />
+        
+            }
 
     return (
         <div className="page-receiving-final">
