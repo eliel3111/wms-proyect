@@ -39,6 +39,9 @@
   .menu-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+    .menu-image {
+  width: 30%;
+}
 }
 
 /* 🖥️ Desktop */
@@ -48,6 +51,9 @@
     padding-right: 100px;
   }
 
+  .menu-image {
+  width: 30%;
+}
   .menu-grid {
     grid-template-columns: repeat(4, 1fr);
   }
