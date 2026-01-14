@@ -11,7 +11,7 @@
     padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    /*gap: 16px;*/
     box-sizing: border-box;
 }
 
@@ -39,6 +39,12 @@
     flex-direction: column;
     gap: 14px;
     width: 100%;
+}
+
+.putaway-actions-with-table {
+  margin-top: 60px;
+  margin-bottom: 30px;
+  background-color: red;
 }
 
 /* 🔵 RECOGER (ORIGEN) */
@@ -130,3 +136,186 @@
         padding: 8px;
         text-align: left;
     }
+
+    /*-------------------------------------------------------*/
+    /* PUT AWAY PICK PAGE*/
+
+    /* Wrapper general */
+.putaway-page {
+  width: 100%;
+  display: flex;
+  justify-content: center; /* centra en desktop */
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+/* "Card" que en desktop deja espacio alrededor, en móvil ocupa todo */
+.putaway-card {
+  width: 100%;
+  max-width: 860px;     /* espacio alrededor en desktop */
+  background: #fff;
+  border: 1px solid #e7e7e7;
+  border-radius: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* Bloques */
+.block {
+  border: 1px solid #efefef;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.block-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+/* PRODUCTO */
+.product-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.label {
+  color: #666;
+  font-size: 13px;
+}
+
+.value {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.product-desc {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+/* UBICACIONES - pills */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pill {
+  border: 1px solid #ddd;
+  background: #f7f7f7;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 44px; /* touch */
+}
+
+.pill.active {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+}
+
+.empty {
+  color: #777;
+  font-size: 14px;
+}
+
+/* CANTIDAD */
+.qty-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.qty-input {
+  width: 100%;
+  min-height: 54px; /* cómodo en touch */
+  font-size: 20px;
+  font-weight: 700;
+  border-radius: 14px;
+  border: 1px solid #ddd;
+  padding: 10px 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.qty-input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+}
+
+.helper {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* BOTONES */
+.block-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 14px;
+  border: none;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Colores */
+.btn-exit {
+  background: #f2f2f2;
+  color: #111;
+}
+
+.btn-save {
+  background: #1a73e8;
+  color: #fff;
+}
+
+/* Desktop: botones no tan gigantes y layout más cómodo */
+@media (min-width: 768px) {
+  .putaway-page {
+    padding: 28px;
+  }
+
+  .putaway-card {
+    padding: 20px;
+  }
+
+  .btn {
+    min-height: 50px;
+    font-size: 15px;
+  }
+}
+
+/* Móvil: ocupa todo el ancho */
+@media (max-width: 480px) {
+  .putaway-page {
+    padding: 0; /* full width */
+  }
+
+  .putaway-card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    max-width: none;
+  }
+}

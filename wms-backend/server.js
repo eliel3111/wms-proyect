@@ -28,6 +28,7 @@ app.use(cookieParser()); // ← ahora sí, en el orden correcto
 // 2. Rutas de API
 // -----------------------------
 app.use("/api", apiRoutes);
+app.get("/__ping", (req, res) => res.send("pong"));
 
 // -----------------------------
 // 3. Iniciar servidor
