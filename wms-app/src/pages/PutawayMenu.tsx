@@ -3,13 +3,18 @@ import "../styles/Putaway.css";
 import { useEffect, useState, useRef } from "react";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
 import apiClient from "../services/apiClient";
+import { useModal } from "../context/ModalContext";
 
 
 export default function PutawayMenu() {
   const navigate = useNavigate();
+  const { openModal } = useModal();
+
   const [loading, setLoading] = useState(true);
   const [pendingLines, setPendingLines] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
+
 
   {/*CALL AL PENDING PUTAWAY LINES FOR THIS USER*/ }
   useEffect(() => {
@@ -23,8 +28,9 @@ export default function PutawayMenu() {
         if (!result.success) {
           throw new Error(result.message || "Error cargando pendientes");
         }
-        console.log(result.data);
+        console.log(result);
         setPendingLines(result.data);
+        setHasActiveSession(result.totalLines > 0);
 
       } catch (err: any) {
         console.error("Error cargando putaway pendientes:", err);
@@ -38,27 +44,41 @@ export default function PutawayMenu() {
   }, []);
 
   // Funcion para start a session
-
   async function handleStartPutaway() {
-  try {
-    const res = await apiClient.get("/putaway/start");
+    try {
+      const res = await apiClient.get("/putaway/start");
 
-    if (res.data.success) {
-      if (res.data.alreadyExists) {
-        console.log("Ya existe sesión activa:", res.data.session);
-      } else {
-        console.log("Nueva sesión creada:", res.data.session);
+      if (res.data.success) {
+        if (res.data.alreadyExists) {
+          console.log("Ya existe sesión activa:", res.data.session);
+        } else {
+          console.log("Nueva sesión creada:", res.data.session);
+        }
+
+        // 👉 aquí navegas a la página de recoger
+        navigate("/putaway/pick");
       }
 
-      // 👉 aquí navegas a la página de recoger
-      navigate("/putaway/pick"); 
+    } catch (error) {
+      console.error("Error iniciando putaway:", error);
+      alert("Error iniciando sesión de putaway");
+    }
+  }
+
+  //FUNCTION: For putaway button
+  function handleGoToPutawayDrop() {
+    if (!hasActiveSession) {
+      openModal({
+        title: "No existe una sesión de Putaway",
+        message: "Recoga productos en la ubicacion de recepcion."
+      });
+      return;
     }
 
-  } catch (error) {
-    console.error("Error iniciando putaway:", error);
-    alert("Error iniciando sesión de putaway");
+    navigate("/putaway/drop");
   }
-}
+
+
 
 
   if (loading) return <LoadingScreen />;
@@ -73,8 +93,8 @@ export default function PutawayMenu() {
 
       {/* 🔷 CONTENEDOR INTERNO RESPONSIVE */}
       <div style={{
-    gap: pendingLines.length == 0 ? "60px" : "16px",
-  }} className="putaway-container">
+        gap: pendingLines.length == 0 ? "60px" : "16px",
+      }} className="putaway-container">
 
         {/* 🏷️ TÍTULO */}
         <div className="putaway-header">
@@ -83,18 +103,24 @@ export default function PutawayMenu() {
 
         {/* 🔘 BOTONES */}
         <div className="putaway-actions"
-          
+
         >
-          <button 
-          className="putaway-btn-primary"
-          onClick={handleStartPutaway}
+          <button
+            className="putaway-btn-primary"
+            onClick={handleStartPutaway}
           >
-            RECOGER
+            RECOGER EN RECEPCION
           </button>
 
-          <button className="putaway-btn-secondary">
-            DESCARGAR
+          <button
+            //disabled={!hasActiveSession}
+            className="putaway-btn-secondary"
+            onClick={handleGoToPutawayDrop}
+          >
+            UBICAR
           </button>
+
+
         </div>
 
         {/* 🔽 SECCIÓN CONDICIONAL */}

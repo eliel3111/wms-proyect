@@ -7,6 +7,7 @@ import OrderLineCard from "../components/OrderLineCard.tsx";
 import ScanModal from "../components/ScanModal.tsx";
 import { useNavigate } from "react-router-dom";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
+import { useModal } from "../context/ModalContext";
 
 
 
@@ -46,6 +47,7 @@ export default function OrdenCompra() {
     const [quantityError, setQuantityError] = useState(false);
     const [shakeKey, setShakeKey] = useState(0);
 
+    const qtyInputRef = useRef<HTMLInputElement>(null);
 
     const scanBufferRef = useRef("");
     const scanTimerRef = useRef<number | null>(null);
@@ -54,6 +56,8 @@ export default function OrdenCompra() {
     const selectedIndexRef = useRef<number | null>(null);
 
     const navigate = useNavigate();
+
+    const { openModal } = useModal();
 
     useEffect(() => {
         if (!id) return;
@@ -252,6 +256,18 @@ export default function OrdenCompra() {
     });
     // FUNCION PARA CERRAR MODAL
     function closeModal() {
+        //Hacer que no se cierre si es menor a cero
+        if (
+            selectedProduct &&
+            typeof selectedProduct.received_qty === "number" &&
+            selectedProduct.received_qty < 0
+        ) {
+            openModal({
+                title: "Ubicación inválida",
+                message: "El código escaneado NO es una ubicacion valida"
+            });
+            return;
+        }
         setIsModalOpen(false);
         setSelectedIndex(null);
         lastCodeRef.current = "";
@@ -440,7 +456,7 @@ export default function OrdenCompra() {
 
 
 
-    
+
 
     if (loading) {
         return <LoadingScreen />;
@@ -562,12 +578,24 @@ export default function OrdenCompra() {
 
                         <div className="qty-row">
                             <input
-                                type="number"
+                                ref={qtyInputRef}
+                                type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 value={selectedProduct.received_qty}
                                 onChange={handleReceivedQtyChange}
                                 className="quantity-input"
+                                onFocus={() => {
+                                    requestAnimationFrame(() => {
+                                        const input = qtyInputRef.current;
+                                        if (!input) return;
+                                        input.select();
+                                    });
+                                }}
+
+
+
+
                             />
 
                             <span className="qty-separator">|</span>
