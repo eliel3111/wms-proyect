@@ -211,9 +211,44 @@ export default function PutawayPickPage() {
 
 
   async function onSave() {
+
+    if (!currentLine || !putLocation) return;
+
+    const qtyNumber = Number(qty);
+
+    if (!qty || qtyNumber <= 0) {
+      openModal({
+        title: "Cantidad inválida",
+        message: "Ingrese una cantidad válida."
+      });
+      return;
+    }
+
     try {
       // 👉 Aquí luego iría la llamada real a la API
-      // await apiClient.post("/putaway/line", payload);
+      if (!sessionId) {
+        throw new Error("No hay sesión activa");
+      }
+
+      if (!currentLine?.id) {
+        throw new Error("No hay producto seleccionado");
+      }
+
+      if (!putLocation?.code) {
+        throw new Error("No hay ubicación seleccionada");
+      }
+
+      const payload = {
+        putaway_session_id: sessionId,
+        product_id: currentLine.sku,
+        to_location_code: putLocation.code,
+        qty: Number(qty)
+      };
+
+      const result = await dropPutaway(payload);
+
+
+      console.log("PUTAWAY DROP OK:", result);
 
       openModal({
         title: "Guardado",
@@ -228,6 +263,20 @@ export default function PutawayPickPage() {
     }
   }
 
+
+
+  // FUNCTION: Drop de producto en putaway
+  async function dropPutaway(payload: {
+    putaway_session_id: number;
+    product_id: string;
+    to_location_code: string;
+    qty: number;
+  }) {
+    const response = await apiClient.post("/putaway/drop", payload);
+    return response.data;
+  }
+
+
   //FUNCTION: Para manejar el input change
   function onQtyChange(value: string) {
     if (value === "") {
@@ -241,7 +290,14 @@ export default function PutawayPickPage() {
     if (!currentLine || !putLocation) return;
 
     //const qty_available = selectedLocation.qty_available; // ✅ ahora TS sabe que existe
-    const qty_available = 2;
+    const qty_available = pendingLines
+      .filter(line => line.sku === currentLine.sku)
+      .reduce((sum, line) => {
+        return sum + Number(line.picked_qty);
+      }, 0);
+
+
+
     if (num > qty_available) {
       setQty(String(Math.trunc(qty_available)));
       openModal({

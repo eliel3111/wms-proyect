@@ -35,3 +35,26 @@ export async function getPrimaryBarcodeBySku(client, sku) {
   `, [sku]);
 }
 
+// Utilizando un sku el me devuelve la informacion basica de un producto
+
+// services/product.service.js
+
+export async function getActiveProductBySku(db, sku) {
+  const result = await db.query(
+    `
+    SELECT
+      id,
+      sku,
+      description,
+      uom
+    FROM products
+    WHERE sku = $1
+      AND status = 'ACTIVE'
+      AND deleted_erp = false
+    LIMIT 1
+    `,
+    [sku]
+  );
+
+  return result.rowCount ? result.rows[0] : null;
+}

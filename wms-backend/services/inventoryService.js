@@ -96,3 +96,42 @@ export async function moveInventoryBetweenLocations(
         success: true
     };
 }
+
+
+
+// SERVICIO: Crea un movimiendo, no afecta inventario, solo dice el movimiento, de donde a donde, y porque
+
+// services/inventoryMovementService.js
+
+export async function createInventoryMovement(client, {
+  productSku,
+  fromLocationId = null,
+  toLocationId = null,
+  qty,
+  movementType,        // 'MOVE', 'RECEIPT', etc
+  referenceType = null, // 'PUTAWAY', 'PICKING', etc
+  referenceId = null,   // session id, order id, etc
+  createdBy = null,
+  note = null
+}) {
+  return client.query(
+    `
+    INSERT INTO inventory_movements
+      (product_sku, from_location_id, to_location_id, qty, movement_type, reference_type, reference_id, created_by, note)
+    VALUES
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    RETURNING *
+    `,
+    [
+      productSku,
+      fromLocationId,
+      toLocationId,
+      qty,
+      movementType,
+      referenceType,
+      referenceId,
+      createdBy,
+      note
+    ]
+  );
+}

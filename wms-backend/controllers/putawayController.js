@@ -1,7 +1,7 @@
 import { db } from "../db.js";
-import { getActiveProductById, getPrimaryBarcodeBySku } from "../services/productService.js";
-import { getActiveStorageLocationByCode, getUserActiveLocation } from "../services/locationService.js";
-import { moveInventoryBetweenLocations } from "../services/inventoryService.js";
+import { getActiveProductById, getPrimaryBarcodeBySku, getActiveProductBySku } from "../services/productService.js";
+import { getActiveStorageLocationByCode, getUserActiveLocation, getActiveLocationByCodeAndType } from "../services/locationService.js";
+import { moveInventoryBetweenLocations, createInventoryMovement } from "../services/inventoryService.js";
 
 // CREATE A PUTAWAY LINE
 export async function createPutawayLine(req, res) {
@@ -85,7 +85,7 @@ export async function createPutawayLine(req, res) {
       });
     }
     console.log("SE BUSCO LA UBICACION DEL USUARIO: ", userLocation);
-    
+
     // 4️⃣ Buscar si ya existe linea
     const existingLineResult = await client.query(`
       SELECT id, picked_qty, remaining_qty, status
@@ -115,7 +115,7 @@ export async function createPutawayLine(req, res) {
       `, [newPickedQty, userLocation.id, line.id]);
 
 
-        console.log("SE actualizo la linea: ", userLocation);
+      console.log("SE actualizo la linea: ", userLocation);
 
       //Aqui luego se puede buscar la informacion del almacen del usuario
       const warehouseId = 1;
@@ -139,7 +139,7 @@ export async function createPutawayLine(req, res) {
     }
 
     // Si no existe entonces crear
- console.log("SE INICIA LA CREACION DE LA LINEA");
+    console.log("SE INICIA LA CREACION DE LA LINEA");
     const insertResult = await client.query(`
   INSERT INTO putaway_lines
   (putaway_session_id, product_id, from_location_id, to_location_id, picked_qty, remaining_qty, status)
@@ -148,7 +148,7 @@ export async function createPutawayLine(req, res) {
 `, [sessionId, productId, fromLocationId, userLocation.id, qty]);
 
 
-console.log("SE CREO YA UNA LINEA: ", insertResult);
+    console.log("SE CREO YA UNA LINEA: ", insertResult);
 
     //Aqui luego se puede buscar la informacion del almacen del usuario
     const warehouseId = 1;
@@ -500,7 +500,7 @@ export async function getPendingPutaway(req, res) {
 export async function scanPutawayLocation(req, res) {
   try {
     const { code } = req.body;
-    console.log(code.length);
+    console.log(code);
 
     if (!code) {
       return res.status(400).json({
@@ -510,7 +510,7 @@ export async function scanPutawayLocation(req, res) {
     }
 
     const result = await getActiveStorageLocationByCode(db, code);
-
+    console.log("RESULTADO", result);
     if (result.rowCount === 0) {
       return res.json({
         success: false,
@@ -536,5 +536,293 @@ export async function scanPutawayLocation(req, res) {
 }
 
 
+// GET A LOCATION ACTIVE USING A BARCODE
+export async function dropPutaway(req, res) {
+  // controllers/putaway.controller.js
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const userId = req.user.id; // asumiendo auth middleware
+    console.log("ID ID ID ID ID ID", userId);
+    console.log("REQ.USER:", req.user);
 
+    const { putaway_session_id, product_id, to_location_code, qty } = req.body;
+
+    /* -----------------------------
+       1️⃣ Validar qty
+    ------------------------------*/
+    if (!qty || qty <= 0 || !Number.isInteger(Number(qty))) {
+      return res.status(400).json({
+        code: "INVALID_QTY",
+        message: "qty debe ser un entero mayor que 0"
+      });
+    }
+
+    /* -----------------------------
+       2️⃣ Validar sesión activa
+    ------------------------------*/
+    const sessionResult = await db.query(
+      `
+      SELECT id, status, user_id
+      FROM putaway_sessions
+      WHERE id = $1
+      `,
+      [putaway_session_id]
+    );
+
+    if (sessionResult.rowCount === 0) {
+      return res.status(404).json({
+        code: "SESSION_NOT_FOUND",
+        message: "La sesión no existe"
+      });
+    }
+
+    const session = sessionResult.rows[0];
+    console.log("SESSION OBTENIDA", session);
+    if (Number(session.user_id) !== userId) {
+      return res.status(403).json({
+        code: "SESSION_NOT_OWNED",
+        message: "La sesión no pertenece al usuario"
+      });
+    }
+
+    if (!["picking", "putting"].includes(session.status)) {
+      return res.status(400).json({
+        code: "SESSION_NOT_ACTIVE",
+        message: "La sesión no está activa"
+      });
+    }
+
+    /* -----------------------------
+       3️⃣ Obtener dock del usuario
+    ------------------------------*/
+    const userLocation = await getUserActiveLocation(client, req.user.id);
+
+    if (!userLocation) {
+      return res.status(404).json({
+        success: false,
+        error: "USER_LOCATION_NOT_FOUND"
+      });
+    }
+    console.log("SE BUSCO LA UBICACION DEL USUARIO: ", userLocation);
+    console.log("alerta alerta", userLocation);
+    const dockLocationId = Number(userLocation.id);
+
+    /* -----------------------------
+       4️⃣ Validar ubicación destino
+    ------------------------------*/
+    const locationResult = await getActiveLocationByCodeAndType(
+      client,
+      to_location_code,
+      "STORAGE"
+    );
+
+    if (locationResult.rowCount === 0) {
+      return res.status(400).json({
+        code: "INVALID_STORAGE_LOCATION",
+        message: "Ubicación destino inválida"
+      });
+    }
+
+    const toLocation = locationResult.rows[0];
+    console.log(toLocation);
+
+    /* -----------------------------
+   4️⃣ Traer líneas disponibles en dock (FOR UPDATE)
+------------------------------*/
+    //Buscar producto usando solo sku
+    const product = await getActiveProductBySku(client, product_id);
+
+    if (!product) {
+      return res.status(404).json({
+        code: "PRODUCT_NOT_FOUND",
+        message: "Producto no existe o no está activo"
+      });
+    }
+
+    console.log("PRODUCTO RESUELTO:", product);
+
+    // 👉 ya tienes:
+    const productId = product.id;
+
+
+
+    console.log("PUTAWAY SESSION ID", putaway_session_id);
+    console.log("product id", productId);
+    console.log("UBICACION DE USUARIO", dockLocationId)
+    const linesResult = await client.query(
+      `
+  SELECT
+    pl.id,
+    pl.putaway_session_id,
+    pl.product_id,
+    pl.from_location_id,
+    pl.to_location_id,
+    pl.picked_qty,
+    pl.remaining_qty
+  FROM putaway_lines pl
+  WHERE pl.putaway_session_id = $1
+    AND pl.product_id = $2
+    AND pl.to_location_id = $3       -- dock del usuario (ajusta si tu modelo usa otra columna)
+    AND pl.status IN ('picked','partial')
+  ORDER BY pl.id
+  FOR UPDATE
+  `,
+      [putaway_session_id, productId, dockLocationId]
+    );
+    if (linesResult.rowCount === 0) {
+      return res.status(400).json({
+        code: "NO_LINES_IN_DOCK",
+        message: "No hay líneas disponibles de este producto en el dock"
+      });
+    }
+
+    const availableLines = linesResult.rows;
+
+    console.log("📦 LÍNEAS DISPONIBLES EN DOCK:", availableLines);
+
+    /* -----------------------------
+   5️⃣ Consumir cantidades una por una (loop)
+------------------------------*/
+    const totalRemaining = availableLines.reduce(
+      (sum, l) => sum + Number(l.remaining_qty),
+      0
+    );
+
+    if (Number(qty) > totalRemaining) {
+      throw {
+        code: "QTY_EXCEEDS_PENDING_IN_DOCK",
+        message: "Cantidad mayor que el total pendiente en dock"
+      };
+    }
+
+    let qtyToDrop = Number(qty);
+
+    for (const line of availableLines) {
+      if (qtyToDrop <= 0) break;
+
+      const currentRemaining = Number(line.remaining_qty);
+
+      if (currentRemaining <= 0) continue;
+
+      const take = Math.min(currentRemaining, qtyToDrop);
+
+      const newRemaining = currentRemaining - take;
+      const newStatus = newRemaining === 0 ? "completed" : "partial";
+
+      // 🔁 actualizar línea
+      await client.query(`
+    UPDATE putaway_lines
+    SET remaining_qty = $1,
+        status = $2,
+        updated_at = now()
+    WHERE id = $3
+  `, [newRemaining, newStatus, line.id]);
+
+      // 🧾 trazabilidad
+      await client.query(`
+    INSERT INTO putaway_drop_lines
+      (putaway_session_id, putaway_line_id, product_id, to_location_id, qty_dropped, status, created_by_user_id)
+    VALUES
+      ($1, $2, $3, $4, $5, 'confirmed', $6)
+  `, [
+        putaway_session_id,
+        line.id,
+        productId,
+        toLocation.id,
+        take,
+        userId
+      ]);
+
+      qtyToDrop -= take;
+    }
+
+    /* -----------------------------
+       6️⃣ Validar si alcanzó la cantidad solicitada
+    ------------------------------*/
+
+    if (qtyToDrop > 0) {
+      throw {
+        code: "QTY_EXCEEDS_PENDING_IN_DOCK",
+        message: "No hay suficiente cantidad pendiente en el dock"
+      };
+    }
+
+
+    /* -----------------------------
+   7️⃣ Mover inventario del dock a storage
+------------------------------*/
+
+    await moveInventoryBetweenLocations(client, {
+      warehouseId: toLocation.warehouse_id,
+      productSku: product.sku,
+      fromLocationId: dockLocationId,
+      toLocationId: toLocation.id,
+      qty: Number(qty)
+    });
+
+    /* -----------------------------
+       8️⃣ Registrar movimiento de inventario
+    ------------------------------*/
+
+    await createInventoryMovement(client, {
+      productSku: product.sku,
+      fromLocationId: dockLocationId,
+      toLocationId: toLocation.id,
+      qty: Number(qty),
+      movementType: "MOVE",
+      referenceType: "PUTAWAY",
+      referenceId: String(putaway_session_id),
+      createdBy: userId,
+      note: `Putaway drop a ubicación ${toLocation.code}`
+    });
+
+
+    /* -----------------------------
+       9️⃣ Cerrar sesión si ya no quedan líneas pendientes
+    ------------------------------*/
+
+    await client.query(`
+      UPDATE putaway_sessions
+      SET status = 'completed', completed_at = now()
+      WHERE id = $1
+        AND NOT EXISTS (
+          SELECT 1 FROM putaway_lines
+          WHERE putaway_session_id = $1
+            AND status IN ('picked','partial')
+        )
+    `, [putaway_session_id]);
+
+    await client.query("COMMIT");
+
+    console.log("Si llega aquí, todo está OK")
+
+    return res.status(200).json({
+      success: true,
+      message: "Validaciones correctas",
+      data: {
+        session,
+        dock_location_id: dockLocationId,
+        to_location: toLocation,
+        product_id,
+        qty: Number(qty)
+      }
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    if (error?.code) {
+      return res.status(400).json(error);
+    }
+
+    console.error("❌ PUTAWAY DROP ERROR:", error);
+
+    return res.status(500).json({
+      code: "SERVER_ERROR",
+      message: "Error interno"
+    });
+  }
+
+};
 

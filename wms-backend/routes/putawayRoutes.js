@@ -1,5 +1,5 @@
 import express from "express";
-import {getPendingPutaway, startingPutaway, getActivePutawaySession, scanPutawayProduct, getActivePutawaySessionExtended, createPutawayLine, scanPutawayLocation  }  from "../controllers/putawayController.js";
+import {getPendingPutaway, startingPutaway, getActivePutawaySession, scanPutawayProduct, getActivePutawaySessionExtended, createPutawayLine, scanPutawayLocation, dropPutaway  }  from "../controllers/putawayController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -19,5 +19,8 @@ router.post("/line", authMiddleware, createPutawayLine);
 
 //Confirm a location in putaway 
 router.post("/scan-putaway-location", authMiddleware, scanPutawayLocation);
+
+//Dropping a putaway line 
+router.post("/drop", authMiddleware, dropPutaway);
 
 export default router;

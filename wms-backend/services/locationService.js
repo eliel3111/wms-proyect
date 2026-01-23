@@ -20,7 +20,7 @@ export async function getActiveLocationByCodeAndType(client, barcode, locationTy
 const locResult = await getActiveLocationByCodeAndType(
   client,
   scannedCode,
-  "RECEIVING"
+  "STORAGE"
 );
 
 if (locResult.rowCount === 0) {
@@ -39,6 +39,7 @@ location.location_type
 
 /*BUSCAR UBICACION STORAGE POR CODIGO ACTIVO*/
 export async function getActiveStorageLocationByCode(client, code) {
+    console.log("INICIANDO BUSQUEDA DE LOCATION", code)
   return client.query(`
     SELECT id, code
     FROM locations
@@ -47,6 +48,7 @@ export async function getActiveStorageLocationByCode(client, code) {
       AND is_active = true
     LIMIT 1
   `, [code]);
+  
 }
 
 
@@ -54,6 +56,7 @@ export async function getActiveStorageLocationByCode(client, code) {
 /*SERVICIO: Utiliza el id del usuario para buscar si tiene un location asignado a el y si lo tiene entonces buscar la informacion de ese location asignado a el*/
 
 export async function getUserActiveLocation(client, userId) {
+    
   const result = await client.query(`
     SELECT 
       l.id,
