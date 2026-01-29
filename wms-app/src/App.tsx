@@ -1,4 +1,4 @@
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Home from "./pages/home.tsx";
 import LoginPage from "./pages/login.tsx";
 import MainLayout from "./components/MainLayout";
@@ -13,6 +13,9 @@ import PutawayPick from "./pages/PutawayPick";
 import PutawayDrop from "./pages/PutawayDrop";
 
 import { ModalProvider } from "./context/ModalContext";
+import TransferPrincipal from "./pages/TransferPrincipal.tsx";
+import TransferPick from "./pages/transferPick.tsx"
+import TransferDrop from "./pages/transferDrop.tsx"
 
 
 
@@ -47,6 +50,11 @@ function App() {
           <Route path="/putaway" element={<PutawayMenu />} />
           <Route path="/putaway/pick" element={<PutawayPick />} />
           <Route path="/putaway/drop" element={<PutawayDrop />} />
+
+          {/* TRANSFER */}
+          <Route path="/transfer" element={<TransferPrincipal />} />
+          <Route path="/transfer/pick" element={<TransferPick />} />
+          <Route path="/transfer/drop" element={<TransferDrop />} />
         </Route>
 
 

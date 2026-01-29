@@ -14,7 +14,7 @@ type Location = {
   code: string;
 };
 
-type ScannedProduct = {
+/*type ScannedProduct = {
   id: number;
   sku: string;
   description: string;
@@ -25,7 +25,7 @@ type ProductLocation = {
   location_id: number;
   location_code: string;
   qty_available: number;
-};
+};*/
 
 
 type PendingPutawayLine = {
@@ -57,7 +57,7 @@ export default function PutawayPickPage() {
   const [currentLine, setCurrentLine] = useState<PendingPutawayLine | null>(null);
   const [putLocation, setPutLocation] = useState<Location | null>(null);
   const putLocationRef = useRef<Location | null>(null);
-  const [locationScanned, setLocationScanned] = useState(false);
+  //const [locationScanned, setLocationScanned] = useState(false);
 
 
 
@@ -90,32 +90,6 @@ export default function PutawayPickPage() {
 
   {/*CALL AL PENDING PUTAWAY LINES FOR THIS USER*/ }
   useEffect(() => {
-    async function loadPendingPutaway() {
-      try {
-        setLoading(true);
-
-        const response = await apiClient.get("/putaway/pending");
-        const result = response.data;
-
-        if (!result.success) {
-          throw new Error(result.message || "Error cargando pendientes");
-        }
-        console.log(result.data);
-        setPendingLines(result.data);
-        setHasActiveSession(result.totalLines > 0);
-        setSessionId(Number(result.sessionId));
-
-        setHasActiveSession(result.totalLines > 0);
-        setSessionId(Number(result.sessionId));
-
-      } catch (err: any) {
-        console.error("Error cargando putaway pendientes:", err);
-        setError("No se pudieron cargar los productos pendientes");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadPendingPutaway();
   }, []);
 
@@ -151,7 +125,13 @@ export default function PutawayPickPage() {
           if (foundLine) {
             console.log("✅ PRODUCTO EN SESSION:", foundLine);
             setCurrentLine(foundLine);
-            setQty(String(Math.trunc(+foundLine.picked_qty)));
+            //setQty(String(Math.trunc(+foundLine.picked_qty)));
+            //enfocar y select el input cantidad
+            // 👉 seleccionar el input manualmente
+            setTimeout(() => {
+              qtyInputRef.current?.focus();
+              qtyInputRef.current?.select();
+            }, 0);
             scanBuffer.current = "";
             return;
           }
@@ -249,6 +229,11 @@ export default function PutawayPickPage() {
 
 
       console.log("PUTAWAY DROP OK:", result);
+      setQty("");
+      setCurrentLine(null);
+      setPutLocation(null);
+      // 🔥 refrescar pendientes
+      await loadPendingPutaway();
 
       openModal({
         title: "Guardado",
@@ -263,7 +248,32 @@ export default function PutawayPickPage() {
     }
   }
 
+  // FUNCTION: to search all the pending lines
+  async function loadPendingPutaway() {
+    try {
+      setLoading(true);
 
+      const response = await apiClient.get("/putaway/pending");
+      const result = response.data;
+
+      if (!result.success) {
+        throw new Error(result.message || "Error cargando pendientes");
+      }
+      console.log(result.data);
+      setPendingLines(result.data);
+      setHasActiveSession(result.totalLines > 0);
+      setSessionId(Number(result.sessionId));
+
+      setHasActiveSession(result.totalLines > 0);
+      setSessionId(Number(result.sessionId));
+
+    } catch (err: any) {
+      console.error("Error cargando putaway pendientes:", err);
+      setError("No se pudieron cargar los productos pendientes");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // FUNCTION: Drop de producto en putaway
   async function dropPutaway(payload: {
@@ -310,12 +320,25 @@ export default function PutawayPickPage() {
     }
   }
 
+
+  //FUNTION: to make input be focus
+  function selectAllOnFocus(e: React.FocusEvent<HTMLInputElement>) {
+    requestAnimationFrame(() => {
+      e.target.select();
+    });
+  }
+
+
   /* =======================
      UI
   ======================= */
 
   const showProductEmpty = putLocation && !currentLine;
 
+
+
+
+  if (loading) return <LoadingScreen />;
 
   return (
     <div className="putaway-page">
@@ -429,7 +452,7 @@ export default function PutawayPickPage() {
           <>
             {/* 🧾 SUBTÍTULO */}
             <div className="putaway-subtitle">
-              <h3>Productos pendientes por descargar</h3>
+              <div>Productos pendientes por ubicar</div>
             </div>
 
             {/* 📋 TABLA */}

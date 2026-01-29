@@ -26,7 +26,6 @@ export default function MainLayout() {
       <ModalError />
 
       <Header
-        logo="/logo.png"
         onMenuClick={openSidebar}
       />
 

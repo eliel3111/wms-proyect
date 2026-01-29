@@ -1,4 +1,5 @@
 export async function getActiveProductById(client, productId) {
+  console.log("Eliel")
   const result = await client.query(
     `
     SELECT 
@@ -14,6 +15,7 @@ export async function getActiveProductById(client, productId) {
     `,
     [productId]
   );
+  console.log("Eliel")
 
   if (result.rowCount === 0) {
     return null;
@@ -58,3 +60,6 @@ export async function getActiveProductBySku(db, sku) {
 
   return result.rowCount ? result.rows[0] : null;
 }
+
+
+

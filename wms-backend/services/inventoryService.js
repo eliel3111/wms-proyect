@@ -10,6 +10,8 @@ export async function moveInventoryBetweenLocations(
         qty
     }
 ) {
+
+    console.log("VALORES: ", warehouseId, productSku, fromLocationId, toLocationId. qty);
     console.log("SE INICIA EL MOVIMIENTO DE INVENTARIO");
     // 1️⃣ Buscar inventario origen
     const fromResult = await client.query(`

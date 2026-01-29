@@ -58,7 +58,7 @@ const SelectInput = ({
             .includes(inputValue.toLowerCase());
         }}
         styles={{
-          control: (base, state) => ({
+          control: (base) => ({
             ...base,
             borderColor: error ? "#e53935" : base.borderColor,
             boxShadow: error ? "0 0 0 1px #e53935" : base.boxShadow,

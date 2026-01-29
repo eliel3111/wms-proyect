@@ -14,10 +14,12 @@ const PORT = process.env.PORT || 3000;
 // -----------------------------
 // 1. Middlewares globales
 // -----------------------------
+console.log("🗄️ DB HOST:", process.env.DB_HOST);
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true, // Necesario para enviar cookies al frontend
+    origin: process.env.FRONTEND_URL,
+    credentials: true,// Necesario para enviar cookies al frontend
   })
 );
 
@@ -28,6 +30,7 @@ app.use(cookieParser()); // ← ahora sí, en el orden correcto
 // 2. Rutas de API
 // -----------------------------
 app.use("/api", apiRoutes);
+app.get("/health", (req, res) => res.json({ ok: true })); 
 app.get("/__ping", (req, res) => res.send("pong"));
 
 // -----------------------------

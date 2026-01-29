@@ -43,7 +43,6 @@ export default function OrdenCompra() {
     const [poNumber, setPoNumber] = useState<string>("");
     const [purchaseOrderId, setPurchaseOrderId] = useState<number | null>(null);
     const [filter, setFilter] = useState<Filter>("all");
-    const [lastCode, setLastCode] = useState<string>("");
     const [quantityError, setQuantityError] = useState(false);
     const [shakeKey, setShakeKey] = useState(0);
 
@@ -120,6 +119,7 @@ export default function OrdenCompra() {
                 console.log("CHECK 5")
                 if (!result.success) {
                     throw new Error(result.message || "Error cargando la orden de compra");
+                    setError("Error cargando la orden de compra");
                 }
 
                 const data = result.data;
@@ -294,7 +294,6 @@ export default function OrdenCompra() {
         // actualizar ref (INMEDIATO)
         lastCodeRef.current = barcode;
         setQuantityError(false);
-        setLastCode(barcode); // opcional (solo UI/debug)
         console.log("CHECK 12")
         // 2️⃣ Cerrar modal primero
         setIsModalOpen(false);

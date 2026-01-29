@@ -3,7 +3,12 @@ import { useEffect, useState } from "react";
 import "../styles/Header.css";
 import { useNavigate } from "react-router-dom";
 
-export default function Header({ logo, onMenuClick }) {
+
+type HeaderProps = {
+  onMenuClick: () => void;
+};
+
+export default function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const [hidden, setHidden] = useState(false);
   let lastScroll = 0;

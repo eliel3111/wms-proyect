@@ -8,7 +8,7 @@ type ScanModalProps = {
   children: React.ReactNode;
 };
 
-export default function ScanModal({ open, title, onClose, children }: ScanModalProps) {
+export default function ScanModal({ open, title, children }: ScanModalProps) {
   if (!open) return null;
 
   return (
