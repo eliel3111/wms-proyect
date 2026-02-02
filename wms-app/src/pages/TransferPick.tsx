@@ -17,6 +17,19 @@ type ScannedProduct = {
     uom?: string;
 };
 
+type ErrorCode =
+    | "QTY_EXCEEDS_AVAILABLE"
+    | "INVALID_STORAGE_LOCATION"
+    | "WAREHOUSE_MISMATCH";
+
+const titles: Record<ErrorCode, string> = {
+    QTY_EXCEEDS_AVAILABLE: "Cantidad inválida",
+    INVALID_STORAGE_LOCATION: "Ubicación inválida",
+    WAREHOUSE_MISMATCH: "Almacén incorrecto"
+};
+
+
+
 export default function TransferPickPage() {
     const navigate = useNavigate();
     const { openModal } = useModal();
@@ -100,7 +113,8 @@ export default function TransferPickPage() {
 
                 try {
                     const res = await apiClient.post("/transfer/scan-product", {
-                        code: scanned
+                        code: scanned,
+                        current_location_id: fromLocationRef.current?.id ?? null
                     });
 
                     const data = res.data;
@@ -147,6 +161,37 @@ export default function TransferPickPage() {
                     }
 
 
+                    else if (!data.success && data.code === "NO_LOCATION") {
+
+                        openModal({
+                            title:
+                                "Primero escanea una ubicación",
+                            message: "Primero debe escanear una ubicación válida antes de escanear un producto."
+                        });
+
+                    }
+
+                    else if (!data.success && data.code === "NO_STOCK_IN_LOCATION") {
+
+                        openModal({
+                            title:
+                                "Verifique el producto",
+                            message: "El producto no existe en esa ubicación o no tiene cantidad disponible."
+                        });
+
+                    }
+
+                    else if (!data.success && data.code === "INVALID_CODE") {
+
+                        openModal({
+                            title:
+                                "Verifique el código que leyó.",
+                            message: "El código no corresponde a una ubicación ni a un producto."
+                        });
+
+                    }
+
+
                     // 🟡 Cualquier otro caso raro
                     else {
                         console.log("⚠️ RESPUESTA DESCONOCIDA:", data);
@@ -190,7 +235,7 @@ export default function TransferPickPage() {
 
             setQty("");
             setCurrentLine(null);
-            setFromLocation(null);
+            //   setFromLocation(null);
 
 
             await loadPendingTransfers();
@@ -237,15 +282,15 @@ export default function TransferPickPage() {
             return res.data;
 
         } catch (error: any) {
-            console.error("❌ ERROR EN TRANSFER:", error);
-
-            const backendError =
-                error.response?.data?.error || "ERROR_DESCONOCIDO";
+            const data = error?.response?.data;
 
             openModal({
-                title: "Ocurrió un error",
-                message: `El error fue: ${backendError}. Contacte al soporte.`
+                title: titles[data?.code as keyof typeof titles] || "Error",
+                message: data?.message || "Ocurrió un error"
             });
+
+            throw error;
+
 
             // 👉 MUY IMPORTANTE: relanzar el error si el que llama lo necesita
             throw error;
@@ -317,7 +362,7 @@ export default function TransferPickPage() {
 
     const showProductEmpty = fromLocation && !currentLine;
     const showProductData = !!currentLine;
-    const showProductIdle = fromLocation && currentLine;
+    //const showProductIdle = fromLocation && currentLine;
 
     if (loading) return <LoadingScreen />;
 
@@ -335,7 +380,7 @@ export default function TransferPickPage() {
                 <section className={`block block-location ${!fromLocation ? "empty" : ""}`}>
                     {fromLocation ? (
                         <>
-                            <div className="block-title">Ubicación destino</div>
+                            <div className="block-title">Ubicación Origen</div>
 
                             <div className="pills">
                                 {fromLocation ? (

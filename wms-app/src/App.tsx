@@ -14,8 +14,8 @@ import PutawayDrop from "./pages/PutawayDrop";
 
 import { ModalProvider } from "./context/ModalContext";
 import TransferPrincipal from "./pages/TransferPrincipal.tsx";
-import TransferPick from "./pages/transferPick.tsx"
-import TransferDrop from "./pages/transferDrop.tsx"
+import TransferPick from "./pages/TransferPick.tsx"
+import TransferDrop from "./pages/TransferDrop.tsx"
 
 
 

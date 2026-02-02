@@ -3,6 +3,8 @@ import { getActiveProductById, getPrimaryBarcodeBySku, getActiveProductBySku } f
 import { getActiveStorageLocationByCode, getUserActiveLocation, getActiveLocationByCodeAndType } from "../services/locationService.js";
 import { moveInventoryBetweenLocations, createInventoryMovement } from "../services/inventoryService.js";
 import { getActiveTransferSession } from "../services/transferSession.service.js";
+import { AppError } from "../utils/AppError.js";
+
 
 // GET ALL PENDING TRANSFER LINES FOR A USER
 export async function getPendingTransfer(req, res) {
@@ -155,7 +157,9 @@ export async function startingTransfer(req, res) {
 
 export async function scanPutawayCode(req, res) {
     try {
-        const { code } = req.body;
+        const { code, current_location_id } = req.body;
+
+        console.log("SE LEYO ESTE CODIGO:", code, "UBICACION:", current_location_id);
 
         if (!code) {
             return res.status(400).json({
@@ -167,9 +171,8 @@ export async function scanPutawayCode(req, res) {
         const normalized = code.trim().toUpperCase();
 
         /* ======================================
-           1️⃣ BUSCAR SI ES UBICACIÓN ACTIVA
+           1️⃣ ¿ES UNA UBICACIÓN?
         ====================================== */
-
         const locationResult = await getActiveStorageLocationByCode(db, normalized);
 
         if (locationResult.rowCount > 0) {
@@ -181,14 +184,13 @@ export async function scanPutawayCode(req, res) {
         }
 
         /* ======================================
-           2️⃣ SI NO ES UBICACIÓN → BUSCAR PRODUCTO
+           2️⃣ ¿ES UN PRODUCTO?
         ====================================== */
-
         const productResult = await db.query(`
       SELECT 
-        p.id, 
-        p.sku, 
-        p.description, 
+        p.id,
+        p.sku,
+        p.description,
         p.uom
       FROM product_barcodes pb
       JOIN products p ON p.sku = pb.product_sku
@@ -199,15 +201,58 @@ export async function scanPutawayCode(req, res) {
         if (productResult.rowCount === 0) {
             return res.json({
                 success: false,
-                code: "NOT_FOUND",
+                code: "INVALID_CODE",
                 message: "El código no corresponde a una ubicación ni a un producto"
             });
         }
 
+        /* ======================================
+           3️⃣ PRODUCTO SIN UBICACIÓN ESCANEADA
+        ====================================== */
+        if (!current_location_id) {
+            return res.json({
+                success: false,
+                code: "NO_LOCATION",
+                message: "Primero escanea una ubicación"
+            });
+        }
+
+        const product = productResult.rows[0];
+
+        /* ======================================
+           4️⃣ VALIDAR INVENTARIO EN ESA UBICACIÓN
+        ====================================== */
+        const inventoryResult = await db.query(`
+      SELECT 
+        il.product_sku,
+        il.location_id,
+        il.qty_available
+      FROM inventory_by_location il
+      WHERE il.product_sku = $1
+        AND il.location_id = $2
+        AND il.qty_available > 0
+      LIMIT 1
+    `, [product.sku, current_location_id]);
+
+        if (inventoryResult.rowCount === 0) {
+            return res.json({
+                success: false,
+                code: "NO_STOCK_IN_LOCATION",
+                message: "El producto no existe en esa ubicación o no tiene cantidad disponible"
+            });
+        }
+
+        /* ======================================
+           5️⃣ TODO OK
+        ====================================== */
         return res.json({
             success: true,
             type: "product",
-            product: productResult.rows[0]
+            product: {
+                ...product,
+                qty_available: inventoryResult.rows[0].qty_available,
+                from_location_id: current_location_id
+            }
         });
 
     } catch (error) {
@@ -218,6 +263,8 @@ export async function scanPutawayCode(req, res) {
         });
     }
 }
+
+
 
 // CREATE A TRANSFER LINE 
 export async function createTransferLine(req, res) {
@@ -231,7 +278,13 @@ export async function createTransferLine(req, res) {
         console.log(" ERROR 1");
         // 1️⃣ Validar producto activo
         const product = await getActiveProductById(client, productId);
-        if (!product) throw { code: "PRODUCT_NOT_FOUND_OR_INACTIVE" };
+        if (!product) {
+            throw new AppError(
+                "PRODUCT_NOT_FOUND_OR_INACTIVE",
+                "El producto no existe o está inactivo."
+            );
+        }
+
 
         // 2️⃣ Validar sesión activa
         const sessionResult = await client.query(`
@@ -244,8 +297,12 @@ export async function createTransferLine(req, res) {
             `, [userId]);
 
         if (sessionResult.rowCount === 0) {
-            throw { code: "NO_ACTIVE_TRANSFER_SESSION" };
+            throw new AppError(
+                "NO_ACTIVE_TRANSFER_SESSION",
+                "No existe una sesión de transferencia activa para este usuario."
+            );
         }
+
 
         const sessionId = sessionResult.rows[0].id;
         console.log("2");
@@ -259,10 +316,15 @@ export async function createTransferLine(req, res) {
             `, [fromLocationId]);
 
         if (locResult.rowCount === 0 || locResult.rows[0].location_type !== "STORAGE") {
-            throw { code: "INVALID_STORAGE_LOCATION" };
+            throw new AppError(
+                "INVALID_STORAGE_LOCATION",
+                "La ubicación escaneada no es una ubicación válida de almacenamiento."
+            );
         }
 
+
         const { warehouse_id } = locResult.rows[0];
+
         console.log("3 - warehouse desde location:", warehouse_id);
 
 
@@ -278,13 +340,35 @@ export async function createTransferLine(req, res) {
             stockResult.rowCount === 0 ||
             Number(stockResult.rows[0].qty_available) < Number(qty)
         ) {
-            throw { code: "QTY_EXCEEDS_AVAILABLE" };
+            throw new AppError(
+                "QTY_EXCEEDS_AVAILABLE",
+                "La cantidad ingresada excede el inventario disponible en esta ubicación."
+            );
         }
+
         console.log("4", userId);
         console.log("5", warehouse_id);
+
+
         // 5️⃣ Ubicación destino del usuario
         const userLocation = await getUserActiveLocation(client, userId);
-        if (!userLocation) throw { code: "USER_LOCATION_NOT_FOUND" };
+
+        if (!userLocation) {
+            throw new AppError(
+                "USER_LOCATION_NOT_FOUND",
+                "No se encontró una ubicación de destino activa para el usuario."
+            );
+        }
+
+
+        if (userLocation.warehouse_id !== warehouse_id) {
+            throw new AppError(
+                "WAREHOUSE_MISMATCH",
+                "La ubicación de origen y destino no pertenecen al mismo almacén."
+            );
+        }
+
+
 
         // 6️⃣ Buscar línea existente
         const existingLineResult = await client.query(`
@@ -323,6 +407,21 @@ export async function createTransferLine(req, res) {
                 qty
             });
             console.log("6");
+
+            await createInventoryMovement(client, {
+                productSku: product.sku,
+                fromLocationId,
+                toLocationId: userLocation.id,
+                qty: Number(qty),
+                movementType: "MOVE",
+                referenceType: "TRANSFER",
+                referenceId: String(sessionId),
+                createdBy: userId,
+                note: `Transfer pick (update) hacia ubicación del usuario`
+            });
+
+
+
             await client.query("COMMIT");
 
             return res.json({ success: true, line: updateResult.rows[0], mode: "updated" });
@@ -346,14 +445,43 @@ export async function createTransferLine(req, res) {
             qty
         });
 
+        await createInventoryMovement(client, {
+            productSku: product.sku,
+            fromLocationId,
+            toLocationId: userLocation.id,
+            qty: Number(qty),
+            movementType: "MOVE",
+            referenceType: "TRANSFER",
+            referenceId: String(sessionId),
+            createdBy: userId,
+            note: `Transfer pick hacia ubicación del usuario`
+        });
+
+
         await client.query("COMMIT");
 
         res.json({ success: true, line: insertResult.rows[0], mode: "created" });
 
     } catch (err) {
         await client.query("ROLLBACK");
-        res.status(400).json({ success: false, error: err.code || "TRANSFER_ERROR" });
-    } finally {
+
+        if (err instanceof AppError) {
+            return res.status(err.status).json({
+                success: false,
+                code: err.code,
+                message: err.message
+            });
+        }
+
+        console.error("❌ TRANSFER ERROR:", err);
+
+        return res.status(500).json({
+            success: false,
+            code: "TRANSFER_ERROR",
+            message: "Ocurrió un error inesperado al procesar la transferencia."
+        });
+    }
+    finally {
         client.release();
     }
 }
@@ -361,112 +489,122 @@ export async function createTransferLine(req, res) {
 
 // POST /transfer/drop
 export async function dropTransfer(req, res) {
-  const client = await db.connect();
-  console.log("INICIO DROP");
-  try {
-    await client.query("BEGIN");
+    const client = await db.connect();
+    console.log("INICIO DROP");
+    try {
+        await client.query("BEGIN");
 
-    const userId = req.user.id;
-    const { transfer_session_id, product_sku, to_location_code, qty } = req.body;
- console.log(userId);
+        const userId = req.user.id;
+        const { transfer_session_id, product_sku, to_location_code, qty } = req.body;
+        console.log(userId);
 
- console.log("ubicacion: ", to_location_code);
-    /* -----------------------------
-       1️⃣ Validar qty
-    ------------------------------*/
-    if (!qty || Number(qty) <= 0) {
-      return res.status(400).json({
-        code: "INVALID_QTY",
-        message: "qty debe ser un número mayor que 0"
-      });
-    }
+        console.log("ubicacion: ", to_location_code);
+        /* -----------------------------
+           1️⃣ Validar qty
+        ------------------------------*/
+        if (!qty || Number(qty) <= 0) {
+            return res.status(400).json({
+                code: "INVALID_QTY",
+                message: "qty debe ser un número mayor que 0"
+            });
+        }
 
-    /* -----------------------------
-       2️⃣ Validar sesión (activa y del usuario)
-    ------------------------------*/
-    const sessionResult = await client.query(`
+        /* -----------------------------
+           2️⃣ Validar sesión (activa y del usuario)
+        ------------------------------*/
+        const sessionResult = await client.query(`
       SELECT id, status, user_id, warehouse_id
       FROM transfer_sessions
       WHERE id = $1
       FOR UPDATE
     `, [transfer_session_id]);
 
-    if (sessionResult.rowCount === 0) {
-      return res.status(404).json({
-        code: "SESSION_NOT_FOUND",
-        message: "La sesión no existe"
-      });
-    }
+        if (sessionResult.rowCount === 0) {
+            throw new AppError(
+                "SESSION_NOT_FOUND",
+                "La sesión no existe",
+                404
+            );
+        }
 
-    const session = sessionResult.rows[0];
 
-    if (Number(session.user_id) !== Number(userId)) {
-      return res.status(403).json({
-        code: "SESSION_NOT_OWNED",
-        message: "La sesión no pertenece al usuario"
-      });
-    }
+        const session = sessionResult.rows[0];
 
-    if (!["open", "in_progress"].includes(session.status)) {
-      return res.status(400).json({
-        code: "SESSION_NOT_ACTIVE",
-        message: "La sesión no está activa"
-      });
-    }
-    console.log("SESSION ESTA ACTIVA");
-    /* -----------------------------
-       3️⃣ Obtener ubicación del usuario (destino intermedio / mano)
-    ------------------------------*/
-    console.log("El user id es: ", userId, "su tipo es,", typeof(userId));
-    const userLocation = await getUserActiveLocation(client, userId);
-    console.log("user location: ", userLocation)
-    if (!userLocation) {
-      return res.status(404).json({
-        code: "USER_LOCATION_NOT_FOUND",
-        message: "El usuario no tiene ubicación asignada"
-      });
-    }
+        if (Number(session.user_id) !== Number(userId)) {
+            throw new AppError(
+                "SESSION_NOT_OWNED",
+                "La sesión no pertenece al usuario",
+                403
+            );
+        }
 
-    const userLocationId = Number(userLocation.id);
-     console.log("SE OBTUVO LA UBICACION DEL USUARIO", userLocationId);
-    /* -----------------------------
-       4️⃣ Validar ubicación destino STORAGE
-    ------------------------------*/
-    console.log(to_location_code, "codigo de ubicacion destino");
-    const locationResult = await getActiveLocationByCodeAndType(
-      client,
-      to_location_code,
-      "STORAGE"
-    );
 
-    if (locationResult.rowCount === 0) {
-      return res.status(400).json({
-        code: "INVALID_STORAGE_LOCATION",
-        message: "Ubicación destino inválida"
-      });
-    }
+        if (!["open", "in_progress"].includes(session.status)) {
+            throw new AppError(
+                "SESSION_NOT_ACTIVE",
+                "La sesión no está activa"
+            );
+        }
 
-    const toLocation = locationResult.rows[0];
-    console.log("SE OBTUVO UBICACION DESTINO, ", toLocation);
-    /* -----------------------------
-       5️⃣ Resolver producto por SKU
-    ------------------------------*/
-    const product = await getActiveProductBySku(client, product_sku);
+        console.log("SESSION ESTA ACTIVA");
+        /* -----------------------------
+           3️⃣ Obtener ubicación del usuario (destino intermedio / mano)
+        ------------------------------*/
+        console.log("El user id es: ", userId, "su tipo es,", typeof (userId));
+        const userLocation = await getUserActiveLocation(client, userId);
+        console.log("user location: ", userLocation)
+        if (!userLocation) {
+            throw new AppError(
+                "USER_LOCATION_NOT_FOUND",
+                "El usuario no tiene ubicación asignada",
+                404
+            );
+        }
 
-    if (!product) {
-      return res.status(404).json({
-        code: "PRODUCT_NOT_FOUND",
-        message: "Producto no existe o no está activo"
-      });
-    }
 
-    const productId = Number(product.id);
-    console.log("SE OBTUBO EL PRODUCTO", product);
-    /* -----------------------------
-       6️⃣ Traer líneas disponibles "en mano" (to_location_id = userLocation)
-         (estas son las líneas que ya fueron “picked” hacia el usuario)
-    ------------------------------*/
-    const linesResult = await client.query(`
+        const userLocationId = Number(userLocation.id);
+        console.log("SE OBTUVO LA UBICACION DEL USUARIO", userLocationId);
+        /* -----------------------------
+           4️⃣ Validar ubicación destino STORAGE
+        ------------------------------*/
+        console.log(to_location_code, "codigo de ubicacion destino");
+        const locationResult = await getActiveLocationByCodeAndType(
+            client,
+            to_location_code,
+            "STORAGE"
+        );
+
+        if (locationResult.rowCount === 0) {
+            throw new AppError(
+                "INVALID_STORAGE_LOCATION",
+                "Ubicación destino inválida"
+            );
+        }
+
+
+        const toLocation = locationResult.rows[0];
+        console.log("SE OBTUVO UBICACION DESTINO, ", toLocation);
+        /* -----------------------------
+           5️⃣ Resolver producto por SKU
+        ------------------------------*/
+        const product = await getActiveProductBySku(client, product_sku);
+
+        if (!product) {
+            throw new AppError(
+                "PRODUCT_NOT_FOUND",
+                "Producto no existe o no está activo",
+                404
+            );
+        }
+
+
+        const productId = Number(product.id);
+        console.log("SE OBTUBO EL PRODUCTO", product);
+        /* -----------------------------
+           6️⃣ Traer líneas disponibles "en mano" (to_location_id = userLocation)
+             (estas son las líneas que ya fueron “picked” hacia el usuario)
+        ------------------------------*/
+        const linesResult = await client.query(`
       SELECT
         tl.id,
         tl.transfer_session_id,
@@ -485,109 +623,112 @@ export async function dropTransfer(req, res) {
       FOR UPDATE
     `, [transfer_session_id, productId, userLocationId]);
 
-    if (linesResult.rowCount === 0) {
-      return res.status(400).json({
-        code: "NO_LINES_IN_USER_LOCATION",
-        message: "No hay líneas disponibles de este producto en la ubicación del usuario"
-      });
-    }
+        if (linesResult.rowCount === 0) {
+            throw new AppError(
+                "NO_LINES_IN_USER_LOCATION",
+                "No hay líneas disponibles de este producto en la ubicación del usuario"
+            );
+        }
 
-    const availableLines = linesResult.rows;
-    console.log("ATENTION", availableLines);
-    /* -----------------------------
-       7️⃣ Validar total pendiente
-    ------------------------------*/
-    const totalRemaining = availableLines.reduce(
-      (sum, l) => sum + Number(l.remaining_qty),
-      0
-    );
 
-    if (Number(qty) > totalRemaining) {
-      return res.status(400).json({
-        code: "QTY_EXCEEDS_PENDING_IN_HAND",
-        message: "Cantidad mayor que el total pendiente en la ubicación del usuario"
-      });
-    }
+        const availableLines = linesResult.rows;
+        console.log("ATENTION", availableLines);
+        /* -----------------------------
+           7️⃣ Validar total pendiente
+        ------------------------------*/
+        const totalRemaining = availableLines.reduce(
+            (sum, l) => sum + Number(l.remaining_qty),
+            0
+        );
 
-    /* -----------------------------
-       8️⃣ Consumir cantidades una por una y crear transfer_drop_lines
-    ------------------------------*/
-    let qtyToMove = Number(qty);
+        if (Number(qty) > totalRemaining) {
+            throw new AppError(
+                "QTY_EXCEEDS_PENDING_IN_HAND",
+                "Cantidad mayor que el total pendiente en la ubicación del usuario"
+            );
+        }
 
-    for (const line of availableLines) {
-      if (qtyToMove <= 0) break;
 
-      const currentRemaining = Number(line.remaining_qty);
-      if (currentRemaining <= 0) continue;
+        /* -----------------------------
+           8️⃣ Consumir cantidades una por una y crear transfer_drop_lines
+        ------------------------------*/
+        let qtyToMove = Number(qty);
 
-      const take = Math.min(currentRemaining, qtyToMove);
-      const newRemaining = currentRemaining - take;
-      const newStatus = newRemaining === 0 ? "completed" : "partial";
+        for (const line of availableLines) {
+            if (qtyToMove <= 0) break;
 
-      // ✅ actualizar transfer_lines
-      await client.query(`
+            const currentRemaining = Number(line.remaining_qty);
+            if (currentRemaining <= 0) continue;
+
+            const take = Math.min(currentRemaining, qtyToMove);
+            const newRemaining = currentRemaining - take;
+            const newStatus = newRemaining === 0 ? "completed" : "partial";
+
+            // ✅ actualizar transfer_lines
+            await client.query(`
         UPDATE transfer_lines
         SET remaining_qty = $1,
             status = $2
         WHERE id = $3
       `, [newRemaining, newStatus, line.id]);
 
-      // ✅ trazabilidad
-      await client.query(`
+            // ✅ trazabilidad
+            await client.query(`
         INSERT INTO transfer_drop_lines
           (transfer_session_id, transfer_line_id, product_id, from_location_id, to_location_id, qty_moved, status, created_by_user_id)
         VALUES
           ($1,$2,$3,$4,$5,$6,'confirmed',$7)
       `, [
-        transfer_session_id,
-        line.id,
-        productId,
-        userLocationId,   // desde la mano del usuario
-        toLocation.id,    // hacia storage final
-        take,
-        userId
-      ]);
+                transfer_session_id,
+                line.id,
+                productId,
+                userLocationId,   // desde la mano del usuario
+                toLocation.id,    // hacia storage final
+                take,
+                userId
+            ]);
 
-      qtyToMove -= take;
-    }
+            qtyToMove -= take;
+        }
 
-    if (qtyToMove > 0) {
-      return res.status(400).json({
-        code: "QTY_NOT_FULFILLED",
-        message: "No se pudo completar la cantidad solicitada"
-      });
-    }
+        if (qtyToMove > 0) {
+            throw new AppError(
+                "QTY_NOT_FULFILLED",
+                "No se pudo completar la cantidad solicitada"
+            );
+        }
 
-    /* -----------------------------
-       9️⃣ Mover inventario real (userLocation -> toLocation)
-    ------------------------------*/
-    await moveInventoryBetweenLocations(client, {
-      warehouseId: toLocation.warehouse_id || session.warehouse_id,
-      productSku: product.sku,
-      fromLocationId: userLocationId,
-      toLocationId: Number(toLocation.id),
-      qty: Number(qty)
-    });
 
-    /* -----------------------------
-       🔟 Registrar movimiento histórico
-    ------------------------------*/
-    await createInventoryMovement(client, {
-      productSku: product.sku,
-      fromLocationId: userLocationId,
-      toLocationId: Number(toLocation.id),
-      qty: Number(qty),
-      movementType: "MOVE",
-      referenceType: "TRANSFER",
-      referenceId: String(transfer_session_id),
-      createdBy: userId,
-      note: `Transfer drop a ubicación ${toLocation.code}`
-    });
+        /* -----------------------------
+           9️⃣ Mover inventario real (userLocation -> toLocation)
+        ------------------------------*/
+        await moveInventoryBetweenLocations(client, {
+            warehouseId: toLocation.warehouse_id || session.warehouse_id,
+            productSku: product.sku,
+            fromLocationId: userLocationId,
+            toLocationId: Number(toLocation.id),
+            qty: Number(qty)
+        });
 
-    /* -----------------------------
-       1️⃣1️⃣ Cerrar sesión si ya no quedan líneas pendientes
-    ------------------------------*/
-    await client.query(`
+        /* -----------------------------
+           🔟 Registrar movimiento histórico
+        ------------------------------*/
+        await createInventoryMovement(client, {
+            productSku: product.sku,
+            fromLocationId: userLocationId,
+            toLocationId: Number(toLocation.id),
+            qty: Number(qty),
+            movementType: "MOVE",
+            referenceType: "TRANSFER",
+            referenceId: String(transfer_session_id),
+            createdBy: userId,
+            note: `Transfer drop a ubicación ${toLocation.code}`
+        });
+
+        /* -----------------------------
+           1️⃣1️⃣ Cerrar sesión si ya no quedan líneas pendientes
+        ------------------------------*/
+        await client.query(`
       UPDATE transfer_sessions
       SET status = 'completed',
           completed_at = now(),
@@ -600,35 +741,40 @@ export async function dropTransfer(req, res) {
         )
     `, [transfer_session_id]);
 
-    await client.query("COMMIT");
+        await client.query("COMMIT");
 
-    return res.status(200).json({
-      success: true,
-      message: "Transfer drop confirmado",
-      data: {
-        session_id: transfer_session_id,
-        user_location_id: userLocationId,
-        to_location: toLocation,
-        product: { id: productId, sku: product.sku },
-        qty: Number(qty)
-      }
-    });
+        return res.status(200).json({
+            success: true,
+            message: "Transfer drop confirmado",
+            data: {
+                session_id: transfer_session_id,
+                user_location_id: userLocationId,
+                to_location: toLocation,
+                product: { id: productId, sku: product.sku },
+                qty: Number(qty)
+            }
+        });
 
-  } catch (error) {
-    await client.query("ROLLBACK");
+    } catch (error) {
+        await client.query("ROLLBACK");
 
-    if (error?.code) {
-      return res.status(400).json(error);
+        if (error instanceof AppError) {
+            return res.status(error.status).json({
+                success: false,
+                code: error.code,
+                message: error.message
+            });
+        }
+
+        console.error("❌ TRANSFER DROP ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            code: "SERVER_ERROR",
+            message: "Error interno"
+        });
+    } finally {
+        client.release();
     }
-
-    console.error("❌ TRANSFER DROP ERROR:", error);
-
-    return res.status(500).json({
-      code: "SERVER_ERROR",
-      message: "Error interno"
-    });
-  } finally {
-    client.release();
-  }
 }
 

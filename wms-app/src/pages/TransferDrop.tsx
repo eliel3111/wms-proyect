@@ -4,6 +4,9 @@ import "../styles/Transfer.css";
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
 import { LoadingScreen } from "../components/LoadingScreen";
+import type { ApiErrorResponse } from "../types/apiError";
+import { errorTitles } from "../constants/errorTitles";
+
 
 type Location = {
     id: number;
@@ -16,6 +19,8 @@ type ScannedProduct = {
     description: string;
     uom?: string;
 };
+
+
 
 export default function TransferPickPage() {
     const navigate = useNavigate();
@@ -103,7 +108,8 @@ export default function TransferPickPage() {
 
                 try {
                     const res = await apiClient.post("/transfer/scan-product", {
-                        code: scanned
+                        code: scanned,
+                        current_location_id: fromLocationRef.current?.id ?? null
                     });
 
                     const data = res.data;
@@ -147,6 +153,36 @@ export default function TransferPickPage() {
                             title: "Código no válido",
                             message: "El código escaneado no corresponde a una ubicación ni a un producto."
                         });
+                    }
+
+                    else if (!data.success && data.code === "NO_LOCATION") {
+
+                        openModal({
+                            title:
+                                "Primero escanea una ubicación",
+                            message: "Primero debe escanear una ubicación válida antes de escanear un producto."
+                        });
+
+                    }
+
+                    else if (!data.success && data.code === "NO_STOCK_IN_LOCATION") {
+
+                        openModal({
+                            title:
+                                "Verifique el producto",
+                            message: "El producto no existe en esa ubicación o no tiene cantidad disponible."
+                        });
+
+                    }
+
+                    else if (!data.success && data.code === "INVALID_CODE") {
+
+                        openModal({
+                            title:
+                                "Verifique el código que leyó.",
+                            message: "El código no corresponde a una ubicación ni a un producto."
+                        });
+
                     }
 
 
@@ -194,7 +230,6 @@ export default function TransferPickPage() {
 
             setQty("");
             setCurrentLine(null);
-            setFromLocation(null);
 
 
             await loadPendingTransfers();
@@ -242,15 +277,21 @@ export default function TransferPickPage() {
             return res.data;
 
         } catch (error: any) {
-            console.error("❌ ERROR EN TRANSFER:", error);
+            const data = error.response?.data as ApiErrorResponse | undefined;
 
-            const backendError =
-                error.response?.data?.error || "ERROR_DESCONOCIDO";
+            if (!data) {
+                openModal({
+                    title: "Error",
+                    message: "Error desconocido"
+                });
+                return;
+            }
 
             openModal({
-                title: "Ocurrió un error",
-                message: `El error fue: ${backendError}. Contacte al soporte.`
+                title: errorTitles[data.code] || "Error",
+                message: data.message
             });
+
 
             // 👉 MUY IMPORTANTE: relanzar el error si el que llama lo necesita
             throw error;
@@ -322,7 +363,7 @@ export default function TransferPickPage() {
 
     const showProductEmpty = fromLocation && !currentLine;
     const showProductData = !!currentLine;
-    const showProductIdle = fromLocation && currentLine;
+    //const showProductIdle = fromLocation && currentLine;
 
     if (loading) return <LoadingScreen />;
 
@@ -352,7 +393,7 @@ export default function TransferPickPage() {
                                 )}
                             </div>
                         </>) : (<div className="scan-product-hint">
-                            LEA UNA UBICACIÓN DE ORIGEN
+                            LEA UNA UBICACIÓN DE DESTINO
                         </div>)}
                 </section>
 

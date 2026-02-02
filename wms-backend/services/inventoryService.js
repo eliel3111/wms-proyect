@@ -11,7 +11,7 @@ export async function moveInventoryBetweenLocations(
     }
 ) {
 
-    console.log("VALORES: ", warehouseId, productSku, fromLocationId, toLocationId. qty);
+    console.log("VALORES: ", warehouseId, productSku, fromLocationId, toLocationId, qty);
     console.log("SE INICIA EL MOVIMIENTO DE INVENTARIO");
     // 1️⃣ Buscar inventario origen
     const fromResult = await client.query(`
@@ -39,7 +39,7 @@ export async function moveInventoryBetweenLocations(
             message: "Cantidad mayor a la disponible en la ubicación de origen"
         };
     }
-
+ 
     // 3️⃣ Restar de origen
     await client.query(`
     UPDATE inventory_by_location
@@ -63,26 +63,26 @@ export async function moveInventoryBetweenLocations(
     console.log("SE BUSCA LA UBICACION DE DESTINO", toResult);
     let toInvId;
 
-    if (toResult.rowCount === 0) {
-        // 👉 crear inventario destino
-        const insertResult = await client.query(`
-    INSERT INTO inventory_by_location
-      (warehouse_id, product_sku, location_id, qty_on_hand, qty_reserved)
-    VALUES
-      ($1, $2, $3, 0, 0)
-    RETURNING id
-  `, [warehouseId, productSku, Number(toLocationId)]);
+   try {
+  if (toResult.rowCount === 0) {
+    const insertResult = await client.query(`
+      INSERT INTO inventory_by_location
+        (warehouse_id, product_sku, location_id, qty_on_hand, qty_reserved)
+      VALUES
+        ($1, $2, $3, 0, 0)
+      RETURNING id
+    `, [warehouseId, productSku, Number(toLocationId)]);
 
-        toInvId = insertResult.rows[0].id;
+    toInvId = insertResult.rows[0].id;
+    console.log("📦 INVENTARIO DESTINO CREADO:", toInvId);
+  } else {
+    toInvId = toResult.rows[0].id;
+  }
+} catch (err) {
+  console.error("🔥 ERROR CREANDO INVENTARIO DESTINO:", err);
+  throw err;
+}
 
-        console.log("📦 INVENTARIO DESTINO CREADO:", toInvId);
-
-    } else {
-        toInvId = toResult.rows[0].id;
-    }
-
-
-    const toInv = toResult.rows[0];
     console.log("CANTIDAD", qty)
     console.log("ID", toInvId)
     // 5️⃣ Sumar en destino

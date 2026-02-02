@@ -764,7 +764,7 @@ export async function dropPutaway(req, res) {
     /* -----------------------------
        8️⃣ Registrar movimiento de inventario
     ------------------------------*/
-
+    console.log("CANTIDAD",qty);
     await createInventoryMovement(client, {
       productSku: product.sku,
       fromLocationId: dockLocationId,
