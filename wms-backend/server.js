@@ -21,12 +21,36 @@ const PORT = process.env.PORT || 3000;
 // -----------------------------
 console.log("🗄️ DB HOST:", process.env.DB_HOST);
 
-app.use(
+/*app.use(
   cors({
     origin: process.env.FRONTEND_URL,
     credentials: true,// Necesario para enviar cookies al frontend
   })
+);*/
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://wms-proyect.vercel.app",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // permitir requests sin origin (Postman, cron, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
 );
+
+app.options("*", cors());
+
 
 app.use(express.json());
 app.use(cookieParser()); // ← ahora sí, en el orden correcto

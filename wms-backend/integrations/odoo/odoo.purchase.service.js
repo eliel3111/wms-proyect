@@ -79,182 +79,126 @@ export async function lockSyncControl(model) {
 
 
 
-
 export async function getActivePurchaseOrders() {
-  const uid = await getOdooUid();
-  const client = getOdooClient("object");
-
   const model = "purchase.order";
+  let lock = null;
+  let maxWriteDate = null;
 
-  const lock = await lockSyncControl(model);
-  console.log("ESTE ES EL TIME: ", lock.lastWriteDate)
-  if (!lock) {
-    console.log(`[SYNC] ${model} ya está corriendo y no se pudo activar funcion getActivePurchaseOrders`);
-    return;
-  }
-
-  let maxWriteDate = lock.lastWriteDate;
-
-
-  /* ==========================
-     1️⃣ TRAER PURCHASE ORDERS
-  ========================== */
-  const poDomain = [
-    ["state", "=", "purchase"],
-    ["write_date", ">", lock.lastWriteDate]
-  ];
-
-
-  const poFields = [
-    "id",
-    "name",
-    "partner_id",
-    "order_line",
-    "picking_ids",
-    "state",
-    "write_date",
-    "date_order",
-    "date_planned",
-    "incoming_picking_count",
-    "receipt_status"
-  ];
-
-  const purchaseOrders = await new Promise((resolve, reject) => {
-    client.methodCall(
-      "execute_kw",
-      [
-        process.env.ODOO_DB,
-        uid,
-        process.env.ODOO_API_KEY,
-        "purchase.order",
-        "search_read",
-        [poDomain],
-        { fields: poFields }
-      ],
-      (err, res) => (err ? reject(err) : resolve(res))
-    );
-  });
-
-  console.log("ESTA ES LA ORDEN DE COMPRA", purchaseOrders);
-
-  // ... todo tu código igual
-
-  const clientDb = await db.connect();
   try {
-    await clientDb.query("BEGIN");
+    const uid = await getOdooUid();
+    const client = getOdooClient("object");
 
-    for (let i = 0; i < purchaseOrders.length; i++) {
-      await upsertPurchaseOrder(clientDb, purchaseOrders[i]);
+    // 🔒 Lock global
+    lock = await lockSyncControl(model);
 
-      const po = purchaseOrders[i];
-      if (!po.write_date) continue;
-
-      if (new Date(po.write_date) > new Date(maxWriteDate)) {
-        maxWriteDate = po.write_date;
-      }
+    if (!lock) {
+      console.log(`[SYNC] ${model} ya está corriendo, se omite este ciclo`);
+      return;
     }
 
-    await clientDb.query("COMMIT");
-  } catch (error) {
-    await clientDb.query("ROLLBACK");
+    maxWriteDate = lock.lastWriteDate;
 
-    // 🔴 Marcar sync como failed
+    /* ==========================
+       1️⃣ TRAER PURCHASE ORDERS
+    ========================== */
+    const poDomain = [
+      ["state", "=", "purchase"],
+      ["write_date", ">", maxWriteDate]
+    ];
+
+    const poFields = [
+      "id",
+      "name",
+      "partner_id",
+      "order_line",
+      "picking_ids",
+      "state",
+      "write_date",
+      "date_order",
+      "date_planned",
+      "incoming_picking_count",
+      "receipt_status"
+    ];
+
+    const purchaseOrders = await new Promise((resolve, reject) => {
+      client.methodCall(
+        "execute_kw",
+        [
+          process.env.ODOO_DB,
+          uid,
+          process.env.ODOO_API_KEY,
+          "purchase.order",
+          "search_read",
+          [poDomain],
+          { fields: poFields }
+        ],
+        (err, res) => (err ? reject(err) : resolve(res))
+      );
+    });
+
+    /* ==========================
+       2️⃣ UPSERT EN DB
+    ========================== */
+    const clientDb = await db.connect();
+    try {
+      await clientDb.query("BEGIN");
+
+      for (const po of purchaseOrders) {
+        await upsertPurchaseOrder(clientDb, po);
+
+        if (po.write_date && new Date(po.write_date) > new Date(maxWriteDate)) {
+          maxWriteDate = po.write_date;
+        }
+      }
+
+      await clientDb.query("COMMIT");
+    } catch (dbError) {
+      await clientDb.query("ROLLBACK");
+      throw dbError;
+    } finally {
+      clientDb.release();
+    }
+
+    /* ==========================
+       ✅ MARCAR SUCCESS
+    ========================== */
     await db.query(
       `
-    UPDATE sync_control
-    SET
-      status = 'failed',
-      updated_at = now(),
-      error_message = $1
-    WHERE model = $2
-    `,
-      [error.message, model]
+      UPDATE sync_control
+      SET
+        last_write_date = $1,
+        status = 'success',
+        updated_at = now(),
+        error_message = NULL
+      WHERE model = $2
+      `,
+      [maxWriteDate, model]
     );
+
+    return purchaseOrders;
+
+  } catch (error) {
+    console.error(`[SYNC ERROR] ${model}`, error.message);
+
+    // 🟥 SI YA HABÍA LOCK → marcar failed
+    if (lock?.id) {
+      await db.query(
+        `
+        UPDATE sync_control
+        SET
+          status = 'failed',
+          updated_at = now(),
+          error_message = $1
+        WHERE model = $2
+        `,
+        [error.message, model]
+      );
+    }
 
     throw error;
-  } finally {
-    clientDb.release();
   }
-
-  /* ✅ SOLO SI TODO SALIÓ BIEN */
-  await db.query(
-    `
-  UPDATE sync_control
-  SET
-    last_write_date = $1,
-    status = 'success',
-    updated_at = now(),
-    error_message = NULL
-  WHERE model = $2
-  `,
-    [maxWriteDate, model]
-  );
-
-
-  /* ==========================
-     2️⃣ OBTENER TODOS LOS PICKING IDS
-  ========================== */
-  const pickingIds = [
-    ...new Set(
-      purchaseOrders.flatMap(po => po.picking_ids || [])
-    )
-  ];
-
-  if (pickingIds.length === 0) {
-    return purchaseOrders;
-  }
-
-  /* ==========================
-     3️⃣ TRAER STOCK.PICKING
-  ========================== */
-  const pickingFields = [
-    "id",
-    "name",
-    "origin",
-    "state",
-    "picking_type_id",
-    "location_id",
-    "location_dest_id",
-    "scheduled_date",
-    "date_done",
-    "move_ids",
-    "company_id"
-  ];
-
-
-  const pickings = await new Promise((resolve, reject) => {
-    client.methodCall(
-      "execute_kw",
-      [
-        process.env.ODOO_DB,
-        uid,
-        process.env.ODOO_API_KEY,
-        "stock.picking",
-        "search_read",
-        [[["id", "in", pickingIds]]],
-        { fields: pickingFields }
-      ],
-      (err, res) => (err ? reject(err) : resolve(res))
-    );
-  });
-
-  console.log(pickings);
-
-  /* ==========================
-     4️⃣ INDEXAR PICKINGS POR ID
-  ========================== */
-  const pickingMap = Object.fromEntries(
-    pickings.map(p => [p.id, p])
-  );
-
-  /* ==========================
-     5️⃣ MERGE EN CADA PO
-  ========================== */
-  return purchaseOrders.map(po => ({
-    ...po,
-    pickings: (po.picking_ids || []).map(id => pickingMap[id]).filter(Boolean)
-  }));
 }
+
 
 export async function getPurchaseOrderLinesByOrderId(orderId) {
   const uid = await getOdooUid();
