@@ -347,7 +347,15 @@ WHERE r.id = $1;
     // CREAR EL PDF CON LA INFORMACION
 
     const html = buildReceiptHtml(headerPDF, enrichedLines);
-    const pdf = await generatePdf(html);
+    let pdf = null;
+
+    try {
+      pdf = await generatePdf(html);
+
+    } catch (err) {
+      console.error("⚠️ PDF falló, recepción cerrada igual:", err);
+    }
+
 
     //--------------------------------------------------
     //GENERAR NOMBRE DEL FILE:
