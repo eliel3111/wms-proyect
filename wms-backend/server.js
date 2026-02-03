@@ -31,6 +31,7 @@ console.log("🗄️ DB HOST:", process.env.DB_HOST);
 const allowedOrigins = [
   "http://localhost:5173",
   "https://wms-proyect.vercel.app",
+  "https://www.sidialwms.com"
 ];
 
 app.use(
