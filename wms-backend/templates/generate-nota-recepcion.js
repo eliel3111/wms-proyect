@@ -1,11 +1,14 @@
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 export async function generatePdf(html) {
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
-console.log("Chrome path:", puppeteer.executablePath());
+
+  console.log("Chrome path:", await chromium.executablePath());
 
   const page = await browser.newPage();
 
@@ -17,5 +20,6 @@ console.log("Chrome path:", puppeteer.executablePath());
   });
 
   await browser.close();
+
   return pdfBuffer;
 }
