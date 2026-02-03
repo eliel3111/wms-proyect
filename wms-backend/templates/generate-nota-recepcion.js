@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 export async function generatePdf(html) {
   const browser = await puppeteer.launch({
@@ -15,12 +16,6 @@ export async function generatePdf(html) {
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
-    margin: {
-      top: "10mm",
-      bottom: "20mm",
-      left: "15mm",
-      right: "15mm",
-    },
   });
 
   await browser.close();
