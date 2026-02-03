@@ -22,7 +22,7 @@ export default function ReceivingFinal() {
     const inputRef = useRef<HTMLInputElement>(null);
     const [loading, setLoading] = useState(true);
     const [locations, setLocations] = useState<ReceivingLocation[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    
     const [confirmation, setConfirmation] = useState<{
         show: boolean;
         receiptCode: string;
@@ -31,7 +31,6 @@ export default function ReceivingFinal() {
         receiptCode: ""
     });
 
-    const [receipt, setReceipt] = useState<string | null>(null);
 
     const { openModal } = useModal();
 
@@ -57,7 +56,7 @@ export default function ReceivingFinal() {
                 console.log(result.data);
                 if (!result.success) {
                     if (result.code === "UBICACION_NO_EXISTE") {
-                        setError("No existe ubicación de recepción configurada");
+                        console.log("No existe ubicación de recepción configurada");
                         return;
                     }
                 }
@@ -66,7 +65,7 @@ export default function ReceivingFinal() {
 
             } catch (err: any) {
                 // Error de red o 500
-                setError("Error consultando ubicaciones de recepción");
+                
                 console.error(err);
             } finally {
                 setLoading(false);

@@ -264,7 +264,7 @@ export default function PutawayPickPage() {
     }
 
     try {
-      const result = await savePutawayLine({
+      await savePutawayLine({
         productId: currentProduct.id,
         fromLocationId: selectedLocation.location_id,
         qty: qtyNumber

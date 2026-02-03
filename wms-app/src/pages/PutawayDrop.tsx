@@ -51,8 +51,7 @@ export default function PutawayPickPage() {
   const [loading, setLoading] = useState(true);
   const [pendingLines, setPendingLines] = useState<PendingPutawayLine[]>([]);
   const pendingLinesRef = useRef<PendingPutawayLine[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
+
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [currentLine, setCurrentLine] = useState<PendingPutawayLine | null>(null);
   const [putLocation, setPutLocation] = useState<Location | null>(null);
@@ -261,15 +260,11 @@ export default function PutawayPickPage() {
       }
       console.log(result.data);
       setPendingLines(result.data);
-      setHasActiveSession(result.totalLines > 0);
       setSessionId(Number(result.sessionId));
-
-      setHasActiveSession(result.totalLines > 0);
       setSessionId(Number(result.sessionId));
 
     } catch (err: any) {
       console.error("Error cargando putaway pendientes:", err);
-      setError("No se pudieron cargar los productos pendientes");
     } finally {
       setLoading(false);
     }
@@ -322,11 +317,11 @@ export default function PutawayPickPage() {
 
 
   //FUNTION: to make input be focus
-  function selectAllOnFocus(e: React.FocusEvent<HTMLInputElement>) {
+  /*function selectAllOnFocus(e: React.FocusEvent<HTMLInputElement>) {
     requestAnimationFrame(() => {
       e.target.select();
     });
-  }
+  }*/
 
 
   /* =======================

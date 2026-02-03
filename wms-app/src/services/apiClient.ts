@@ -30,7 +30,7 @@ export function setAuthStore(authStore: AuthStore): void {
 // ---------------------------
 
 const apiClient: AxiosInstance = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   withCredentials: true, // si usas cookies HttpOnly
 });
 

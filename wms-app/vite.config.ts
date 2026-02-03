@@ -44,10 +44,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://192.168.1.43:3000",
+        target: "https://wms-proyect.onrender.com",
         changeOrigin: true,
         secure: false,
       },
     },
   },
 });
+//target: "http://192.168.1.43:3000",

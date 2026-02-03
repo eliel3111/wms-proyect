@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import "../styles/Putaway.css";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";

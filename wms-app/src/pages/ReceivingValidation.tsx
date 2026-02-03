@@ -23,9 +23,8 @@ export default function ReceivingValidation() {
 
     const [diferencias, setDiferencias] = useState<Diferencia[]>([]);
     const [loading, setLoading] = useState(true);
-    const [purchaseOrderId, setPurchaseOrderId] = useState<number | null>(null);
-    const [purchaseOrderNumber, setPurchaseOrderNumber] = useState<string>("");
 
+   
 
     useEffect(() => {
         if (!id) return;
@@ -50,7 +49,6 @@ export default function ReceivingValidation() {
                 console.log("DIFERENCIAS: ", diffs);
                 // 1️⃣ Guardar diferencias en state
                 setDiferencias(diffs);
-                setPurchaseOrderNumber(result.data.purchase_order_number);
 
                 // 2️⃣ Si no hay diferencias → ir directo a final
                 if (diffs.length === 0) {
