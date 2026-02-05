@@ -5,13 +5,14 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
-import { startCronJobs } from "./cron/cronJobs.js";
+import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
 
 
 
 console.log("🔥 ESTE ES EL SERVER.JS QUE ESTÁ CORRIENDO 🔥");
 
-startCronJobs();
+//startCronJobs();
+//productsCronJobs();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
