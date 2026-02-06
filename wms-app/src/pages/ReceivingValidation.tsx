@@ -24,7 +24,7 @@ export default function ReceivingValidation() {
     const [diferencias, setDiferencias] = useState<Diferencia[]>([]);
     const [loading, setLoading] = useState(true);
 
-   
+
 
     useEffect(() => {
         if (!id) return;
@@ -52,7 +52,9 @@ export default function ReceivingValidation() {
 
                 // 2️⃣ Si no hay diferencias → ir directo a final
                 if (diffs.length === 0) {
-                    navigate(`/receiving/final/${poId}`);
+                    setTimeout(() => {
+                        navigate(`/receiving/final/${poId}`, { replace: true });
+                    }, 5);
                 }
 
             } catch (error) {
