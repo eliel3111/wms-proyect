@@ -38,13 +38,15 @@ function App() {
             </PrivateRoute>
           }
         >
-          <Route path="/menu" element={<Menu />} />
+
 
           {/* RECEIVING */}
-          <Route path="/receiving" element={<ReceivingSearch />} />
-          <Route path="/ordencompra/:id" element={<OrdenCompra />} />
-          <Route path="/validation/:id" element={<ReceivingValidation />} />
-          <Route path="/final/:id" element={<ReceivingFinal />} />
+          <Route path="menu" element={<Menu />} />
+          <Route path="receiving" element={<ReceivingSearch />} />
+          <Route path="ordencompra/:id" element={<OrdenCompra />} />
+          <Route path="validation/:id" element={<ReceivingValidation />} />
+          <Route path="receiving/final/:id" element={<ReceivingFinal />} />
+
 
           {/* PUTAWAY */}
           <Route path="/putaway" element={<PutawayMenu />} />

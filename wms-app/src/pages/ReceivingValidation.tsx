@@ -111,7 +111,7 @@ export default function ReceivingValidation() {
 
                     <button
                         className="btn-finalize-blue"
-                        onClick={() => navigate(`/final/${id}`)}
+                        onClick={() => navigate(`/receiving/final/${id}`)}
                     >
                         Finalizar
                     </button>
