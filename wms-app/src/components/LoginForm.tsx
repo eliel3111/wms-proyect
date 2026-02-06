@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthProvider.tsx";
 import { useNavigate } from "react-router-dom";
-import "../styles/LoginForm.css"; 
+import "../styles/LoginForm.css";
+import { Eye, EyeOff } from "lucide-react";
+
 
 
 
@@ -11,18 +13,19 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  
+  const [showPassword, setShowPassword] = useState(false);
+
   const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
-  console.log("Usuario actualizado:", user);
-  console.log("Autenticado:", isAuthenticated);
+    console.log("Usuario actualizado:", user);
+    console.log("Autenticado:", isAuthenticated);
 
 
-}, [user, isAuthenticated]);
+  }, [user, isAuthenticated]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-  e.preventDefault();
+    e.preventDefault();
     setError("");
     try {
       await login({ email, password });
@@ -59,16 +62,29 @@ export default function LoginForm() {
 
           <div className="form-group">
             <label htmlFor="password">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="input"
-            />
+
+            <div className="password-wrapper">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="input"
+              />
+
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+
+            </div>
           </div>
+
 
           {error && <p className="error-message">{error}</p>}
 
@@ -76,7 +92,7 @@ export default function LoginForm() {
             Entrar
           </button>
 
-          
+
         </form>
       </div>
     </div>

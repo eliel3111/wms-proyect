@@ -204,3 +204,31 @@
   }
 
 }
+
+
+/* Mostrar contraseña */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper .input {
+  width: 100%;
+  padding-right: 45px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
+
+.toggle-password:hover {
+  color: #2764cc;
+}
