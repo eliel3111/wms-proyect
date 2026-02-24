@@ -2,6 +2,47 @@ import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
 export async function generatePdf(html) {
+  let browser;
+
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (isProduction) {
+    console.log("🌍 Running on RENDER/PROD");
+
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+
+  } else {
+    console.log("💻 Running LOCAL");
+
+    browser = await puppeteer.launch({
+      executablePath:
+        "C:/Program Files/Google/Chrome/Application/chrome.exe",
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+  }
+
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    printBackground: true,
+  });
+
+  await browser.close();
+  return pdfBuffer;
+}
+
+
+/*import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+
+export async function generatePdf(html) {
   const browser = await puppeteer.launch({
     args: chromium.args,
     executablePath: await chromium.executablePath(),
@@ -22,4 +63,4 @@ export async function generatePdf(html) {
   await browser.close();
 
   return pdfBuffer;
-}
+}*/

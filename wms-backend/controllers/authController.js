@@ -100,6 +100,14 @@ export async function login(req, res) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
+    const dbCheck = await db.query(`
+SELECT current_database(),
+inet_server_addr(),
+inet_server_port()
+`);
+console.log("CONECTADO A:", dbCheck.rows);
+
+
     // 2️⃣ Normalizar email
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -117,6 +125,13 @@ export async function login(req, res) {
       [normalizedEmail]
     );
 
+const perm = await db.query(`
+SELECT current_database() as db, permissions 
+FROM users 
+WHERE email=$1
+`, [email]);
+
+console.log("PERMISOS VIENEN DE:", perm.rows);
 
 
     if (userResult.rows.length === 0) {

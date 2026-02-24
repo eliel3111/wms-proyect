@@ -40,3 +40,33 @@ export async function sendReceiptEmail({
     ],
   });
 }
+
+
+export async function sendTransferEmail({
+  receiptEmail,
+  pdfBuffer,
+  transferCode,
+  slug
+}) {
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || '"WMS" <noreply@wms.com>',
+    to: receiptEmail,
+    subject: `Nota de Traslado ${transferCode}`,
+    html: `
+      <h3>Nota de Traslado</h3>
+      <p>Se ha enviado un traslado de almacén.</p>
+      <p><strong>Código:</strong> ${transferCode}</p>
+      <p><strong>Empresa:</strong> ${slug || ""}</p>
+      <p>El PDF se encuentra adjunto a este correo.</p>
+    `,
+    attachments: [
+      {
+        filename: `Nota_Traslado_${transferCode}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
+  });
+
+}

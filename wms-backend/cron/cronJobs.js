@@ -1,6 +1,8 @@
 import cron from "node-cron";
 import { getActivePurchaseOrders, getPurchaseOrderLinesByOrderId } from "../integrations/odoo/odoo.purchase.service.js";
 import { getActiveProducts } from "../integrations/odoo/odoo.products.service.js";
+import { syncWarehouses } from "../sync/warehouse.sync.js";
+import { loginOdoo } from "../services/login.service.js";
 
 export function startCronJobs() {
     // Cada 15 minutos
@@ -41,4 +43,23 @@ export function productsCronJobs() {
 });
 
     console.log("✅ Cron jobs started");
+}
+
+
+
+
+export function startWarehouseCron() {
+
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      console.log("⏰ Ejecutando cron warehouses");
+
+      const uid = await loginOdoo();
+      await syncWarehouses(uid);
+
+    } catch (error) {
+      console.error("❌ Error cron warehouses:", error);
+    }
+  });
+
 }
