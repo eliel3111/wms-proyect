@@ -136,6 +136,8 @@ export async function getActivePurchaseOrders() {
       );
     });
 
+    console.log("ORDENES DE COMPRA DE ODOO OBTENIDA", purchaseOrders);
+
     /* ==========================
        2️⃣ UPSERT EN DB
     ========================== */
@@ -239,5 +241,236 @@ export async function getPurchaseOrderLinesByOrderId(orderId) {
       }
     );
   });
+}
+
+
+
+// ===============================================
+// 🔥 PROCESAR LINEAS DE PURCHASE ORDER
+// ===============================================
+
+export async function processPurchaseOrderLines(orderLines) {
+
+  if (!Array.isArray(orderLines) || orderLines.length === 0) {
+    console.warn("⚠️ orderLines vacío o inválido");
+    return;
+  }
+
+  const orderId = orderLines?.[0]?.order_id?.[0] || null;
+
+  console.log("ORDER LINES:", orderLines);
+
+  const result = await db.query(
+    `
+  SELECT id
+  FROM purchase_orders
+  WHERE erp_order_id = $1
+  AND status IN ('open', 'partial')
+  LIMIT 1
+  `,
+    [orderId]
+  );
+
+  const wmsOrderId = result.rows[0]?.id || null;
+
+  /* =====================================
+     1️⃣ EXTRAER ERP PRODUCT IDS
+  ===================================== */
+
+  const erpIds = orderLines
+    .map(line => line.product_id?.[0])
+    .filter(Boolean);
+
+  if (erpIds.length === 0) {
+    console.warn("⚠️ No hay ERP product IDs válidos");
+    return;
+  }
+
+  /* =====================================
+     2️⃣ TRAER PRODUCTOS ACTIVOS
+  ===================================== */
+
+  const productsResult = await db.query(
+    `
+    SELECT id, sku, description, erp_id
+    FROM products
+    WHERE erp_id = ANY($1)
+      AND status = 'ACTIVE'
+      AND deleted_erp = false
+    `,
+    [erpIds]
+  );
+
+  // Crear mapa erp_id → producto
+  const productMap = new Map();
+
+  for (const product of productsResult.rows) {
+    productMap.set(product.erp_id, product);
+  }
+
+  /* =====================================
+     3️⃣ TRAER BARCODES DE ESOS SKUS
+  ===================================== */
+
+  const skus = productsResult.rows.map(p => p.sku);
+
+  let barcodeSet = new Set();
+
+  if (skus.length > 0) {
+    const barcodeResult = await db.query(
+      `
+      SELECT product_sku
+      FROM product_barcodes
+      WHERE product_sku = ANY($1)
+      `,
+      [skus]
+    );
+
+    barcodeSet = new Set(
+      barcodeResult.rows.map(r => r.product_sku)
+    );
+  }
+
+  /* =====================================
+     4️⃣ PROCESAR CADA LINEA SIN MÁS QUERIES
+  ===================================== */
+
+  const processedLines = [];
+
+  let sequence = 1; // 🔥 secuencia real por orden
+
+  for (const line of orderLines) {
+
+    const erpProductId = line.product_id?.[0] || null;
+
+    if (!erpProductId) {
+      console.warn("Linea sin ERP product ID:", line.id);
+      continue;
+    }
+
+    const product = productMap.get(erpProductId);
+
+    if (!product) {
+      console.warn("Producto no encontrado en WMS:", erpProductId);
+      continue;
+    }
+
+    const line_number = sequence; // 👈 usamos secuencia controlada
+    sequence++;                   // 👈 incrementamos solo si la línea es válida
+
+    const productId = product.id;
+    const sku = product.sku;
+    const description = product.description;
+
+    const product_exists = barcodeSet.has(sku);
+
+    const deleted_erp = line.state === "cancel";
+
+    console.log("------------------------------------------------");
+    console.log("ERP LINE ID:", line.id);
+    console.log("LINE NUMBER:", line_number);
+    console.log("ERP PRODUCT ID:", erpProductId);
+    console.log("LOCAL PRODUCT ID:", productId);
+    console.log("SKU:", sku);
+    console.log("DESCRIPTION:", description);
+    console.log("HAS BARCODE:", product_exists);
+
+    processedLines.push({
+      wms_order_id: wmsOrderId,
+      erp_line_id: line.id,
+      erp_order_id: orderId,
+      erp_product_id: erpProductId,
+      product_id: productId,
+      sku,
+      description,
+      ordered_qty: line.product_qty,
+      qty_received: line.qty_received,
+      product_exists,
+      deleted_erp,
+      line_number
+    });
+  }
+
+  return processedLines;
+}
+
+
+
+// ===============================================
+// 🔥 UPSERT MASIVO CON deleted_erp VARIABLE
+// ===============================================
+
+export async function upsertPurchaseOrderLines(processedLines) {
+
+  if (!Array.isArray(processedLines) || processedLines.length === 0) {
+    console.log("⚠️ No hay líneas para upsert");
+    return;
+  }
+
+  const values = [];
+  const params = [];
+
+  processedLines.forEach((line, i) => {
+
+    const base = i * 9; // 👈 ahora son 9 columnas
+
+    values.push(`
+      ($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4},
+       $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8},
+       $${base + 9})
+    `);
+
+    params.push(
+      line.erp_line_id,        // 1
+      line.erp_order_id,       // 2
+      line.sku,                // 3
+      line.wms_order_id,       // 4 purchase_order_id
+      line.product_exists,     // 5
+      line.description,        // 6
+      line.ordered_qty,        // 7
+      line.deleted_erp,        // 8
+      line.line_number         // 9 👈 NUEVO
+    );
+  });
+
+  const query = `
+    INSERT INTO purchase_order_lines (
+      erp_line_id,
+      erp_order_id,
+      sku,
+      purchase_order_id,
+      product_exists,
+      description,
+      ordered_qty,
+      deleted_erp,
+      line_number
+    )
+    VALUES
+      ${values.join(",")}
+    ON CONFLICT (erp_line_id)
+    DO UPDATE SET
+      erp_order_id = EXCLUDED.erp_order_id,
+      sku = EXCLUDED.sku,
+      purchase_order_id = EXCLUDED.purchase_order_id,
+      product_exists = EXCLUDED.product_exists,
+      description = EXCLUDED.description,
+      ordered_qty = EXCLUDED.ordered_qty,
+      deleted_erp = EXCLUDED.deleted_erp,
+      line_number = EXCLUDED.line_number, -- 👈 agregado
+      updated_at = NOW()
+    WHERE
+      purchase_order_lines.erp_order_id IS DISTINCT FROM EXCLUDED.erp_order_id OR
+      purchase_order_lines.sku IS DISTINCT FROM EXCLUDED.sku OR
+      purchase_order_lines.purchase_order_id IS DISTINCT FROM EXCLUDED.purchase_order_id OR
+      purchase_order_lines.product_exists IS DISTINCT FROM EXCLUDED.product_exists OR
+      purchase_order_lines.description IS DISTINCT FROM EXCLUDED.description OR
+      purchase_order_lines.ordered_qty IS DISTINCT FROM EXCLUDED.ordered_qty OR
+      purchase_order_lines.deleted_erp IS DISTINCT FROM EXCLUDED.deleted_erp OR
+      purchase_order_lines.line_number IS DISTINCT FROM EXCLUDED.line_number
+  `;
+
+  await db.query(query, params);
+
+  console.log(`✅ UPSERT masivo ejecutado (${processedLines.length} líneas)`);
 }
 

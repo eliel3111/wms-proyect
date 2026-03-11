@@ -1,5 +1,6 @@
 import { db } from "../../db.js";
-import { fetchItemsPage } from "./citrus.items.js";
+import { fetchItemsPage, fetchPurchaseOrdersPage } from "./citrus.items.js";
+import { insertProductFromERP } from "./citrus.product.service.js";
 
 export async function syncAllItems() {
 
@@ -8,13 +9,17 @@ export async function syncAllItems() {
 
     let page = 0;
     let jobId = null;
+    let client;
 
     try {
+
+        client = await db.connect();   // 🔥 AQUI
+
 
         // -------------------------------------------------
         // 🔐 1. LOCK GLOBAL (evita 2 sync simultáneos)
         // -------------------------------------------------
-        const lock = await db.query(`
+        const lock = await client.query(`
       SELECT pg_try_advisory_lock(999999) as locked
     `);
 
@@ -26,13 +31,38 @@ export async function syncAllItems() {
         // -------------------------------------------------
         // 2. BUSCAR JOB ACTIVO
         // -------------------------------------------------
-        const jobSearch = await db.query(`
-  SELECT * 
-  FROM sincronizacion_productos
-  ORDER BY id DESC
-  LIMIT 1
+        const jobSearch = await client.query(`
+SELECT 
+  id,
+  DATE(fecha_inicio) AS fecha_inicio
+FROM sincronizacion_productos
+ORDER BY id DESC
+LIMIT 1
 `);
 
+        let fechaInicio = null;
+        let fechaFin = new Date();
+
+        if (jobSearch.rowCount > 0) {
+            fechaInicio = jobSearch.rows[0].fecha_inicio;
+            jobId = jobSearch.rows[0].id;
+            console.log("Fecha desde DB:", fechaInicio);
+        }
+
+        if (!fechaInicio) {
+            fechaInicio = "2000-01-01";
+        }
+
+        const fechaInicioFormatted = new Date(fechaInicio)
+            .toISOString()
+            .slice(0, 10);
+
+        const fechaFinFormatted = new Date()
+            .toISOString()
+            .slice(0, 10);
+
+        console.log("Fecha Inicio:", fechaInicioFormatted);
+        console.log("Fecha Fin:", fechaFinFormatted);
 
         if (jobSearch.rows.length > 0) {
 
@@ -40,7 +70,7 @@ export async function syncAllItems() {
             jobId = job.id;
 
             // 🔁 reutilizar misma fila
-            await db.query(`
+            await client.query(`
     UPDATE sincronizacion_productos
     SET pagina_actual = 0,
         fecha_inicio = NOW(),
@@ -57,7 +87,7 @@ export async function syncAllItems() {
         }
         else {
             // primera vez en la vida
-            const insert = await db.query(`
+            const insert = await client.query(`
     INSERT INTO sincronizacion_productos
     (pagina_actual, tamano_pagina, estado)
     VALUES (0, $1, 'RUNNING')
@@ -77,13 +107,22 @@ export async function syncAllItems() {
         while (true) {
 
             //console.log(`📄 Página actual: ${page}`);
+            console.log(fechaInicioFormatted);
+            console.log(fechaFin);
+            const items = await fetchItemsPage(page,
+                pageSize, fechaInicioFormatted, fechaFinFormatted);
 
-            const items = await fetchItemsPage(page, pageSize);
+            const orders = await fetchPurchaseOrdersPage(
+                1,
+                50,
+                "2024-01-01T00:00:00",
+                fechaFinFormatted
+            );
 
             if (!items || items.length === 0) {
                 console.log("🏁 No hay más items");
 
-                await db.query(`
+                await client.query(`
           UPDATE sincronizacion_productos
           SET estado='DONE',
               fecha_ultima_actualizacion=NOW()
@@ -101,14 +140,16 @@ export async function syncAllItems() {
             for (const item of items) {
                 try {
                     // 🔥 AQUI TU UPSERT
-                    // await saveItem(item);
+                    console.log(item);
+                    const wmsResult = await insertProductFromERP(client, item);
+                    console.log(wmsResult);
 
                 } catch (err) {
                     erroresPagina++;
                     console.error("❌ Error item:", err.message);
 
                     // opcional: guardar error en tabla errores
-                    await db.query(`
+                    await client.query(`
             INSERT INTO sincronizacion_errores
             (producto_id, pagina, mensaje_error, payload)
             VALUES ($1,$2,$3,$4)
@@ -124,7 +165,7 @@ export async function syncAllItems() {
             // -------------------------------------------------
             // 6. ACTUALIZAR PROGRESO
             // -------------------------------------------------
-            await db.query(`
+            await client.query(`
         UPDATE sincronizacion_productos
         SET pagina_actual=$1,
             fecha_ultima_actualizacion=NOW(),
@@ -142,7 +183,7 @@ export async function syncAllItems() {
 
                 //console.log("🏁 Última página detectada");
 
-                await db.query(`
+                await client.query(`
           UPDATE sincronizacion_productos
           SET estado='DONE',
               fecha_ultima_actualizacion=NOW()
@@ -162,7 +203,7 @@ export async function syncAllItems() {
         console.error("🔴 ERROR SYNC:", error.message);
 
         if (jobId) {
-            await db.query(`
+            await client.query(`
         UPDATE sincronizacion_productos
         SET estado='ERROR',
             fecha_ultima_actualizacion=NOW()
@@ -171,7 +212,13 @@ export async function syncAllItems() {
         }
 
     } finally {
-        // 🔓 liberar lock global
-        await db.query(`SELECT pg_advisory_unlock(999999)`);
+        try {
+            if (client) {
+                await client.query(`SELECT pg_advisory_unlock(999999)`);
+                client.release();   // 🔥 MUY IMPORTANTE
+            }
+        } catch (err) {
+            console.error("Error liberando recursos:", err.message);
+        }
     }
 }

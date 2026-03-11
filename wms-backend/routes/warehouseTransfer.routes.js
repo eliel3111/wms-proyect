@@ -1,6 +1,6 @@
 import express from "express";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { authorizeWarehouseSession, settingLocationOrigin, settingLocationDestination, addProductToInternalPicking, clearPickingLocations, deleteWarehouseTransferLine, closeTransferSession, getReceiveWarehouseTransfers, getReceivingByPickingId, saveWarehouseTransfer, getReceivingDifferences } from "../controllers/warehouseTransfer.controller.js";
+import { authorizeWarehouseSession, settingLocationOrigin, settingLocationDestination, addProductToInternalPicking, clearPickingLocations, deleteWarehouseTransferLine, closeTransferSession, getReceiveWarehouseTransfers, getReceivingByPickingId, saveWarehouseTransfer, getReceivingDifferences, closeWarehouseTransferReceptionFinal } from "../controllers/warehouseTransfer.controller.js";
 
 
 const router = express.Router();
@@ -54,6 +54,13 @@ router.post(
 // Get all purschase order lines with differences in an order
 router.get(
   "/differences/:poId", authMiddleware, getReceivingDifferences
+);
+
+// Close warehouse transfer receiving
+router.post(
+  "/close",
+  authMiddleware,
+  closeWarehouseTransferReceptionFinal
 );
 
 export default router;

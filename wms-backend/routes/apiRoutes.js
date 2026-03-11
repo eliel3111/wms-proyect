@@ -6,6 +6,7 @@ import putawayRoutes from "./putawayRoutes.js"
 import transferRoutes from "./transferRoutes.js"
 import odooRoutes from "./odoo.routes.js"
 import warehouseTransfer from "./warehouseTransfer.routes.js"
+import pickingWarehouse from "./pickingWarehouse.js"
 
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.use("/putaway", putawayRoutes);
 router.use("/transfer", transferRoutes);
 router.use("/odoo", odooRoutes);
 router.use("/warehouse-transfers", warehouseTransfer);
+router.use("/picking", pickingWarehouse);
 
 export default router;

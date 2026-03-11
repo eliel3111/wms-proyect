@@ -11,6 +11,545 @@ import { randomUUID } from "crypto";
 import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
 import { sendTransferEmail } from "../services/sendReceiptEmail.js";
 
+// CloseWarehouseTransferReceptionFinal.js (controller)
+export async function closeWarehouseTransferReceptionFinal(req, res) {
+    const client = await db.connect();
+
+    try {
+        console.log("✅ ENDPOINT: closeWarehouseTransferReceptionFinal");
+
+        const { pickingId, locationId } = req.body;
+        const userId = req.user?.id; // ajusta según tu auth
+
+        console.log("SE OBTUVO: ", pickingId, locationId, userId);
+
+        // -----------------------------
+        // 0) Validaciones rápidas input
+        // -----------------------------
+        if (!pickingId || !locationId) {
+            return res.status(400).json({
+                success: false,
+                title: "Datos requeridos",
+                message: "Debes enviar pickingId y locationId",
+            });
+        }
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                title: "No autenticado",
+                message: "No se pudo identificar el usuario",
+            });
+        }
+
+        const picking_id = Number(pickingId);
+        const receiving_location_id = Number(locationId);
+
+        if (Number.isNaN(picking_id) || Number.isNaN(receiving_location_id)) {
+            return res.status(400).json({
+                success: false,
+                title: "Datos inválidos",
+                message: "pickingId o locationId no son válidos",
+            });
+        }
+
+        await client.query("BEGIN");
+
+        // ------------------------------------
+        // 1) Buscar y lockear el picking
+        // ------------------------------------
+        const pickingResult = await client.query(
+            `
+      SELECT id, name, state, location_id, location_dest_id
+      FROM stock_picking
+      WHERE id = $1
+      FOR UPDATE
+      `,
+            [picking_id]
+        );
+
+        if (pickingResult.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({
+                success: false,
+                title: "Picking no encontrado",
+                message: "El traslado no existe",
+            });
+        }
+
+        const picking = pickingResult.rows[0];
+        console.log(picking);
+        // idempotencia: si ya está done, devuelve OK sin tocar inventario
+        if (picking.state === "done") {
+            await client.query("ROLLBACK");
+            return res.status(200).json({
+                success: true,
+                title: "Ya finalizado",
+                message: "El picking ya estaba en estado done",
+                data: { pickingId: picking.id, pickingName: picking.name },
+            });
+        }
+
+        if (picking.state === "cancel") {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                success: false,
+                title: "Picking cancelado",
+                message: "No se puede finalizar un picking cancelado",
+            });
+        }
+
+        if (picking.state === "draft") {
+            await client.query("ROLLBACK");
+            console.log("DRAFT");
+            return res.status(409).json({
+                success: false,
+                title: "No confirmado",
+                message: "El picking está en draft. Debes confirmarlo antes de finalizar.",
+            });
+        }
+
+        // ----------------------------------------------------
+        // 2) Validar receiving location (debe ser RECEIVING)
+        // ----------------------------------------------------
+        const receivingLocationResult = await client.query(
+            `
+      SELECT id, code, warehouse_id
+      FROM locations
+      WHERE id = $1
+        AND is_active = true
+        AND location_type = 'RECEIVING'
+      LIMIT 1
+      `,
+            [receiving_location_id]
+        );
+
+        if (receivingLocationResult.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({
+                success: false,
+                title: "Ubicación inválida",
+                message: "La ubicación no existe, no está activa o no es de tipo RECEIVING",
+            });
+        }
+
+        const receivingLocation = receivingLocationResult.rows[0];
+
+        // Validación: la ubicación seleccionada debe pertenecer al almacén destino del picking
+        if (Number(receivingLocation.warehouse_id) !== Number(picking.location_dest_id)) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                success: false,
+                title: "Ubicación incorrecta",
+                message: "Esa ubicación no pertenece al almacén destino del picking",
+            });
+        }
+
+        // --------------------------------------------
+        // 3) Traer stock_moves (lock) + products join
+        // --------------------------------------------
+        const movesResult = await client.query(
+            `
+      SELECT
+        sm.id,
+        sm.product_id,
+        sm.product_qty::float AS product_qty,
+        sm.quantity_done::float AS quantity_done,
+        sm.state,
+        p.sku,
+        p.description
+      FROM stock_move sm
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.picking_id = $1
+        AND sm.state NOT IN ('done', 'cancel')
+      FOR UPDATE
+      `,
+            [picking_id]
+        );
+
+        if (movesResult.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                success: false,
+                title: "Sin líneas",
+                message: "No hay movimientos pendientes para este picking",
+            });
+        }
+
+        const moves = movesResult.rows;
+
+        // --------------------------------------------
+        // 4) Validar diferencias y permiso del usuario
+        // --------------------------------------------
+        const hasDifferences = moves.some(
+            (m) => Number(m.product_qty) !== Number(m.quantity_done)
+        );
+
+        if (hasDifferences) {
+            // 🔐 Verificar permiso desde users.permissions JSON
+            const permResult = await client.query(
+                `
+                SELECT permissions
+                FROM users
+                WHERE id = $1
+                    AND is_active = true
+                LIMIT 1
+                `,
+                [userId]
+            );
+
+            if (permResult.rowCount === 0) {
+                await client.query("ROLLBACK");
+                return res.status(403).json({
+                    success: false,
+                    title: "Usuario inválido",
+                    message: "El usuario no existe o está inactivo",
+                });
+            }
+
+            // 📦 permissions JSON completo
+            const permissions = permResult.rows[0].permissions || {};
+
+            // 🔎 buscar permiso específico
+            const allowed =
+                permissions?.warehouse_transfer?.can_receive_transfer_differences === true;
+
+            // ❌ Si NO tiene permiso → bloquear
+            if (!allowed) {
+                await client.query("ROLLBACK");
+
+                const diffList = moves
+                    .filter((m) => Number(m.product_qty) !== Number(m.quantity_done))
+                    .map((m) => `${m.sku} (ordered:${m.product_qty}, done:${m.quantity_done})`)
+                    .join(", ");
+
+                return res.status(409).json({
+                    success: false,
+                    title: "Diferencias no permitidas",
+                    message: `No tienes permiso para finalizar con diferencias. ${diffList}`,
+                });
+            }
+
+            // ✅ Si tiene permiso → continúa normal
+            console.log("🟢 Usuario con permiso para cerrar con diferencias");
+        }
+
+        // ---------------------------------------------------------
+        // 5) Por cada stock_move: actualizar stock_move_line
+        //    - location_dest_id = receiving_location_id
+        //    - qty_done = quantity_done (pero evitando duplicación)
+        //    - state = 'done'
+        // ---------------------------------------------------------
+        const moveIds = moves.map((m) => m.id);
+
+        // Traer todas las move_lines de esos moves (lock)
+        const moveLinesResult = await client.query(
+            `
+      SELECT
+  sml.id,
+  sml.move_id,
+  sml.location_id,
+  sml.location_dest_id,
+  sml.qty_done::float AS qty_done
+FROM stock_move_line sml
+WHERE sml.move_id = ANY($1)
+ORDER BY sml.move_id, sml.id
+FOR UPDATE
+      `,
+            [moveIds]
+        );
+
+        if (moveLinesResult.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                success: false,
+                title: "Sin detalle",
+                message: "No existen stock_move_line para este picking. No se puede finalizar.",
+            });
+        }
+
+        const moveLines = moveLinesResult.rows;
+
+        // Indexar move_lines por move_id
+        const moveLinesByMove = new Map();
+        for (const ml of moveLines) {
+            if (!moveLinesByMove.has(ml.move_id)) moveLinesByMove.set(ml.move_id, []);
+            moveLinesByMove.get(ml.move_id).push(ml);
+        }
+
+        // Actualizar move_lines:
+        // Regla simple y segura:
+        // - Todas las líneas: location_dest_id = receiving_location_id y state='done'
+        // - Solo la primera línea del move tendrá qty_done = move.quantity_done; las demás qty_done = 0
+        for (const mv of moves) {
+            const lines = moveLinesByMove.get(mv.id) || [];
+            if (lines.length === 0) continue;
+
+            let remaining = Number(mv.quantity_done) || 0;
+
+            for (let i = 0; i < lines.length; i++) {
+                const ml = lines[i];
+
+                const qtyToSet = i === 0 ? remaining : 0;
+
+                await client.query(
+                    `
+          UPDATE stock_move_line
+          SET
+            location_dest_id = $1,
+            qty_done = $2,
+            state = 'done'
+          WHERE id = $3
+          `,
+                    [receiving_location_id, qtyToSet, ml.id]
+                );
+            }
+
+            // (Opcional) marcar el move done también
+            await client.query(
+                `
+        UPDATE stock_move
+        SET state = 'done'
+        WHERE id = $1
+        `,
+                [mv.id]
+            );
+        }
+
+        // ---------------------------------------------------------
+        // 6) Agrupar movimientos por (sku, origin, destination)
+        //    usando las stock_move_line ya actualizadas
+        // ---------------------------------------------------------
+        const groupedResult = await client.query(
+            `
+      SELECT
+        p.sku,
+        sml.location_id AS from_location_id,
+        sml.location_dest_id AS to_location_id,
+        SUM(sml.qty_done)::float AS qty
+      FROM stock_move_line sml
+      JOIN stock_move sm ON sm.id = sml.move_id
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.picking_id = $1
+        AND sml.state = 'done'
+        AND sml.qty_done > 0
+      GROUP BY p.sku, sml.location_id, sml.location_dest_id
+      ORDER BY p.sku
+      `,
+            [picking_id]
+        );
+
+        const grouped = groupedResult.rows;
+
+        // Si no hay qty_done > 0, igual puedes cerrar picking (depende de negocio)
+        // Aquí lo permitimos.
+        // ---------------------------------------------------------
+        // 7) Actualizar inventory_by_location:
+        //    - Restar en origen
+        //    - Sumar en destino
+        // ---------------------------------------------------------
+        // Necesitamos warehouse_id para cada location involucrada
+        const involvedLocationIds = [
+            ...new Set(
+                grouped.flatMap((g) => [Number(g.from_location_id), Number(g.to_location_id)])
+            ),
+        ];
+
+        const locationWarehouseMap = new Map();
+        if (involvedLocationIds.length > 0) {
+            const locMapResult = await client.query(
+                `
+        SELECT id, warehouse_id
+        FROM locations
+        WHERE id = ANY($1)
+        `,
+                [involvedLocationIds]
+            );
+
+            for (const row of locMapResult.rows) {
+                locationWarehouseMap.set(Number(row.id), Number(row.warehouse_id));
+            }
+        }
+
+        // ✅ En vez de upsert masivo, movemos inventario usando el servicio
+        // grouped viene del query que agrupa por sku, from_location_id, to_location_id, qty
+
+        for (const g of grouped) {
+            const sku = g.sku;
+            const fromLocationId = Number(g.from_location_id);
+            const toLocationId = Number(g.to_location_id);
+            const qty = Number(g.qty) || 0;
+
+            if (qty <= 0) continue;
+
+            // warehouseId: en tu caso, el destino pertenece al warehouse del picking
+            // pero para mover inventario entre locations, lo ideal es usar el warehouse del ORIGEN (o validar ambos iguales)
+            const fromWh = locationWarehouseMap.get(fromLocationId);
+            const toWh = locationWarehouseMap.get(toLocationId);
+
+            if (!fromWh || !toWh) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    success: false,
+                    title: "Ubicación incompleta",
+                    message: "No se pudo determinar el warehouse_id para una ubicación involucrada",
+                });
+            }
+
+            // destino debe ser el warehouse destino del picking
+            if (Number(toWh) !== Number(picking.location_dest_id)) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    success: false,
+                    title: "Destino inválido",
+                    message: "La ubicación de recepción no pertenece al almacén destino del traslado",
+                });
+            }
+
+            try {
+                await moveInventoryBetweenLocations(client, {
+                    warehouseId: Number(fromWh),      // o toWh (son iguales si validas)
+                    productSku: sku,
+                    fromLocationId,
+                    toLocationId,
+                    qty,
+                });
+            } catch (err) {
+                await client.query("ROLLBACK");
+
+                // 🎯 Normalizar errores del servicio a tu formato backend
+                const code = err?.code;
+                const msg = err?.message;
+
+                if (code === "ORIGIN_NOT_FOUND") {
+                    return res.status(409).json({
+                        success: false,
+                        title: "Inventario origen no encontrado",
+                        message: `No existe inventario en ubicación origen para SKU ${sku} (loc ${fromLocationId})`,
+                    });
+                }
+
+                if (code === "QTY_EXCEEDS_AVAILABLE") {
+                    return res.status(409).json({
+                        success: false,
+                        title: "Stock insuficiente",
+                        message: `Cantidad mayor a la disponible en origen para SKU ${sku}. Origen loc ${fromLocationId}, qty ${qty}`,
+                    });
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    title: "Error moviendo inventario",
+                    message: msg || "Error inesperado moviendo inventario entre ubicaciones",
+                });
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 8) Insert masivo en inventory_movements (historial)
+        //    reference_type='stock.move' reference_id=move_id
+        // ---------------------------------------------------------
+        // Nota: tu requerimiento dice "reference_id = stock_move.id"
+        // Como estamos agrupando, un grupo puede representar múltiples moves.
+        // Solución: insertar movimientos POR MOVE (más exacto) o
+        // insertar agrupado con reference_id = pickingId.
+        //
+        // Te lo dejo exacto por MOVE, sin agrupar por move_id:
+        const movementsResult = await client.query(
+            `
+      SELECT
+        sm.id AS move_id,
+        p.sku,
+        sml.location_id AS from_location_id,
+        sml.location_dest_id AS to_location_id,
+        SUM(sml.qty_done)::float AS qty
+      FROM stock_move_line sml
+      JOIN stock_move sm ON sm.id = sml.move_id
+      JOIN products p ON p.id = sm.product_id
+      WHERE sm.picking_id = $1
+        AND sml.state = 'done'
+        AND sml.qty_done > 0
+      GROUP BY sm.id, p.sku, sml.location_id, sml.location_dest_id
+      `,
+            [picking_id]
+        );
+
+        const moveGroups = movementsResult.rows;
+
+        if (moveGroups.length > 0) {
+            const moveValues = [];
+            const moveParams = [];
+
+            moveGroups.forEach((row, i) => {
+                const base = i * 7;
+                moveValues.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`);
+                moveParams.push(
+                    row.sku,
+                    row.from_location_id,
+                    row.to_location_id,
+                    row.qty,
+                    "MOVE",
+                    "stock.move",
+                    String(row.move_id)
+                );
+            });
+
+            await client.query(
+                `
+        INSERT INTO inventory_movements
+          (product_sku, from_location_id, to_location_id, qty, movement_type, reference_type, reference_id)
+        VALUES
+          ${moveValues.join(",")}
+        `,
+                moveParams
+            );
+        }
+
+        // ---------------------------------------------------------
+        // 9) Marcar picking DONE (al final)
+        // ---------------------------------------------------------
+        await client.query(
+            `
+  UPDATE stock_picking
+  SET state = 'done'
+  WHERE id = $1
+  `,
+            [picking_id]
+        );
+        await client.query("COMMIT");
+
+        return res.status(200).json({
+            success: true,
+            title: "Recepción finalizada",
+            message: "El picking fue finalizado correctamente",
+            data: {
+                pickingId: picking.id,
+                pickingName: picking.name,
+                receivingLocationId: receiving_location_id,
+                hasDifferences,
+                movedLines: moveGroups.length,
+                groupedInventoryRows: grouped.length,
+            },
+        });
+    } catch (error) {
+        try {
+            await client.query("ROLLBACK");
+        } catch (_) { }
+
+        console.error("❌ closeWarehouseTransferReceptionFinal:", error);
+
+        return res.status(500).json({
+            success: false,
+            title: "Error interno",
+            message: "Error finalizando el picking",
+            error: error.message,
+        });
+    } finally {
+        client.release();
+    }
+}
+
+
 //Start putaway transfer pick session
 export async function authorizeWarehouseSession(req, res) {
     try {
@@ -1519,7 +2058,7 @@ export async function getReceiveWarehouseTransfers(req, res) {
     `;
 
         const pickingResult = await client.query(pickingQuery);
-
+        console.log("TRASLADOS PENDING: ",pickingResult);
         if (pickingResult.rowCount === 0) {
             return res.json({
                 success: false,
@@ -1531,7 +2070,7 @@ export async function getReceiveWarehouseTransfers(req, res) {
         /* =============================
            4. VALIDAR ALMACENES ACTIVOS
         ============================== */
-
+        console.log("Llega aqui");
         const validPickings = [];
 
         for (const picking of pickingResult.rows) {
@@ -1768,100 +2307,100 @@ export async function getReceivingByPickingId(req, res) {
 // Save warehouse transfer receiving
 export async function saveWarehouseTransfer(req, res) {
 
-  console.log("🚀 HIT /warehouse-transfers/save");
-  console.log("BODY:", req.body);
+    console.log("🚀 HIT /warehouse-transfers/save");
+    console.log("BODY:", req.body);
 
-  const client = await db.connect();
+    const client = await db.connect();
 
-  try {
+    try {
 
-    const {
-      picking_id,
-      picking_name,
-      reception_status, // se ignora
-      lines
-    } = req.body;
+        const {
+            picking_id,
+            picking_name,
+            reception_status, // se ignora
+            lines
+        } = req.body;
 
-    /* ---------------- VALIDACIONES ---------------- */
+        /* ---------------- VALIDACIONES ---------------- */
 
-    if (!picking_id || !picking_name) {
-      return res.status(400).json({
-        success:false,
-        title:"Datos incompletos",
-        message:"picking_id y picking_name son requeridos"
-      });
-    }
+        if (!picking_id || !picking_name) {
+            return res.status(400).json({
+                success: false,
+                title: "Datos incompletos",
+                message: "picking_id y picking_name son requeridos"
+            });
+        }
 
-    if (!Array.isArray(lines) || lines.length === 0) {
-      return res.status(400).json({
-        success:false,
-        title:"Sin líneas",
-        message:"No hay líneas para actualizar"
-      });
-    }
+        if (!Array.isArray(lines) || lines.length === 0) {
+            return res.status(400).json({
+                success: false,
+                title: "Sin líneas",
+                message: "No hay líneas para actualizar"
+            });
+        }
 
-    for (const line of lines) {
-      if (
-        typeof line.id !== "number" ||
-        typeof line.quantity_done !== "number" ||
-        line.quantity_done < 0
-      ) {
-        return res.status(400).json({
-          success:false,
-          title:"Formato inválido",
-          message:"Cada línea debe tener id y quantity_done >= 0"
-        });
-      }
-    }
+        for (const line of lines) {
+            if (
+                typeof line.id !== "number" ||
+                typeof line.quantity_done !== "number" ||
+                line.quantity_done < 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    title: "Formato inválido",
+                    message: "Cada línea debe tener id y quantity_done >= 0"
+                });
+            }
+        }
 
-    /* ---------------- TRANSACCIÓN ---------------- */
+        /* ---------------- TRANSACCIÓN ---------------- */
 
-    await client.query("BEGIN");
+        await client.query("BEGIN");
 
-    /* ---------------- VALIDAR PICKING ---------------- */
+        /* ---------------- VALIDAR PICKING ---------------- */
 
-    const pickingResult = await client.query(`
+        const pickingResult = await client.query(`
       SELECT id, state, locked
       FROM stock_picking
       WHERE id = $1
       FOR UPDATE
-    `,[picking_id]);
+    `, [picking_id]);
 
-    if (pickingResult.rowCount === 0) {
-      throw new Error("PICKING_NOT_FOUND");
-    }
+        if (pickingResult.rowCount === 0) {
+            throw new Error("PICKING_NOT_FOUND");
+        }
 
-    const picking = pickingResult.rows[0];
+        const picking = pickingResult.rows[0];
 
-    if (["done","cancel"].includes(picking.state)) {
-      return res.status(409).json({
-        success:false,
-        title:"Picking cerrado",
-        message:"El traslado ya está completado o cancelado"
-      });
-    }
+        if (["done", "cancel"].includes(picking.state)) {
+            return res.status(409).json({
+                success: false,
+                title: "Picking cerrado",
+                message: "El traslado ya está completado o cancelado"
+            });
+        }
 
-    if (picking.locked !== true) {
-      return res.status(409).json({
-        success:false,
-        title:"Picking no confirmado",
-        message:"Debes confirmar el picking antes de recibir"
-      });
-    }
+        if (picking.locked !== true) {
+            return res.status(409).json({
+                success: false,
+                title: "Picking no confirmado",
+                message: "Debes confirmar el picking antes de recibir"
+            });
+        }
 
-    /* 🔥 poner picking en waiting */
-    await client.query(`
+        /* 🔥 poner picking en waiting */
+        await client.query(`
       UPDATE stock_picking
       SET state = 'waiting'
       WHERE id = $1
-    `,[picking_id]);
+    `, [picking_id]);
 
-    /* ---------------- UPDATE MASIVO stock_move ---------------- */
+        /* ---------------- UPDATE MASIVO stock_move ---------------- */
 
-    const lineIds = lines.map(l => l.id);
-    const qtys = lines.map(l => l.quantity_done);
+        const lineIds = lines.map(l => l.id);
+        const qtys = lines.map(l => l.quantity_done);
 
-    await client.query(`
+        await client.query(`
       UPDATE stock_move sm
       SET quantity_done = data.quantity_done
       FROM (
@@ -1871,106 +2410,106 @@ export async function saveWarehouseTransfer(req, res) {
       ) AS data
       WHERE sm.id = data.id
       AND sm.state NOT IN ('cancel','done')
-    `,[lineIds, qtys]);
+    `, [lineIds, qtys]);
 
-    /* ---------------- COMMIT ---------------- */
+        /* ---------------- COMMIT ---------------- */
 
-    await client.query("COMMIT");
+        await client.query("COMMIT");
 
-    return res.json({
-      success:true,
-      message:"Transferencia guardada correctamente"
-    });
+        return res.json({
+            success: true,
+            message: "Transferencia guardada correctamente"
+        });
 
-  } catch(error){
+    } catch (error) {
 
-    await client.query("ROLLBACK");
-    console.error("❌ saveWarehouseTransfer:", error);
+        await client.query("ROLLBACK");
+        console.error("❌ saveWarehouseTransfer:", error);
 
-    return res.status(500).json({
-      success:false,
-      title:"Error guardando",
-      message:error.message || "Error interno"
-    });
+        return res.status(500).json({
+            success: false,
+            title: "Error guardando",
+            message: error.message || "Error interno"
+        });
 
-  } finally {
-    client.release();
-  }
+    } finally {
+        client.release();
+    }
 }
 
 
 
 // Get receiving differences by picking (warehouse transfer)
 export async function getReceivingDifferences(req, res) {
- console.log("ESTA FUNCIONANDO");
-  const { poId } = req.params;
- console.log("id obtenido: ", poId);
-  /* 1️⃣ validar parámetro */
-  if (!poId ) {
-    return res.status(400).json({
-      success:false,
-      title:"ID requerido",
-      message:"Debes enviar el picking id"
-    });
-  }
+    console.log("ESTA FUNCIONANDO");
+    const { poId } = req.params;
+    console.log("id obtenido: ", poId);
+    /* 1️⃣ validar parámetro */
+    if (!poId) {
+        return res.status(400).json({
+            success: false,
+            title: "ID requerido",
+            message: "Debes enviar el picking id"
+        });
+    }
 
-  const pickingId = Number(poId );
+    const pickingId = Number(poId);
 
-  if (isNaN(pickingId)) {
-    return res.status(400).json({
-      success:false,
-      title:"ID inválido",
-      message:"El picking id no es válido"
-    });
-  }
+    if (isNaN(pickingId)) {
+        return res.status(400).json({
+            success: false,
+            title: "ID inválido",
+            message: "El picking id no es válido"
+        });
+    }
 
-  try {
+    try {
 
-    /* 2️⃣ buscar picking */
-    const pickingResult = await db.query(`
+        /* 2️⃣ buscar picking */
+        const pickingResult = await db.query(`
       SELECT id, name, state, locked
       FROM stock_picking
       WHERE id = $1
       LIMIT 1
-    `,[pickingId]);
+    `, [pickingId]);
 
-    if (pickingResult.rowCount === 0) {
-      return res.status(404).json({
-        success:false,
-        title:"Picking no encontrado",
-        message:"El traslado no existe"
-      });
-    }
+        if (pickingResult.rowCount === 0) {
+            return res.status(404).json({
+                success: false,
+                title: "Picking no encontrado",
+                message: "El traslado no existe"
+            });
+        }
 
-    const picking = pickingResult.rows[0];
+        const picking = pickingResult.rows[0];
 
-    /* 3️⃣ validar estado */
-    if (["cancel","done"].includes(picking.state)) {
-      return res.status(409).json({
-        success:false,
-        title:"Picking cerrado",
-        message:"El traslado está cancelado o finalizado"
-      });
-    }
+        /* 3️⃣ validar estado */
+        if (["cancel", "done"].includes(picking.state)) {
+            return res.status(409).json({
+                success: false,
+                title: "Picking cerrado",
+                message: "El traslado está cancelado o finalizado"
+            });
+        }
 
-    if (picking.state !== "waiting") {
-      return res.status(409).json({
-        success:false,
-        title:"No recibido",
-        message:"El picking aún no ha sido recibido"
-      });
-    }
+        if (picking.state !== "waiting") {
+            return res.status(409).json({
+                success: false,
+                title: "No recibido",
+                message: "El picking aún no ha sido recibido"
+            });
+        }
 
-    if (picking.locked === false) {
-      return res.status(409).json({
-        success:false,
-        title:"Picking no confirmado",
-        message:"Debes confirmar el picking antes de validar"
-      });
-    }
+        if (picking.locked === false) {
+            return res.status(409).json({
+                success: false,
+                title: "Picking no confirmado",
+                message: "Debes confirmar el picking antes de validar"
+            });
+        }
 
-    /* 4️⃣ buscar líneas con diferencias + productos */
-    const linesResult = await db.query(`
+        /* 4️⃣ buscar líneas con diferencias + productos */
+        const linesResult = await db.query(`
       SELECT 
         sm.id,
         sm.product_id,
@@ -1987,55 +2526,55 @@ export async function getReceivingDifferences(req, res) {
       AND sm.state NOT IN ('cancel','done')
       AND sm.product_qty <> sm.quantity_done
       ORDER BY sm.id ASC
-    `,[pickingId]);
+    `, [pickingId]);
 
-    /* 5️⃣ validar productos activos */
-    const invalidProducts = linesResult.rows.filter(
-      p => !p.sku || p.status !== "ACTIVE" || p.deleted_erp === true
-    );
+        /* 5️⃣ validar productos activos */
+        const invalidProducts = linesResult.rows.filter(
+            p => !p.sku || p.status !== "ACTIVE" || p.deleted_erp === true
+        );
 
-    if (invalidProducts.length > 0) {
+        if (invalidProducts.length > 0) {
 
-      const list = invalidProducts
-        .map(p => `SKU:${p.sku || "UNKNOWN"} (product_id:${p.product_id})`)
-        .join(", ");
+            const list = invalidProducts
+                .map(p => `SKU:${p.sku || "UNKNOWN"} (product_id:${p.product_id})`)
+                .join(", ");
 
-      return res.status(409).json({
-        success:false,
-        title:"Producto inválido",
-        message:`Productos inactivos o eliminados: ${list}`
-      });
+            return res.status(409).json({
+                success: false,
+                title: "Producto inválido",
+                message: `Productos inactivos o eliminados: ${list}`
+            });
+        }
+
+        /* 6️⃣ limpiar respuesta */
+        const cleanLines = linesResult.rows.map(l => ({
+            id: l.id,
+            product_id: l.product_id,
+            sku: l.sku,
+            description: l.description,
+            received_qty: l.received_qty,
+            ordered_qty: l.ordered_qty,
+            difference_qty: l.difference_qty
+        }));
+
+        /* 7️⃣ respuesta final */
+        return res.json({
+            success: true,
+            data: {
+                picking_id: picking.id,
+                picking_name: picking.name,
+                lines: cleanLines
+            }
+        });
+
+    } catch (error) {
+
+        console.error("❌ getReceivingDifferences:", error);
+
+        return res.status(500).json({
+            success: false,
+            title: "Error interno",
+            message: "Error obteniendo diferencias del picking"
+        });
     }
-
-    /* 6️⃣ limpiar respuesta */
-    const cleanLines = linesResult.rows.map(l => ({
-      id: l.id,
-      product_id: l.product_id,
-      sku: l.sku,
-      description: l.description,
-      received_qty: l.received_qty,
-      ordered_qty: l.ordered_qty,
-      difference_qty: l.difference_qty
-    }));
-
-    /* 7️⃣ respuesta final */
-    return res.json({
-      success:true,
-      data:{
-        picking_id: picking.id,
-        picking_name: picking.name,
-        lines: cleanLines
-      }
-    });
-
-  } catch(error){
-
-    console.error("❌ getReceivingDifferences:", error);
-
-    return res.status(500).json({
-      success:false,
-      title:"Error interno",
-      message:"Error obteniendo diferencias del picking"
-    });
-  }
 }

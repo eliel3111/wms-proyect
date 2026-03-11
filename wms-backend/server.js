@@ -1,3 +1,4 @@
+console.log("🚨 SERVER NUEVO EJECUTANDO 🚨");
 import dotenv from "dotenv";
 dotenv.config();
 import { db } from "./db.js";
@@ -5,22 +6,51 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
+import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
 //import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
 //import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
+//import { startWarehouseCron } from "./cron/cronJobs.js";
+//import { startMainCron, runFullSync } from "./cron/cronJobs.js";
 
+console.log("🔥 CRON NUEVO EJECUTANDO 🔥");
+// 🔥 Cron automático
+//startMainCron();
 
+// 🔥 Ejecutar manual al iniciar (opcional)
+// await runFullSync();
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get("/test-sale-orders", async (req, res) => {
 
+  try {
+    
+     const orders = await getActiveSaleOrders();
+      console.log("RESULTADO FINAL 🚨🚨🚨🚨 ", orders);
+    res.json({
+      success: true,
+      data: orders
+    });
 
-console.log("🔥 ESTE ES EL SERVER.JS QUE ESTÁ CORRIENDO 🔥");
+  } catch (error) {
+
+    res.json({
+      success: false,
+      error: error.message
+    });
+
+  }
+
+});
+
 
 //startCronJobs();
 //productsCronJobs();
-
+//console.log("🔥 LLAMANDO CRON 🔥");
+//startWarehouseCron();
 //CITRUS SYNC
 //startCitrusCron();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+
 
 // -----------------------------
 // 1. Middlewares globales

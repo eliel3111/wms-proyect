@@ -87,8 +87,11 @@ export async function getActiveProducts() {
             await finishSyncControl(model, SYNC_STATUS.SUCCESS, maxWriteDate);
             return [];
         }
-
+        console.log("PRODUCTS", products);
         for (const p of products) {
+
+
+
             const productDate = new Date(p.write_date);
             const currentMax = maxWriteDate ? new Date(maxWriteDate) : null;
 
@@ -169,19 +172,69 @@ export async function getActiveProducts() {
         for (const p of result) {
 
             /* =====================================
-               1️⃣ VALIDAR SKU
+            1️⃣ VALIDAR ERP ID
             ===================================== */
-            if (!p.sku || p.sku === false) {
+            if (!p.erp_product_id) {
                 console.error(
-                    `[SYNC PRODUCT] ❌ Producto ERP ${p.erp_product_id} sin SKU → SKIPPED`
+                    `[SYNC PRODUCT] ❌ Producto sin ERP ID → SKIPPED`
                 );
                 continue;
             }
 
             /* =====================================
+               1️⃣ VALIDAR SKU
+            ===================================== */
+            let sku = p.sku ? String(p.sku).trim() : null;
+
+            if (!p.sku || p.sku === false) {
+                console.warn(
+                    `[SYNC PRODUCT] ⚠️ Producto ERP ${p.erp_product_id} sin SKU → Generando automático`
+                );
+
+                // 🔎 Buscar si ya existe en DB por erp_id
+                const existing = await db.query(
+                    `SELECT sku FROM products WHERE erp_id = $1 LIMIT 1`,
+                    [p.erp_product_id]
+                );
+
+                if (existing.rowCount > 0) {
+                    // ✅ Reusar SKU existente
+                    sku = existing.rows[0].sku;
+                    console.log(`[SYNC PRODUCT] 🔁 Reutilizando SKU existente: ${sku}`);
+                } else {
+
+                    // 🔢 Buscar último SKU tipo SKU-XXX
+                    const lastSkuResult = await db.query(`
+            SELECT sku
+            FROM products
+            WHERE sku LIKE 'SKU-%'
+            ORDER BY sku DESC
+            LIMIT 1
+        `);
+
+                    let nextNumber = 1;
+
+                    if (lastSkuResult.rowCount > 0) {
+                        const lastSku = lastSkuResult.rows[0].sku; // SKU-058
+                        const match = lastSku.match(/SKU-(\d+)/);
+
+                        if (match) {
+                            nextNumber = parseInt(match[1], 10) + 1;
+                        }
+                    }
+
+                    sku = `SKU-${String(nextNumber).padStart(3, "0")}`;
+
+                    console.log(`[SYNC PRODUCT] 🆕 SKU generado automáticamente: ${sku}`);
+                }
+            }
+
+            console.log("ESTO ES P", p);
+            
+            /* =====================================
                2️⃣ NORMALIZAR DATA
             ===================================== */
-            const sku = String(p.sku).trim();
+
 
             const description =
                 p.description_sale ||
@@ -201,26 +254,29 @@ export async function getActiveProducts() {
             try {
                 await db.query(
                     `
-      INSERT INTO products (
-        sku,
-        description,
-        uom,
-        status,
-        category_id,
-        deleted_erp
-      )
-      VALUES ($1,$2,$3,$4,$5,false)
+  INSERT INTO products (
+    erp_id,
+    sku,
+    description,
+    uom,
+    status,
+    category_id,
+    deleted_erp
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,false)
 
-      ON CONFLICT (sku)
-      DO UPDATE SET
-        description = EXCLUDED.description,
-        uom = EXCLUDED.uom,
-        status = EXCLUDED.status,
-        category_id = EXCLUDED.category_id,
-        deleted_erp = false,
-        updated_at = now()
-      `,
+  ON CONFLICT (sku)
+  DO UPDATE SET
+    erp_id = EXCLUDED.erp_id,
+    description = EXCLUDED.description,
+    uom = EXCLUDED.uom,
+    status = EXCLUDED.status,
+    category_id = EXCLUDED.category_id,
+    deleted_erp = false,
+    updated_at = now()
+  `,
                     [
+                        p.erp_product_id, // ← viene de Odoo
                         sku,
                         description,
                         uom,
@@ -230,6 +286,58 @@ export async function getActiveProducts() {
                 );
 
                 console.log(`[SYNC PRODUCT] ✅ ${sku} upsert OK`);
+
+                // 👇 verificar barcode
+                if (p.barcode) {
+
+                    console.log(sku);
+                    console.log(p.barcode);
+
+                    
+
+                    // 1️⃣ buscar barcodes existentes
+                    const existing = await db.query(
+                        `SELECT barcode 
+             FROM product_barcodes
+             WHERE product_sku = $1`,
+                        [sku]
+                    );
+
+                    // 2️⃣ si no hay barcodes
+                    if (existing.rows.length === 0) {
+
+                        await db.query(
+                            `INSERT INTO product_barcodes (product_sku, barcode, is_primary)
+                 VALUES ($1, $2, $3)`,
+                            [sku, p.barcode, true]
+                        );
+
+                        console.log("✅ Barcode primario insertado:", p.barcode);
+
+                    } else {
+
+                        // 3️⃣ verificar si ya existe
+                        const barcodeExists = existing.rows.some(
+                            row => row.barcode === p.barcode
+                        );
+
+                        if (!barcodeExists) {
+
+                            await db.query(
+                                `INSERT INTO product_barcodes (product_sku, barcode, is_primary)
+                     VALUES ($1, $2, $3)`,
+                                [sku, p.barcode, false]
+                            );
+
+                            console.log("➕ Barcode adicional insertado:", p.barcode);
+
+                        } else {
+
+                            console.log("⚪ Barcode ya existe:", p.barcode);
+
+                        }
+                    }
+                }
 
             } catch (err) {
                 console.error(

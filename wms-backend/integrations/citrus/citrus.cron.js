@@ -1,6 +1,5 @@
 import cron from "node-cron";
 import { syncAllItems } from "./citrus.sync.js";
-import { testSpeed } from "./citrus.speed.test.js";
 
 let running = false; // evita doble ejecución
 

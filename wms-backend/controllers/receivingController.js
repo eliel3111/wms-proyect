@@ -4,6 +4,7 @@ import { generatePdf } from "../templates/generate-nota-recepcion.js";
 import { randomUUID } from "crypto";
 import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
 import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
+import { runFullSync } from "../cron/cronJobs.js";
 
 export async function CloseReception(req, res) {
   console.log("END END END END POINT POINT");
@@ -797,6 +798,41 @@ export async function getReceivingByPoId(req, res) {
     }
 
 
+    /* 🔵 Buscar recepciones completed de esta PO */
+    const completedReceiptsResult = await db.query(
+      `
+  SELECT id
+  FROM receipts
+  WHERE purchase_order_id = $1
+    AND status = 'completed'
+  `,
+      [purchaseOrder.id]
+    );
+
+    const completedReceiptIds = completedReceiptsResult.rows.map(r => r.id);
+
+    let maxReceivedMap = new Map();
+
+    if (completedReceiptIds.length > 0) {
+
+      const receiptLinesResult = await db.query(
+        `
+    SELECT
+      purchase_order_line_id,
+      sku,
+      MAX(received_qty) AS max_received_qty
+    FROM receipt_lines
+    WHERE receipt_id = ANY($1)
+    GROUP BY purchase_order_line_id, sku
+    `,
+        [completedReceiptIds]
+      );
+
+      receiptLinesResult.rows.forEach(row => {
+        maxReceivedMap.set(row.purchase_order_line_id, Number(row.max_received_qty));
+      });
+    }
+
 
     /* 2️⃣ Buscar las líneas */
     const linesResult = await db.query(
@@ -817,23 +853,23 @@ export async function getReceivingByPoId(req, res) {
 
     console.log(linesResult.rows);
 
-    /* 3️⃣ Obtener SKUs válidos */
-    const validSkus = linesResult.rows
-      .filter(line => line.product_exists)
-      .map(line => line.sku);
-
+    /* 3️⃣ Obtener TODOS los SKUs */
+    const skus = linesResult.rows.map(line => line.sku);
+    console.log("ESTOS SON LOS SKUS", skus);
     /* 4️⃣ Buscar barcodes */
     let barcodeMap = new Map();
 
-    if (validSkus.length > 0) {
+    if (skus.length > 0) {
       const barcodeResult = await db.query(
         `
         SELECT product_sku, barcode
         FROM product_barcodes
         WHERE product_sku = ANY($1)
         `,
-        [validSkus]
+        [skus]
       );
+
+      console.log("ESTE SON LOS BARCODES", barcodeResult);
 
       barcodeResult.rows.forEach(row => {
         if (!barcodeMap.has(row.product_sku)) {
@@ -842,16 +878,22 @@ export async function getReceivingByPoId(req, res) {
         barcodeMap.get(row.product_sku).push(row.barcode);
       });
     }
-
+    console.log("BARCODE MAP", barcodeMap);
     /* 5️⃣ Enriquecer líneas */
-    const enrichedLines = linesResult.rows.map(line => ({
-      ...line,
-      barcodes: line.product_exists
-        ? barcodeMap.get(line.sku) || []
-        : []
-    }));
+    const enrichedLines = linesResult.rows.map(line => {
 
+      const maxReceivedQty = maxReceivedMap.get(line.id) || 0;
 
+      return {
+        ...line,
+        received_qty: maxReceivedQty,
+        min_received_qty: maxReceivedQty,
+        barcodes: barcodeMap.get(line.sku) || [],
+        product_exists: (barcodeMap.get(line.sku) || []).length > 0
+      };
+    });
+
+    console.log("ENRICHED LINES:", enrichedLines);
 
     /* 6️⃣ Responder */
     return res.status(200).json({
@@ -1037,6 +1079,11 @@ export async function confirmingIdOrder(req, res) {
 // Search ALL open or patial purchase orders
 export async function gettingOpenOrders(req, res) {
   try {
+
+    // 1️⃣ Ejecutar sync
+    await runFullSync();
+
+    // 2️⃣ Traer órdenes actualizadas
     const result = await db.query(`
       SELECT id, purchase_order_number
       FROM purchase_orders
@@ -1044,17 +1091,21 @@ export async function gettingOpenOrders(req, res) {
       ORDER BY created_at ASC
     `);
 
-    res.status(200).json({
+    // 3️⃣ UNA SOLA RESPUESTA
+    return res.status(200).json({
       success: true,
+      message: "Full sync ejecutado",
       data: result.rows,
     });
+
   } catch (error) {
+
     console.error("Error fetching purchase orders", error);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: "ERROR_FETCHING_PURCHASE_ORDERS",
     });
   }
 }
-
 

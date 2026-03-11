@@ -7,7 +7,7 @@ import OrderLineCard from "../components/OrderLineCard.tsx";
 import ScanModal from "../components/ScanModal.tsx";
 import { useNavigate } from "react-router-dom";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
-import { useModal } from "../context/ModalContext";
+import { useModal } from "../context/ModalContext.tsx";
 
 
 
@@ -15,19 +15,18 @@ import { useModal } from "../context/ModalContext";
 
 /* Tipos base */
 type Product = {
-  id: number;
-  sku: string;
-  description: string;
-  ordered_qty: number;
-  received_qty: number;
-  min_received_qty: number; // 👈 AGREGA ESTO
-  product_exists: boolean;
-  barcodes: string[];
+    id: number;
+    sku: string;
+    description: string;
+    ordered_qty: number;
+    received_qty: number;
+    product_exists: boolean;
+    barcodes: string[];
 };
 
 type Filter = "all" | "read" | "unread";
 
-export default function OrdenCompra() {
+export default function ReceiveWareTransferStart() {
     /* 1️⃣ Obtener ID desde la URL */
     const { id } = useParams<{ id: string }>();
 
@@ -41,8 +40,8 @@ export default function OrdenCompra() {
     /*const [countQty, setCountQty] = useState<number>(0);*/
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [poNumber, setPoNumber] = useState<string>("");
-    const [purchaseOrderId, setPurchaseOrderId] = useState<number | null>(null);
+    const [pickName, setPickName] = useState<string>("");
+    const [pickingId, setPickingId] = useState<number | null>(null);
     const [filter, setFilter] = useState<Filter>("all");
     const [quantityError, setQuantityError] = useState(false);
     const [shakeKey, setShakeKey] = useState(0);
@@ -62,10 +61,10 @@ export default function OrdenCompra() {
     useEffect(() => {
         if (!id) return;
         console.log("CHECK 1")
-        const poId = Number(id);
-        if (isNaN(poId)) return;
-        //fetchPurchaseOrderById(poId);
-        setPurchaseOrderId(poId);
+        const PickingId = Number(id);
+        if (isNaN(PickingId)) return;
+        //fetchPurchaseOrderById(PickingId);
+        setPickingId(PickingId);
 
     }, [id]);
 
@@ -80,33 +79,33 @@ export default function OrdenCompra() {
     }, [selectedIndex]);
 
     useEffect(() => {
-        if (!purchaseOrderId) return;
+        if (!pickingId) return;
 
         const timeout = setTimeout(() => {
             saveReceptionIDB({
-                id: purchaseOrderId,
-                purchase_order_number: poNumber,
+                id: pickingId,
+                purchase_order_number: pickName,
                 lines: products,
             });
             console.log("💾 Guardado automático en IndexedDB");
         }, 2000); // ⏱️ ideal para scanner + input manual
 
         return () => clearTimeout(timeout);
-    }, [products, purchaseOrderId, poNumber]);
+    }, [products, pickingId, pickName]);
 
 
 
 
     useEffect(() => {
         console.log("CHECK 3")
-        if (!purchaseOrderId) return;
+        if (!pickingId) return;
         console.log(products);
         const loadData = async () => {
             setLoading(true);
             console.log("CHECK 4")
             try {
                 // 1️⃣ IndexedDB
-                const local = await getReceptionByPOId(purchaseOrderId);
+                const local = await getReceptionByPOId(pickingId);
 
                 if (local) {
                     console.log("LOCAL VARIABLE", local);
@@ -114,7 +113,7 @@ export default function OrdenCompra() {
                 }
 
                 // 2️⃣ Backend
-                const response = await apiClient.get(`/receiving/${purchaseOrderId}`);
+                const response = await apiClient.get(`/warehouse-transfers/${pickingId}`);
                 console.log("RESPUESTA BASE DE DATOS", response.data);
                 const result = response.data;
                 console.log("CHECK 5")
@@ -125,7 +124,7 @@ export default function OrdenCompra() {
 
                 const data = result.data;
 
-                setPoNumber(data.purchase_order_number);
+                setPickName(data.picking_name);
                 setProducts(
                     prioritizeMissingProducts(data.lines)
                 );
@@ -134,7 +133,7 @@ export default function OrdenCompra() {
                 if (!local?.lines || local.lines.length === 0) {
                     console.log("CHECK 6")
                     await saveReceptionIDB({
-                        id: purchaseOrderId,
+                        id: pickingId,
                         purchase_order_number: data.purchase_order_number,
                         lines: data.lines,
                     });
@@ -149,14 +148,14 @@ export default function OrdenCompra() {
         };
 
         loadData();
-    }, [purchaseOrderId]);
+    }, [pickingId]);
 
 
 
 
 
     useEffect(() => {
-        if (!poNumber || products.length === 0 || idbProducts.length === 0) return;
+        if (!pickName || products.length === 0 || idbProducts.length === 0) return;
 
         // 3️⃣ Crear diccionario sku → received_qty
         console.log("CHECK 7")
@@ -186,7 +185,7 @@ export default function OrdenCompra() {
             prioritizeMissingProducts(mergedProducts)
         );
 
-    }, [poNumber, idbProducts]);
+    }, [pickName, idbProducts]);
 
 
 
@@ -376,32 +375,6 @@ export default function OrdenCompra() {
         setSelectedIndex(0);
     }
 
-    function handleReceivedQtyBlur() {
-    if (selectedIndex === null) return;
-
-    setProducts(prev => {
-        const updated = [...prev];
-        const current = updated[selectedIndex];
-
-        let finalQty = Number(current.received_qty) || 0;
-
-        if (finalQty < current.min_received_qty) {
-            finalQty = current.min_received_qty;
-        }
-
-        if (finalQty > current.ordered_qty) {
-            finalQty = current.ordered_qty;
-        }
-
-        updated[selectedIndex] = {
-            ...current,
-            received_qty: finalQty
-        };
-
-        return updated;
-    });
-}
-
 
     // FUNCTION TO ADD +1 TO THE PRODUCT USING SCANNER
     function incrementReceivedQty() {
@@ -444,19 +417,19 @@ export default function OrdenCompra() {
     // FUNCTION TO SAVE RECEPTION TO BACK END
 
     async function saveReceptionToBackend(receptionStatus: string) {
-        if (!purchaseOrderId) {
-            console.error("❌ purchaseOrderId no existe");
+        if (!pickingId) {
+            console.error("❌ pickingId no existe");
             return;
         }
 
         try {
-            const response = await apiClient.post("/receiving/save", {
-                purchase_order_id: purchaseOrderId,
-                purchase_order_number: poNumber,
+            const response = await apiClient.post("/warehouse-transfers/save", {
+                picking_id: pickingId,
+                picking_name: pickName,
                 reception_status: receptionStatus,
                 lines: products.map(p => ({
                     id: Number(p.id),
-                    received_qty: Number(p.received_qty),
+                    quantity_done: Number(p.received_qty),
                 })),
             });
 
@@ -469,7 +442,7 @@ export default function OrdenCompra() {
             }
 
             // 🧹 BORRAR INDEXEDDB SOLO SI EL BACKEND CONFIRMA
-            await deleteReceptionByPOId(purchaseOrderId);
+            await deleteReceptionByPOId(pickingId);
 
             console.log("🗑️ IndexedDB limpiado correctamente");
 
@@ -511,8 +484,8 @@ export default function OrdenCompra() {
 
                     {/* DETAILS */}
                     <div className="order-details">
-                        <div className="order-number">{poNumber}</div>
-                        <div className="order-number-title">Orden de Compra</div>
+                        <div className="order-number">{pickName}</div>
+                        <div className="order-number-title">Orden de Traslado de Almacen</div>
                     </div>
                 </div>
                 <div className="order-div-b">
@@ -534,7 +507,7 @@ export default function OrdenCompra() {
                     {/* ✅ FINALIZAR */}
                     <button onClick={async () => {
                         await saveReceptionToBackend("in_progress");
-                        navigate(`/validation/${purchaseOrderId}`);
+                        navigate(`/warehouse-transfer-validation/${pickingId}`);
                     }} className="pill-btn finish-btn">
                         <span className="icon">
                             {/* ICONO CHECK */}
@@ -610,7 +583,6 @@ export default function OrdenCompra() {
                                 pattern="[0-9]*"
                                 value={selectedProduct.received_qty}
                                 onChange={handleReceivedQtyChange}
-                                onBlur={handleReceivedQtyBlur}
                                 className="quantity-input"
                                 onFocus={() => {
                                     requestAnimationFrame(() => {

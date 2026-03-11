@@ -1,61 +1,126 @@
 import cron from "node-cron";
-import { getActivePurchaseOrders, getPurchaseOrderLinesByOrderId } from "../integrations/odoo/odoo.purchase.service.js";
+import { getActivePurchaseOrders, getPurchaseOrderLinesByOrderId, processPurchaseOrderLines, upsertPurchaseOrderLines } from "../integrations/odoo/odoo.purchase.service.js";
 import { getActiveProducts } from "../integrations/odoo/odoo.products.service.js";
-import { syncWarehouses } from "../sync/warehouse.sync.js";
-import { loginOdoo } from "../services/login.service.js";
+import { syncWarehousesFull } from "../integrations/odoo/odoo.warehouse.sync.js";
+
+
+// ===============================================
+// 🔥 FULL SYNC EN ORDEN CONTROLADO
+// ===============================================
+
+export async function runFullSync() {
+
+  console.log("🚀 FULL SYNC START");
+
+  try {
+
+    console.log("1️⃣ Sync Warehouses");
+    await syncWarehousesFull();
+
+    console.log("2️⃣ Sync Products");
+    await getActiveProducts();
+
+    console.log("3️⃣ Sync Purchase Orders");
+
+    const orders = await getActivePurchaseOrders();
+
+    for (const order of orders) {
+      const orderLines = await getPurchaseOrderLinesByOrderId(order.id);
+      const processedLines = await processPurchaseOrderLines(orderLines);
+      await upsertPurchaseOrderLines(processedLines);
+    }
+
+    console.log("✅ FULL SYNC DONE");
+
+  } catch (error) {
+
+    console.error("❌ FULL SYNC FAILED:", error);
+
+  }
+}
+
+
+
+export function startMainCron() {
+
+  // Cada 10 minutos
+  cron.schedule("*/10 * * * *", async () => {
+
+    console.log("⏰ Ejecutando MAIN CRON");
+
+    await runFullSync();
+
+  });
+
+  console.log("✅ Main cron started (cada 10 minutos)");
+}
+
+
+
+
+
+
+
 
 export function startCronJobs() {
-    // Cada 15 minutos
-    cron.schedule("* * * * *", async () => {
-        try {
-            console.log("[CRON] Sync PURSCHASE ORDER start");
-            let orderLines;
-            const orders = await getActivePurchaseOrders();
 
-            for (const order of orders) {
-                orderLines = await getPurchaseOrderLinesByOrderId(order.id);
+  cron.schedule("*/10 * * * * *", async () => {
 
-                // guardar order + lines en tu WMS
-            }
+    try {
 
+      console.log("[CRON] Sync PURCHASE ORDER start");
 
-            console.log("[CRON] Sync PURSCHASE ORDER done, Count: ", orders.length, " Data: ", orders);
-            console.log(orderLines);
-        } catch (err) {
-            console.error("[CRON] Sync PURSCHASE ORDER failed:", err);
-        }
-    });
+      const orders = await getActivePurchaseOrders();
 
-    console.log("✅ Cron jobs started");
+      for (const order of orders) {
+
+        const orderLines = await getPurchaseOrderLinesByOrderId(order.id);
+      
+        const processedLines = await processPurchaseOrderLines(orderLines);
+
+        await upsertPurchaseOrderLines(processedLines);
+
+        // 🔥 aquí luego haces tu UPSERT masivo
+      }
+
+      console.log("[CRON] Sync PURCHASE ORDER done, Count:", orders.length);
+
+    } catch (err) {
+
+      console.error("[CRON] Sync PURCHASE ORDER failed:", err);
+
+    }
+
+  });
+
+  console.log("✅ Cron jobs started");
 }
-
 
 export function productsCronJobs() {
-    // Cada 15 minutos
-    cron.schedule("* * * * *", async () => {
-  try {
-    console.log("[CRON] Sync products start");
-    await getActiveProducts();
-    console.log("[CRON] Sync products done");
-  } catch (err) {
-    console.error("[CRON] Sync products failed:", err);
-  }
-});
+  // Cada 15 minutos
+  cron.schedule("*/10 * * * * *", async () => {
+    try {
+      console.log("[CRON] Sync products start");
+      await getActiveProducts();
+      console.log("[CRON] Sync products done");
+    } catch (err) {
+      console.error("[CRON] Sync products failed:", err);
+    }
+  });
 
-    console.log("✅ Cron jobs started");
+  console.log("✅ Cron jobs started");
 }
 
 
 
-
+// ✅ Warehouse sync fully operational
 export function startWarehouseCron() {
 
-  cron.schedule("*/5 * * * *", async () => {
+  cron.schedule("*/10 * * * * *", async () => {
     try {
       console.log("⏰ Ejecutando cron warehouses");
 
-      const uid = await loginOdoo();
-      await syncWarehouses(uid);
+      await syncWarehousesFull();
 
     } catch (error) {
       console.error("❌ Error cron warehouses:", error);

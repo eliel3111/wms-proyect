@@ -11,7 +11,14 @@ export async function upsertPurchaseOrder(client, po) {
       ? po.date_planned.split(" ")[0]
       : null;
 
-    const status = "open"; // purchase → open
+    const statusMap = {
+      purchase: "open",
+      done: "cancelled",
+      cancel: "cancelled"
+    };
+
+    const status = statusMap[po.state] || "open";
+    console.log("ORDEN ESTATUS ESTATUS", po);
     const erpWriteDate = po.write_date;
 
     const result = await client.query(

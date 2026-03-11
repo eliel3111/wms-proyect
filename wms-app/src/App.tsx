@@ -11,11 +11,16 @@ import ReceivingFinal from "./pages/ReceivingFinal.tsx";
 import PutawayMenu from "./pages/PutawayMenu";
 import PutawayPick from "./pages/PutawayPick";
 import PutawayDrop from "./pages/PutawayDrop";
-
+import TransferWarehouse from "./pages/transferWarehouses.tsx"
 import { ModalProvider } from "./context/ModalContext";
 import TransferPrincipal from "./pages/TransferPrincipal.tsx";
 import TransferPick from "./pages/TransferPick.tsx"
 import TransferDrop from "./pages/TransferDrop.tsx"
+import ReceiveWareTransferSearch from "./pages/receive_warehouse_transfer.tsx"
+import ReceiveWareTransferStart from "./pages/receive_warehouse_reception.tsx"
+import ReceiveWareValidation from "./pages/receive_warehouse_validation.tsx"
+import ReceiveWareFinal from "./pages/receive_warehouse_final.tsx"
+import MonitorPicking from "./pages/picking_monitor_selection.tsx";
 
 
 
@@ -57,6 +62,17 @@ function App() {
           <Route path="/transfer" element={<TransferPrincipal />} />
           <Route path="/transfer/pick" element={<TransferPick />} />
           <Route path="/transfer/drop" element={<TransferDrop />} />
+
+          {/*WAREHOUSE TRANSFER */}
+          <Route path="/warehouse-transfer" element={<TransferWarehouse />} />
+          <Route path="/warehouse-transfer-receive" element={<ReceiveWareTransferSearch />} />
+          <Route path="/warehouse-transfer-recepcion/:id" element={<ReceiveWareTransferStart />} />
+          <Route path="/warehouse-transfer-validation/:id" element={<ReceiveWareValidation />} />
+          <Route path="/warehouse-transfer-final/:id" element={<ReceiveWareFinal />} />
+
+          {/*WAREHOUSE PICKING */}
+          <Route path="/picking-monitor" element={<MonitorPicking />} />
+
         </Route>
 
 

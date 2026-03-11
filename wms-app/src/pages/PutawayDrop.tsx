@@ -60,7 +60,7 @@ export default function PutawayPickPage() {
 
 
 
-
+  
   const qtyInputRef = useRef<HTMLInputElement | null>(null);
   const scanBuffer = useRef<string>("");
   const currentLineRef = useRef<PendingPutawayLine | null>(null);
