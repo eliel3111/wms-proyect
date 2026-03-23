@@ -584,6 +584,8 @@ export async function savingReception(req, res) {
       lines,
     } = req.body;
 
+    console.log("🚨🚨🚨🚨 ALERTA SAVE SAVE", req.body);
+
     /* ---------------- VALIDACIONES ---------------- */
 
     if (!purchase_order_id || !purchase_order_number || !Array.isArray(lines)) {
@@ -851,7 +853,7 @@ export async function getReceivingByPoId(req, res) {
       [purchaseOrder.id]
     );
 
-    console.log(linesResult.rows);
+    console.log("PUCHASE ORDER LINES: ",linesResult.rows);
 
     /* 3️⃣ Obtener TODOS los SKUs */
     const skus = linesResult.rows.map(line => line.sku);
@@ -878,16 +880,17 @@ export async function getReceivingByPoId(req, res) {
         barcodeMap.get(row.product_sku).push(row.barcode);
       });
     }
-    console.log("BARCODE MAP", barcodeMap);
+    console.log("LINEAS MAP", maxReceivedMap);
     /* 5️⃣ Enriquecer líneas */
     const enrichedLines = linesResult.rows.map(line => {
 
-      const maxReceivedQty = maxReceivedMap.get(line.id) || 0;
+      const dbQty = line.received_qty ?? 0;
+const receiptQty = maxReceivedMap.get(line.id) ?? 0;
 
       return {
         ...line,
-        received_qty: maxReceivedQty,
-        min_received_qty: maxReceivedQty,
+        received_qty: dbQty,
+  min_received_qty: receiptQty,
         barcodes: barcodeMap.get(line.sku) || [],
         product_exists: (barcodeMap.get(line.sku) || []).length > 0
       };

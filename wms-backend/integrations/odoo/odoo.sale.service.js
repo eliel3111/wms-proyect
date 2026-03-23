@@ -8,11 +8,13 @@ const OLD_DATE = "2000-01-01 00:00:00";
 
 
 export async function getActiveSaleOrders() {
+  //Se define el modelo
   const model = "sale.order";
   let lock = null;
   let maxWriteDate = null;
 
   try {
+    //Autentificacion
     const uid = await getOdooUid();
     const client = getOdooClient("object");
 
@@ -64,7 +66,7 @@ export async function getActiveSaleOrders() {
       );
     });
 
-    /*console.log("ORDENES DE COMPRA DE ODOO OBTENIDA", saleOrders);*/
+    console.log("ORDENES DE COMPRA DE ODOO OBTENIDA", saleOrders);
 
     const allPickingIds = saleOrders
       .flatMap(order => order.picking_ids)
@@ -128,6 +130,8 @@ export async function getActiveSaleOrders() {
       await clientDb.query("BEGIN");
 
       for (const so of saleOrders) {
+
+
         await upsertSaleOrder(clientDb, so);
 
         if (so.write_date && new Date(so.write_date) > new Date(maxWriteDate)) {
@@ -183,8 +187,8 @@ export async function getActiveSaleOrders() {
       await deleteStockPickingBySaleOrderId(clientDb, so.id, so.state);
 
       if (so.write_date && new Date(so.write_date) > new Date(maxWriteDate)) {
-          maxWriteDate = so.write_date;
-        }
+        maxWriteDate = so.write_date;
+      }
     }
 
 
@@ -205,7 +209,10 @@ export async function getActiveSaleOrders() {
       [maxWriteDate, model]
     );
 
-    return saleOrders;
+    const allPickings = saleOrders.flatMap(order => order.picking_ids);
+
+    //console.log("ORDERS", saleOrders);
+    return allPickings;
 
   } catch (error) {
     console.error(`[SYNC ERROR x] ${model}`, error.message);
@@ -236,6 +243,7 @@ export async function upsertSaleOrder(client, so) {
   try {
 
     console.log("🟢 UPSERT SALE ORDER:", so.id);
+    console.log("🟢 UPSERT SALE ORDER:", so.partner_id[1]);
 
     const erpOrderId = so.id;
 
@@ -274,11 +282,7 @@ export async function upsertSaleOrder(client, so) {
       console.log("🆕 GENERATED ORDER:", orderNumber);
     }
 
-    /* ==========================
-       2️⃣ SUPPLIER
-    ========================== */
-
-    const supplierName = so.partner_id?.[1] ?? null;
+    
 
     /* ==========================
        3️⃣ WRITE DATE
@@ -328,44 +332,82 @@ async function upsertPicking(client, so, picking) {
     const locationId = picking.location_id?.[0] ?? null;
     const locationDestId = picking.location_dest_id?.[0] ?? null;
 
+    //SUPPLIER
+    const supplierName = so.partner_id?.[1] ?? null;
+
     const statusMap = {
       draft: "draft",
       waiting: "waiting",
       confirmed: "confirmed",
-      assigned: "confirmed", //El wms asigna el picking luego aunque el erp lo tenga asignado
+      assigned: "confirmed",
       done: "done",
       cancel: "cancel"
     };
 
     const state = statusMap[picking.state] || "draft";
 
-    await client.query(`
-      INSERT INTO stock_picking (
-        erp_id,
-        sale_id,
-        state,
-        picking_type,
-        erp_location_id,
-        erp_location_dest_id,
-        order_name
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      ON CONFLICT (erp_id)
-      DO UPDATE SET
-        sale_id = EXCLUDED.sale_id,
-        state = EXCLUDED.state,
-        erp_location_id = EXCLUDED.erp_location_id,
-        erp_location_dest_id = EXCLUDED.erp_location_dest_id
-    `,
-      [
-        erpId,
-        saleId,
-        state,
-        'outgoing',
-        locationId,
-        locationDestId,
-        saleName
-      ]);
+    /* =========================
+       1️⃣ UPDATE SI EXISTE
+    ========================= */
+
+    const updateResult = await client.query(`
+  UPDATE stock_picking
+  SET
+    sale_id = $1,
+    state = $2,
+    erp_location_id = $3,
+    erp_location_dest_id = $4,
+    order_name = $5,
+    erp_cliente = $6
+  WHERE erp_id = $7
+  RETURNING id
+`, [
+  saleId,
+  state,
+  locationId,
+  locationDestId,
+  saleName,
+  supplierName,
+  erpId
+]);
+
+    /* =========================
+       2️⃣ SI NO EXISTE → INSERT
+    ========================= */
+
+    if (updateResult.rowCount === 0) {
+
+      console.log("➕ INSERTANDO PICKING NUEVO");
+
+      await client.query(`
+    INSERT INTO stock_picking (
+      erp_id,
+      sale_id,
+      state,
+      picking_type,
+      erp_location_id,
+      erp_location_dest_id,
+      order_name,
+      erp_cliente
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+  `, [
+    erpId,
+    saleId,
+    state,
+    'outgoing',
+    locationId,
+    locationDestId,
+    saleName,
+    supplierName
+  ]);
+
+
+    } else {
+
+      console.log("♻️ PICKING ACTUALIZADO");
+
+    }
 
   } catch (error) {
     console.error("❌ Error upserting picking:", error);
@@ -376,6 +418,7 @@ async function upsertPicking(client, so, picking) {
 
 //si una orden de venta esta cancel o done, entonces el wms picking lo ponemos cancel or done.
 export async function deleteStockPickingBySaleOrderId(client, saleOrderId, soState) {
+
   try {
 
     console.log("🗑 CHECK PICKING FOR SALE ORDER:", saleOrderId);
@@ -392,6 +435,10 @@ export async function deleteStockPickingBySaleOrderId(client, saleOrderId, soSta
       return;
     }
 
+    /* =====================================
+       1️⃣ ACTUALIZAR PICKINGS
+    ===================================== */
+
     const result = await client.query(
       `
       UPDATE stock_picking
@@ -407,12 +454,37 @@ export async function deleteStockPickingBySaleOrderId(client, saleOrderId, soSta
       return;
     }
 
-    console.log("✅ PICKINGS ACTUALIZADOS:", result.rowCount);
+    const pickingIds = result.rows.map(r => r.id);
+
+    console.log("✅ PICKINGS ACTUALIZADOS:", pickingIds);
+
+    /* =====================================
+       2️⃣ ACTUALIZAR STOCK_MOVES
+    ===================================== */
+
+    const moveResult = await client.query(
+      `
+      UPDATE stock_move
+      SET state = $1,
+          write_date = now()
+      WHERE picking_id = ANY($2)
+      RETURNING id
+      `,
+      [newState, pickingIds]
+    );
+
+    console.log("📦 MOVES ACTUALIZADOS:", moveResult.rowCount);
+
+    return {
+      pickings: pickingIds,
+      moves: moveResult.rows.map(r => r.id)
+    };
 
   } catch (error) {
 
-    console.error("❌ ERROR deleting stock picking:", error);
+    console.error("❌ ERROR updating picking/moves:", error);
     throw error;
 
   }
+
 }

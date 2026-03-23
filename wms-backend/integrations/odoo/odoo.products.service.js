@@ -230,7 +230,7 @@ export async function getActiveProducts() {
             }
 
             console.log("ESTO ES P", p);
-            
+
             /* =====================================
                2️⃣ NORMALIZAR DATA
             ===================================== */
@@ -254,29 +254,29 @@ export async function getActiveProducts() {
             try {
                 await db.query(
                     `
-  INSERT INTO products (
-    erp_id,
-    sku,
-    description,
-    uom,
-    status,
-    category_id,
-    deleted_erp
-  )
-  VALUES ($1,$2,$3,$4,$5,$6,false)
+INSERT INTO products (
+  erp_id,
+  sku,
+  description,
+  uom,
+  status,
+  category_id,
+  deleted_erp
+)
+VALUES ($1,$2,$3,$4,$5,$6,false)
 
-  ON CONFLICT (sku)
-  DO UPDATE SET
-    erp_id = EXCLUDED.erp_id,
-    description = EXCLUDED.description,
-    uom = EXCLUDED.uom,
-    status = EXCLUDED.status,
-    category_id = EXCLUDED.category_id,
-    deleted_erp = false,
-    updated_at = now()
-  `,
+ON CONFLICT (erp_id)
+DO UPDATE SET
+  sku = EXCLUDED.sku,
+  description = EXCLUDED.description,
+  uom = EXCLUDED.uom,
+  status = EXCLUDED.status,
+  category_id = EXCLUDED.category_id,
+  deleted_erp = false,
+  updated_at = now()
+`,
                     [
-                        p.erp_product_id, // ← viene de Odoo
+                        p.erp_product_id,
                         sku,
                         description,
                         uom,
@@ -293,7 +293,7 @@ export async function getActiveProducts() {
                     console.log(sku);
                     console.log(p.barcode);
 
-                    
+
 
                     // 1️⃣ buscar barcodes existentes
                     const existing = await db.query(
@@ -340,11 +340,11 @@ export async function getActiveProducts() {
                 }
 
             } catch (err) {
-                console.error(
-                    `[SYNC PRODUCT ERROR] SKU ${sku}`,
-                    err.message
-                );
-            }
+    console.error(
+        `[SYNC PRODUCT ERROR] ERP ${p.erp_product_id}`,
+        err.message
+    );
+}
         }
 
 

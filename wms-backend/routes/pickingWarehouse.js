@@ -1,5 +1,5 @@
 import express from "express";
-import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday} from "../controllers/pickingController.js"
+import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings} from "../controllers/pickingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
@@ -24,6 +24,9 @@ router.get("/all-pickers", authMiddleware, getAllPickers);
 
 // Elimina soft un picker, ya no saldra en all pickers
 router.post("/active-today", authMiddleware, updatePickerActiveToday);
+
+// obtiene todos los picking de despacho y sus asignaciones
+router.get("/active-orders", getPickings);
 
 
 export default router;

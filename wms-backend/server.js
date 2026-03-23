@@ -7,10 +7,62 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
 import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
-//import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
-//import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
+import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
+import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
+import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 //import { startWarehouseCron } from "./cron/cronJobs.js";
-//import { startMainCron, runFullSync } from "./cron/cronJobs.js";
+import { startMainCron, runFullSync } from "./cron/cronJobs.js";
+import { assignmentService } from "./services/saleAssignmentService.js";
+import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
+
+
+
+
+import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get("/test-purchase-orders", async (req, res) => {
+  //console.log("🚨CPO CHECK 1");
+  const data = await syncAllPurchaseOrders();
+
+  res.json({
+    success: true,
+    data
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 console.log("🔥 CRON NUEVO EJECUTANDO 🔥");
 // 🔥 Cron automático
@@ -18,17 +70,21 @@ console.log("🔥 CRON NUEVO EJECUTANDO 🔥");
 
 // 🔥 Ejecutar manual al iniciar (opcional)
 // await runFullSync();
-const app = express();
-const PORT = process.env.PORT || 3000;
+
 app.get("/test-sale-orders", async (req, res) => {
 
   try {
-    
-     const orders = await getActiveSaleOrders();
-      console.log("RESULTADO FINAL 🚨🚨🚨🚨 ", orders);
+
+    const picking = await getActiveSaleOrders();
+   console.log("RESULTADO FINAL 🚨🚨🚨🚨 ", picking);
+
+    const moves = await getActiveSaleMoves(picking);
+
+    await assignmentService();
+
     res.json({
       success: true,
-      data: orders
+      data: true
     });
 
   } catch (error) {
@@ -47,6 +103,10 @@ app.get("/test-sale-orders", async (req, res) => {
 //productsCronJobs();
 //console.log("🔥 LLAMANDO CRON 🔥");
 //startWarehouseCron();
+
+
+
+
 //CITRUS SYNC
 //startCitrusCron();
 

@@ -7,6 +7,8 @@ const ERP_BASE = "https://testapi.citrus.com.do/40";
 // =====================================================
 // FUNCIÓN PRINCIPAL PARA LLAMAR ERP
 // =====================================================
+/*
+#3La función callERP se encarga de llamar al ERP Citrus usando SOAP. Primero obtiene el token y ticket de autenticación, luego envía una petición POST con Axios al endpoint del ERP pasando el XML y los headers necesarios (SOAPAction, Authorization, UsuarioTicketId). Cuando recibe la respuesta, convierte el XML a JSON, extrae el resultado (BuscarItemsResult) y lo parsea si viene como string JSON. Si el ERP indica que la sesión expiró, automáticamente hace relogin y repite la petición. Finalmente devuelve los datos procesados; si ocurre un error, imprime el status, headers y XML del error para diagnóstico y lanza la excepción.*/
 export async function callERP(endpoint, soapAction, xmlBody) {
     try {
         // 🔐 obtener token actual
@@ -132,4 +134,131 @@ export async function callERP(endpoint, soapAction, xmlBody) {
     }
 
 
+}
+
+
+
+
+
+export async function callERPPurchase(endpoint, soapAction, xmlBody) {
+  try {
+    let auth = await getERPAuth();
+
+    const url = `https://testapi.citrus.com.do/40/${endpoint}`;
+
+    /* ===============================
+       📡 REQUEST AL ERP
+    =============================== */
+
+    const response = await axios({
+      method: "post",
+      url,
+      data: xmlBody,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: soapAction,
+        Authorization: auth.token.trim(),
+        UsuarioTicketId: String(auth.ticket).trim()
+      },
+      timeout: 20000,
+      transformRequest: [(data) => data]
+    });
+
+    /* ===============================
+       🔥 PARSE XML → JSON
+    =============================== */
+
+    const parsed = await parseStringPromise(response.data, {
+      explicitArray: false,
+      ignoreAttrs: true
+    });
+
+    // 🔥 manejar namespace dinámico (soap / soapenv / s)
+    const envelopeKey = Object.keys(parsed)[0];
+    const bodyKey = Object.keys(parsed[envelopeKey])[0];
+
+    const body = parsed[envelopeKey][bodyKey];
+
+    // 🔥 nodo específico de Citrus
+    const responseNode = body["BuscarOrdenesComprasResponse"];
+
+    if (!responseNode) {
+      console.log("❌ No existe BuscarOrdenesComprasResponse");
+      console.log(JSON.stringify(body, null, 2));
+      return null;
+    }
+
+    // 🔥 aquí viene JSON STRING
+    const raw = responseNode["BuscarOrdenesComprasResult"];
+
+    if (!raw) {
+      console.log("❌ No existe BuscarOrdenesComprasResult");
+      return null;
+    }
+
+    let data;
+
+    if (typeof raw === "string" && raw.trim().startsWith("{")) {
+      data = JSON.parse(raw);
+    } else {
+      data = raw;
+    }
+
+    /* ===============================
+       🔁 RELOGIN AUTOMÁTICO
+    =============================== */
+
+    if (data?.SesionExpirada === 1 || data?.TicketInvalido === 1) {
+
+      console.log("🔄 ERP Purchase session expired → re-login");
+
+      auth = await refreshERPToken();
+
+      const retry = await axios.post(url, xmlBody, {
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: soapAction,
+          Authorization: auth.token.trim(),
+          UsuarioTicketId: String(auth.ticket).trim()
+        }
+      });
+
+      const parsedRetry = await parseStringPromise(retry.data, {
+        explicitArray: false,
+        ignoreAttrs: true
+      });
+
+      const envelopeRetry = Object.keys(parsedRetry)[0];
+      const bodyRetryKey = Object.keys(parsedRetry[envelopeRetry])[0];
+
+      const bodyRetry = parsedRetry[envelopeRetry][bodyRetryKey];
+
+      const responseRetry = bodyRetry["BuscarOrdenesComprasResponse"];
+      const rawRetry = responseRetry["BuscarOrdenesComprasResult"];
+
+      if (typeof rawRetry === "string" && rawRetry.trim().startsWith("{")) {
+        return JSON.parse(rawRetry);
+      }
+
+      return rawRetry;
+    }
+
+    /* ===============================
+       ✅ RESULTADO FINAL
+    =============================== */
+
+    return data;
+
+  } catch (error) {
+    console.log("🔴 ERP PURCHASE ERROR:");
+
+    if (error.response) {
+      console.log("STATUS:", error.response.status);
+      console.log("BODY:", error.response.data); // XML error real
+    } else {
+      console.log(error.message);
+    }
+
+    throw error;
+  }
 }

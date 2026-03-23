@@ -1,7 +1,342 @@
 import { db } from "../../db.js";
-import { fetchItemsPage, fetchPurchaseOrdersPage } from "./citrus.items.js";
+import { fetchAllItems, fetchPurchaseOrdersTest } from "./citrus.items.js";
 import { insertProductFromERP } from "./citrus.product.service.js";
+import { callERP } from "./erpClient.js";
 
+
+//🚨🚨🚨🚨🚨Me quede en actualizar esto para ordenes de compra, la ordenes de compra llegan juntas con las lineas, tengo que buscar por fecha, pero primero chequiar si hay de actualizacion si no hay entonces usar de creacion. Solo he tocado syncAllPurchaseOrders tengo que moficar fetchAllItems(maxWriteDate); y luego adentro de fetch modificar callERP( si es necesario, quizas no🚨🚨🚨🚨🚨*/
+export async function syncAllPurchaseOrders() {
+    //console.log("🚨CPO CHECK 2");
+    const model = "citrus.purchase";
+
+    let lock = null;
+    let maxWriteDate = null;
+
+    try {
+
+        console.log("🚀 Sync PURCHASE ORDERS iniciado");
+
+        lock = await lockSyncControl(model);
+
+        if (!lock) {
+            console.log(`[SYNC] ${model} ya está corriendo`);
+            return;
+        }
+        //console.log("🚨CPO CHECK 3", lock);
+        maxWriteDate = lock.lastWriteDate;
+
+        console.log("LAST WRITE DATE:", maxWriteDate);
+
+        /* ===============================
+           1️⃣ LLAMAR ERP
+        =============================== */
+
+        const pucharseOrders = await fetchPurchaseOrdersTest(maxWriteDate);
+
+        const orders = pucharseOrders?.Data?.OrdenCompras || [];
+        //console.log("VER ORDENES DE COMPRAS: ", orders);
+        orders.forEach((order) => {
+            console.log("LINEAS:", order.OrdenCompraDetalles);
+        });
+
+        if (orders.length === 0) {
+            console.log("⚠️ ERP no devolvió órdenes");
+
+            await db.query(`
+        UPDATE sync_control
+        SET
+          status = 'success',
+          updated_at = now(),
+          error_message = NULL
+        WHERE model = $1
+      `, [model]);
+
+            return;
+        }
+
+        //console.log(`📦 ${orders} órdenes recibidas`);
+
+        /* ===============================
+           2️⃣ CALCULAR NUEVA FECHA
+        =============================== */
+
+        let newMaxWriteDate = maxWriteDate;
+
+        for (const order of orders) {
+
+
+            const erpDateObj = new Date(order.FechaActualizacion || order.FechaCreacion);
+
+            if (!erpDateObj) continue;
+
+
+            console.log("new date", erpDateObj);
+            console.log(newMaxWriteDate);
+            if (!newMaxWriteDate || erpDateObj > new Date(newMaxWriteDate)) {
+                console.log("PRUEBA 1");
+                newMaxWriteDate = erpDateObj.toISOString();
+            }
+        }
+
+        //console.log("🆕 NEW MAX DATE:", newMaxWriteDate);
+
+        /* ===============================
+           3️⃣ GUARDAR
+        =============================== */
+
+        await db.query(`
+      UPDATE sync_control
+      SET
+        last_write_date = $1,
+        status = 'success',
+        updated_at = now(),
+        error_message = NULL
+      WHERE model = $2
+    `, [newMaxWriteDate, model]);
+
+        console.log("✅ Sync Purchase Orders terminado");
+
+    } catch (error) {
+
+        //console.error(`[SYNC ERROR] citrus.purchase`, error.message);
+
+        if (lock?.id) {
+            await db.query(`
+        UPDATE sync_control
+        SET
+          status = 'failed',
+          updated_at = now(),
+          error_message = $1
+        WHERE model = $2
+      `, [error.message, model]);
+        }
+
+        throw error;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+#1Se declara el model, luego de usa lockSyncControl para bloquiar ese modelo en la sincronizacion. Si esta lock anteriormente entonces no se continua, pero si todo bien se define el la fecha de inicio del sync. Luego se usa fetchAllItems para buscar todos los items usando la fecha de inicio.
+
+#5Cuando llega desde fetchAllItems, se verifica si el ERP devolvió productos; si no hay, se marca la sincronización como success y se termina. Si hay items, se inicia una transacción, se recorren y se insertan o actualizan con insertProductFromERP, actualizando también maxWriteDate con la fecha más reciente. Si todo sale bien se hace COMMIT y se guarda el nuevo last_write_date; si ocurre un error se hace ROLLBACK y el estado del sync se marca como failed.
+*/
+export async function syncAllItems() {
+
+    const model = "citrus.items";
+
+    let lock = null;
+    let maxWriteDate = null;
+
+    try {
+
+        console.log("🚀 Sync items iniciado");
+
+        // 🔒 obtener lock
+        lock = await lockSyncControl(model);
+
+        if (!lock) {
+            console.log(`[SYNC] ${model} ya está corriendo`);
+            return;
+        }
+
+        maxWriteDate = lock.lastWriteDate;
+
+        console.log("LAST WRITE DATE:", maxWriteDate);
+
+        /* ===============================
+           1️⃣ LLAMAR ERP
+        =============================== */
+
+        const items = await fetchAllItems(maxWriteDate);
+
+        if (!items || items.length === 0) {
+
+            console.log("⚠️ ERP no devolvió items");
+
+            await db.query(`
+    UPDATE sync_control
+    SET
+      status = 'success',
+      updated_at = now(),
+      error_message = NULL
+    WHERE model = $1
+  `, [model]);
+
+            return;
+        }
+
+        console.log(`📦 ${items.length} items recibidos`);
+
+        /* ===============================
+           2️⃣ UPSERT DB
+        =============================== */
+
+        const client = await db.connect();
+
+        try {
+
+            await client.query("BEGIN");
+
+            for (const item of items) {
+
+                await insertProductFromERP(client, item);
+
+                // actualizar maxWriteDate
+                if (item.FechaActualizacion &&
+                    new Date(item.FechaActualizacion) > new Date(maxWriteDate)) {
+
+                    maxWriteDate = item.FechaActualizacion;
+                }
+            }
+
+            await client.query("COMMIT");
+
+        } catch (error) {
+
+            await client.query("ROLLBACK");
+            throw error;
+
+        } finally {
+            client.release();
+        }
+
+        /* ===============================
+           ✅ MARCAR SUCCESS
+        =============================== */
+
+        await db.query(`
+      UPDATE sync_control
+      SET
+        last_write_date = $1,
+        status = 'success',
+        updated_at = now(),
+        error_message = NULL
+      WHERE model = $2
+    `, [maxWriteDate, model]);
+
+        console.log("✅ Sync items terminado");
+
+    } catch (error) {
+
+        console.error(`[SYNC ERROR] citrus.items`, error.message);
+
+        if (lock?.id) {
+
+            await db.query(`
+        UPDATE sync_control
+        SET
+          status = 'failed',
+          updated_at = now(),
+          error_message = $1
+        WHERE model = $2
+      `, [error.message, model]);
+
+        }
+
+        throw error;
+    }
+}
+
+const OLD_DATE = "2000-01-01 00:00:00";
+
+export async function lockSyncControl(model) {
+    const client = await db.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        // 1️⃣ Buscar registro con lock
+        const result = await client.query(
+            `
+      SELECT id, last_write_date, status
+      FROM sync_control
+      WHERE model = $1
+      FOR UPDATE
+      `,
+            [model]
+        );
+
+        // 2️⃣ Si existe y está corriendo → salir
+        if (result.rowCount > 0) {
+            const row = result.rows[0];
+
+            if (row.status === "running") {
+                await client.query("ROLLBACK");
+                return null; // ocupado
+            }
+
+            // 3️⃣ Existe y NO está corriendo → marcar running
+            await client.query(
+                `
+        UPDATE sync_control
+SET status = 'running',
+    updated_at = now(),
+    error_message = NULL
+WHERE model = $1
+AND (
+  status != 'running'
+  OR updated_at < now() - interval '10 minutes'
+)
+        `,
+                [model]
+            );
+
+            await client.query("COMMIT");
+
+            return {
+                id: row.id,
+                lastWriteDate: row.last_write_date
+            };
+        }
+
+        // 4️⃣ No existe → crear registro
+        const insertResult = await client.query(
+            `
+      INSERT INTO sync_control (model, last_write_date, status)
+      VALUES ($1, $2, 'running')
+      RETURNING id, last_write_date
+      `,
+            [model, OLD_DATE]
+        );
+
+        await client.query("COMMIT");
+
+        return {
+            id: insertResult.rows[0].id,
+            lastWriteDate: insertResult.rows[0].last_write_date
+        };
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+
+/*
 export async function syncAllItems() {
 
     console.log("🚀 Iniciando sync productos...");
@@ -107,12 +442,12 @@ LIMIT 1
         while (true) {
 
             //console.log(`📄 Página actual: ${page}`);
-            console.log(fechaInicioFormatted);
+            console.log("FORMATO CORRECTO", fechaInicioFormatted);
             console.log(fechaFin);
             const items = await fetchItemsPage(page,
                 pageSize, fechaInicioFormatted, fechaFinFormatted);
 
-            const orders = await fetchPurchaseOrdersPage(
+            /*const orders = await fetchPurchaseOrdersPage(
                 1,
                 50,
                 "2024-01-01T00:00:00",
@@ -221,4 +556,4 @@ LIMIT 1
             console.error("Error liberando recursos:", err.message);
         }
     }
-}
+}*/

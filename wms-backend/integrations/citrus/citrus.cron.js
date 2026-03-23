@@ -6,7 +6,7 @@ let running = false; // evita doble ejecución
 export function startCitrusCron() {
   console.log("🟢 Citrus cron started (cada 30s)");
 
-  cron.schedule("*/30 * * * * *", async () => {
+  cron.schedule("*/10 * * * * *", async () => {
     if (running) {
       console.log("⏳ Sync ya corriendo... skip");
       return;

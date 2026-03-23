@@ -44,7 +44,7 @@ export async function runFullSync() {
 export function startMainCron() {
 
   // Cada 10 minutos
-  cron.schedule("*/10 * * * *", async () => {
+  cron.schedule("*/10 * * * * *", async () => {
 
     console.log("⏰ Ejecutando MAIN CRON");
 

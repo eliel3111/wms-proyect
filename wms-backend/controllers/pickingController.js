@@ -7,6 +7,169 @@ import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 import { runFullSync } from "../cron/cronJobs.js";
 
 
+// obtiene todos los picking de despacho y sus asignaciones
+export async function getPickings(req, res) {
+  try {
+
+    console.log("🟥 Endpoint GET /picking/available-users [getPickings()] iniciado");
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    /* =========================
+       1️⃣ TOTAL REGISTROS
+    ========================= */
+    const totalResult = await db.query(`
+      SELECT COUNT(*) AS total
+      FROM stock_picking
+      WHERE state NOT IN ('done', 'cancel')
+        AND picking_type = 'outgoing'
+    `);
+
+    const total = Number(totalResult.rows[0].total);
+
+    /* =========================
+       2️⃣ OBTENER PICKINGS
+    ========================= */
+    const pickingResult = await db.query(`
+      SELECT id, name, user_id, erp_cliente
+      FROM stock_picking
+      WHERE state NOT IN ('done', 'cancel')
+        AND picking_type = 'outgoing'
+      ORDER BY id DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    const pickings = pickingResult.rows;
+
+    if (pickings.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        total,
+        page,
+        limit
+      });
+    }
+
+    /* =========================
+       3️⃣ IDS
+    ========================= */
+    const pickingIds = pickings.map(p => p.id);
+
+    /* =========================
+       4️⃣ PICKING ASSIGNMENTS
+    ========================= */
+    const assignmentResult = await db.query(`
+      SELECT stock_picking_id, picker_id
+      FROM picking_assignments
+      WHERE stock_picking_id = ANY($1)
+    `, [pickingIds]);
+
+    const assignmentMap = new Map();
+
+    assignmentResult.rows.forEach(row => {
+      assignmentMap.set(
+  Number(row.stock_picking_id),
+  Number(row.picker_id)
+);
+    });
+
+    /* =========================
+       5️⃣ PICKERS
+    ========================= */
+    const pickerIds = [...new Set(assignmentResult.rows.map(r => r.picker_id))];
+   //console.log("PICKERS IDS:", pickerIds)
+    let pickerMap = new Map();
+
+    if (pickerIds.length > 0) {
+      const pickerResult = await db.query(`
+        SELECT id, user_id, active, active_today
+        FROM pickers
+        WHERE id = ANY($1)
+      `, [pickerIds]);
+
+      pickerResult.rows.forEach(row => {
+        pickerMap.set(row.id, row);
+      });
+    }
+    //console.log("PICKERS IDS:", pickerMap);
+    /* =========================
+       6️⃣ USERS
+    ========================= */
+    const userIds = [...new Set(
+      Array.from(pickerMap.values()).map(p => p.user_id)
+    )];
+
+    //console.log("USERS:", userIds);
+
+    let userMap = new Map();
+
+    if (userIds.length > 0) {
+      const userResult = await db.query(`
+        SELECT id, full_name
+        FROM users
+        WHERE id = ANY($1)
+      `, [userIds]);
+
+      userResult.rows.forEach(row => {
+        userMap.set(row.id, row.full_name);
+      });
+    }
+    //console.log("NAMES:", userMap);
+    /* =========================
+       7️⃣ ENRIQUECER DATA
+    ========================= */
+    const result = pickings.map(p => {
+//console.log(p.id);
+//console.log(assignmentMap);
+      const pickerId = assignmentMap.get(Number(p.id)) || null;
+      const picker = pickerMap.get(pickerId);
+
+      let pickerActive = false;
+      let pickerName = null;
+//console.log(picker);
+      if (picker) {
+        //console.log("eliel");
+        pickerActive = picker.active && picker.active_today;
+        pickerName = userMap.get(picker.user_id) || null;
+      }
+
+      return {
+        id: p.id,
+        name: p.name,
+        erp_cliente: p.erp_cliente,
+        picker_id: pickerId,
+        picker_active: pickerActive,
+        picker_name: pickerName
+      };
+    });
+    console.log(
+  `🟨 Pickings: ${pickings.length} | Total: ${total} | Page: ${page} | Limit: ${limit} | Offset: ${offset} | Assignments: ${assignmentMap.size} | Pickers: ${pickerMap.size} | Users: ${userMap.size}`
+);
+console.log("🟩 Endpoint GET /picking/available-users [getPickings()] terminado");
+    /* =========================
+       8️⃣ RESPUESTA
+    ========================= */
+    return res.json({
+      success: true,
+      data: result,
+      total,
+      page,
+      limit
+    });
+
+  } catch (error) {
+    console.error("❌ ERROR GET PICKINGS:", error);
+    return res.status(500).json({
+      success: false,
+      message: "ERROR_FETCHING_PICKINGS"
+    });
+  }
+}
+
+
+
 export async function updatePickerActiveToday(req, res) {
 
   try {
