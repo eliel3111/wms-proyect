@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import PickerModal from "./PickingModal";
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
+import { LoadingScreen } from "../components/LoadingScreen.tsx";
 
 interface Picker {
     id: number
@@ -227,7 +228,9 @@ export default function PickingActive() {
 
     };
 
-
+    if (loadingPickers) {
+        return <LoadingScreen />;
+    }
 
     return (
 

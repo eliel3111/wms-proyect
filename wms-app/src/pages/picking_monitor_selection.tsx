@@ -1,13 +1,6 @@
-import { useParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
-import apiClient from "../services/apiClient.ts";
-import OrderLineCard from "../components/OrderLineCard.tsx";
-import ScanModal from "../components/ScanModal.tsx";
-import { useNavigate } from "react-router-dom";
-import { LoadingScreen } from "../components/LoadingScreen.tsx";
-import { useModal } from "../context/ModalContext";
+import { useEffect, useState } from "react";
 import "../styles/picking.css";
-import { Package, Workflow, GitBranch, Activity, Cog } from "lucide-react";
+import { Package, Activity } from "lucide-react";
 import PickingProcess from "../components/PickingProcess.tsx"
 import PickingActive from "../components/PickingActive.tsx"
 
@@ -24,6 +17,7 @@ export default function MonitorPicking() {
 
         const apply = () => {
             setIsMobile(mq.matches);
+            console.log(isMobile);
             // Si vuelve a desktop, cerramos el menú móvil
             if (!mq.matches) setMobileMenuOpen(false);
         };
