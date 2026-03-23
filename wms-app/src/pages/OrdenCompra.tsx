@@ -98,12 +98,12 @@ export default function OrdenCompra() {
 
 
     useEffect(() => {
-        console.log("CHECK 3")
+        
         if (!purchaseOrderId) return;
         console.log(products);
         const loadData = async () => {
             setLoading(true);
-            console.log("CHECK 4")
+            
             try {
                 // 1️⃣ IndexedDB
                 const local = await getReceptionByPOId(purchaseOrderId);
@@ -169,13 +169,14 @@ export default function OrdenCompra() {
         // 4️⃣ Mezclar backend + local
         const mergedProducts = products.map((p: Product) => {
             const localQty = receivedMap.get(p.sku);
-
+            //console.log(localQty);
+            //console.log(p.received_qty);
             return {
                 ...p,
                 received_qty:
-                    typeof localQty === "number" && localQty > 0
-                        ? localQty
-                        : p.received_qty,
+    typeof localQty === "number"
+        ? Math.max(localQty, p.received_qty)
+        : p.received_qty,
             };
         });
 
