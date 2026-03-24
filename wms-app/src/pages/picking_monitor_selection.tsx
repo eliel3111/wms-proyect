@@ -43,14 +43,17 @@ export default function MonitorPicking() {
                 <div className="sidebarInner">
                     <h3>Sidebar</h3>
                     <nav className="nav">
+
                         <button onClick={() => setView("pickers-active")} className="sidebar-button">
                             <Package size={22} />
                             <span>Pickets</span>
                         </button>
+
                         <button onClick={() => setView("picking-process")} className="sidebar-button">
                             <Activity size={22} />
                             <span>Proceso de Picking</span>
                         </button>
+                        
                     </nav>
                 </div>
             </aside>

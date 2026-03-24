@@ -75,9 +75,12 @@ body {
   flex-direction: column;
   gap: 20px;
   padding: 20px;
+  height: 100%;
   background-color: rgb(253, 253, 253);
   max-width: 1200px;
   margin: 0 auto;
+
+position: relative;
 }
 
 
@@ -519,6 +522,216 @@ input:checked + .slider:before{
 }
 
 
+
+/* =========================
+    PICKING PROCESS
+   ========================= */
+.sidebar-picking-process {
+  position: absolute; /* relativo a mainInner */
+  top: 0;
+  right: 0;
+  width: 40%; /* puedes cambiar a 30% */
+  height: 100%;
+  background: #cfcfcf; /* gris oscuro elegante tipo Tailwind slate-800 */
+  box-shadow: -6px 0 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  color: #1f2937; /* gris oscuro casi negro */
+  border-left: 1px solid #686868;
+
+
+
+  /* animación */
+  transform: translateX(100%);
+  animation: slideIn 0.3s forwards;
+}
+
+
+/*CONTROL DE PAGUINAS*/
+.page-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 0px 24px;
+  border-radius: 12px;
+
+  background: #e8e8e8;
+  color: #333;
+
+  font-weight: 500;
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+}
+
+.page-control:hover {
+  background: #dcdcdc;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+}
+
+.pagination-text {
+  font-size: 16px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.pagination-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50px;
+  background: transparent;
+  font-size: 24px;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.pagination-btn:hover {
+  background: #909195;
+}
+
+.pagination-btn:not(:last-child) {
+  border-right: 1px solid #cbd5e1;
+}
+
+.pickersactivecontainer {
+  width: 100%;
+}
+
+/* CARD */
+.pickings-card {
+  width: 100%;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* HEADER */
+.pickings-header h3 {
+  margin: 0 0 15px;
+  font-size: 20px;
+  color: #1f2937;
+}
+
+/* TABLE */
+.pickings-table {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.pickings-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1.5fr 1fr;
+  align-items: center;
+  padding: 12px 10px;
+  border-bottom: 1px solid #f1f1f1;
+  cursor: pointer;
+}
+
+.pickings-row:nth-child(odd) {
+  background: white;
+}
+
+.pickings-row:nth-child(even) {
+  background: #f5f5f5;
+}
+
+.pickings-row:hover {
+  background-color: #f1f5f9;
+}
+
+/* HEADER ROW */
+.pickings-row-header {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 16px;
+  font-weight: 500;
+   display: grid;
+  grid-template-columns: 1fr 2fr 1.5fr 1fr;
+  align-items: center;
+  padding: 12px 10px;
+  border-bottom: 2px solid #f1f1f1;
+  cursor: pointer;
+}
+
+/* PICKER */
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* AVATAR */
+.avatar {
+  width: 28px;
+  height: 28px;
+  background: #d1d5db;
+  border-radius: 50%;
+}
+
+/* STATUS */
+.status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ACTIVO */
+.status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* INACTIVO */
+.status.inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* 🔥 RESPONSIVE */
+@media (max-width: 768px) {
+  .pickings-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 12px;
+  }
+
+  .pickings-row.header {
+    display: none;
+  }
+
+  .pickings-row span {
+    font-size: 14px;
+  }
+
+  .pickings-row span::before {
+    content: attr(data-label);
+    font-weight: bold;
+    display: block;
+    color: #6b7280;
+    font-size: 12px;
+  }
+}
+
+@keyframes slideIn {
+  to {
+    transform: translateX(0);
+  }
+}
+
+
 /* MOBILE */
 
 @media (max-width:600px){
@@ -528,6 +741,15 @@ input:checked + .slider:before{
     max-height:90vh;
     border-radius:18px;
   }
+
+
+  .sidebar-picking-process {
+  position: absolute; /* relativo a mainInner */
+  top: 0;
+  left: 0;
+  width: 100%; /* puedes cambiar a 30% */
+  padding-top: 50px;
+}
 
 }
 
