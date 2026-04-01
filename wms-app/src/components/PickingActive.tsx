@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import PickerModal from "./PickingModal";
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
-import { LoadingScreen } from "../components/LoadingScreen.tsx";
+
 
 interface Picker {
     id: number
@@ -16,7 +16,7 @@ export default function PickingActive() {
 
     const { openModal } = useModal();
     const [pickers, setPickers] = useState<Picker[]>([])
-    const [loadingPickers, setLoadingPickers] = useState(false)
+    const [loadingPickers, setLoadingPickers] = useState(true);
     const [open, setOpen] = useState(false);
     const [users, setUsers] = useState<{ id: number; full_name: string }[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -28,18 +28,35 @@ export default function PickingActive() {
         pickerId: null
     })
 
+    
+
 
     useEffect(() => {
+  const loadPickers = async () => {
+    console.log("🚀 Cargando pickers...");
+    setLoadingPickers(true);
 
-        fetchPickers()
+    try {
+      await fetchPickers();
+      console.log("✅ Pickers cargados");
+    } catch (error) {
+      console.error("🔥 Error cargando pickers:", error);
 
-    }, [])
+      openModal({
+        title: "Error",
+        message: "No se pudieron cargar los pickers",
+      });
+    } 
+  };
+
+  loadPickers();
+}, []);
     //Funcion para buscar todos los pickers
     const fetchPickers = async () => {
-
+console.log("fetching");
         try {
 
-            setLoadingPickers(true)
+        
 
             const res = await apiClient.get("/picking/all-pickers")
 
@@ -228,16 +245,14 @@ export default function PickingActive() {
 
     };
 
-    if (loadingPickers) {
-        return <LoadingScreen />;
-    }
+    
 
     return (
 
         <div className="mainInner">
             <div className="monitor-header">
 
-                <div>
+                <div >
                     <div className="monitor-title-small">
                         Pantalla Monitor
                     </div>
@@ -259,63 +274,72 @@ export default function PickingActive() {
 
             <div className="pickersactivecontainer">
 
-                {pickers.map((picker) => (
+  {loadingPickers ? (
+    <>
+      <div className="skeleton-row" />
+      <div className="skeleton-row" />
+      <div className="skeleton-row" />
+    </>
+  ) : (
+    pickers.map((picker) => (
 
-                    <div className="pickerperson" key={picker.id}>
+      <div className="pickerperson" key={picker.id}>
 
-                        <div className="personalinformation">
+        <div className="personalinformation">
 
-                            <div className="avatar">
-                                {<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" id="fi_1144709"><path d="m512 256c0 74.921875-32.191406 142.328125-83.488281 189.148438-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562s-127-25.328125-172.511719-66.851562c-51.296875-46.820313-83.488281-114.226563-83.488281-189.148438 0-141.378906 114.621094-256 256-256s256 114.621094 256 256zm0 0" fill="#ffaa20"></path><path d="m512 256c0 74.921875-32.191406 142.328125-83.488281 189.148438-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562v-512c141.378906 0 256 114.621094 256 256zm0 0" fill="#ff8900"></path><path d="m428.511719 444.128906v1.019532c-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562s-127-25.328125-172.511719-66.851562v-1.019532c0-74.160156 47.042969-137.550781 112.863281-161.867187 18.589844-6.882813 38.6875-10.640625 59.648438-10.640625s41.058594 3.757812 59.660156 10.640625c65.820313 24.328125 112.851563 87.707031 112.851563 161.867187zm0 0" fill="#7985eb"></path><path d="m428.511719 444.128906v1.019532c-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562v-240.378906c20.960938 0 41.058594 3.757812 59.660156 10.640625 65.820313 24.328125 112.851563 87.707031 112.851563 161.867187zm0 0" fill="#4b5be6"></path><path d="m361.808594 194.921875c0 58.339844-47.457032 105.8125-105.808594 105.8125-58.339844 0-105.808594-47.472656-105.808594-105.8125s47.46875-105.808594 105.808594-105.808594c58.351562 0 105.808594 47.46875 105.808594 105.808594zm0 0" fill="#ffdba9"></path><path d="m361.808594 194.921875c0 58.339844-47.457032 105.8125-105.808594 105.8125v-211.621094c58.351562 0 105.808594 47.46875 105.808594 105.808594zm0 0" fill="#ffc473"></path></svg>}
-                            </div>
+          <div className="avatar">
+            {<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" id="fi_1144709"><path d="m512 256c0 74.921875-32.191406 142.328125-83.488281 189.148438-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562s-127-25.328125-172.511719-66.851562c-51.296875-46.820313-83.488281-114.226563-83.488281-189.148438 0-141.378906 114.621094-256 256-256s256 114.621094 256 256zm0 0" fill="#ffaa20"></path><path d="m512 256c0 74.921875-32.191406 142.328125-83.488281 189.148438-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562v-512c141.378906 0 256 114.621094 256 256zm0 0" fill="#ff8900"></path><path d="m428.511719 444.128906v1.019532c-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562s-127-25.328125-172.511719-66.851562v-1.019532c0-74.160156 47.042969-137.550781 112.863281-161.867187 18.589844-6.882813 38.6875-10.640625 59.648438-10.640625s41.058594 3.757812 59.660156 10.640625c65.820313 24.328125 112.851563 87.707031 112.851563 161.867187zm0 0" fill="#7985eb"></path><path d="m428.511719 444.128906v1.019532c-45.511719 41.523437-106.050781 66.851562-172.511719 66.851562v-240.378906c20.960938 0 41.058594 3.757812 59.660156 10.640625 65.820313 24.328125 112.851563 87.707031 112.851563 161.867187zm0 0" fill="#4b5be6"></path><path d="m361.808594 194.921875c0 58.339844-47.457032 105.8125-105.808594 105.8125-58.339844 0-105.808594-47.472656-105.808594-105.8125s47.46875-105.808594 105.808594-105.808594c58.351562 0 105.808594 47.46875 105.808594 105.808594zm0 0" fill="#ffdba9"></path><path d="m361.808594 194.921875c0 58.339844-47.457032 105.8125-105.808594 105.8125v-211.621094c58.351562 0 105.808594 47.46875 105.808594 105.808594zm0 0" fill="#ffc473"></path></svg>}
+          </div>
 
-                            <span className="pickername">
-                                {picker.full_name}
-                            </span>
+          <span className="pickername">
+            {picker.full_name}
+          </span>
 
-                        </div>
+        </div>
 
-                        <div className="pickerstatus">
+        <div className="pickerstatus">
 
-                            <label className="switch">
-                                <input
-                                    type="checkbox"
-                                    checked={picker.active_today}
-                                    onChange={(e) =>
-                                        handlePickerChange(picker.id, e.target.checked)
-                                    }
-                                />
-                                <span className="slider"></span>
-                            </label>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={picker.active_today}
+              onChange={(e) =>
+                handlePickerChange(picker.id, e.target.checked)
+              }
+            />
+            <span className="slider"></span>
+          </label>
 
-                            <span className="picker-divider">|</span>
+          <span className="picker-divider">|</span>
 
-                            <div
-                                className="picker-delete"
-                                onClick={() =>
-                                    setDeleteModal({
-                                        open: true,
-                                        pickerId: picker.id
-                                    })
-                                }
+          <div
+            className="picker-delete"
+            onClick={() =>
+              setDeleteModal({
+                open: true,
+                pickerId: picker.id
+              })
+            }
+          >
+            <svg className="delete-icon" viewBox="0 0 24 24">
+              <path d="M3 6h18M9 6V4h6v2M8 6v14h8V6"
+                stroke="currentColor"
+                strokeWidth="2"
+                fill="none"
+              />
+            </svg>
+          </div>
 
-                            >
-                                {/* tu SVG aquí */}
-                                <svg
-                                    className="delete-icon"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M3 6h18M9 6V4h6v2M8 6v14h8V6" stroke="currentColor" strokeWidth="2" fill="none" />
-                                </svg>
-                            </div>
+        </div>
 
-                        </div>
+      </div>
 
-                    </div>
+    ))
+  )}
 
-                ))}
+</div>
 
-            </div>
+
 
 
             {open && (
@@ -323,11 +347,11 @@ export default function PickingActive() {
                     users={users}
                     isLoading={loadingUsers}
                     onClose={() => setOpen(false)}
-                    onSave={(data) => {
-                        savePickers(data);
-                        setOpen(false);
-                        fetchPickers(); // refresca lista
-                    }}
+                    onSave={async (data) => {
+    await savePickers(data);
+    fetchPickers(); // refresca lista
+    setOpen(false);
+}}
                 />
             )}
 

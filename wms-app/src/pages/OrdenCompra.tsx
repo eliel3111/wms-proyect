@@ -100,7 +100,6 @@ export default function OrdenCompra() {
     useEffect(() => {
         
         if (!purchaseOrderId) return;
-        console.log(products);
         const loadData = async () => {
             setLoading(true);
             

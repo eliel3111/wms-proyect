@@ -1,0 +1,252 @@
+/* QTY circle */
+.picking-user-order-name {
+  position: absolute;
+  top: 22px;
+  right: 16px;
+  background: #ff3b30;
+  width: 80px;
+  height: 37px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+
+/* BASE PILL BUTTON */
+.picking-user-finish {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 14px 22px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  width: 200px;
+  border: none;
+  cursor: pointer;
+  justify-content: center;
+  background-color: #333333;
+  color: azure;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+
+  transition: transform 0.1s ease,
+              box-shadow 0.15s ease,
+              background-color 0.15s ease;
+}
+
+.picking-user-finish:hover {
+  background-color: #444444; /* más claro */
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+
+.picking-user-finish:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ICONO */
+.picking-user-finish .icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picking-user-finish svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+/* TEXTO */
+.picking-user-finish .label {
+  white-space: nowrap;
+  color: azure;
+  font-size: 16px;
+}
+
+/* SVG */
+.order-icon-picking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f59e0b;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.picking-user-filter-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+
+  display: flex;
+  justify-content: center; /* 👈 centra horizontalmente */
+  align-items: center;
+
+
+  gap: 12px;
+
+  background-color: #444444;
+  padding: 15px;
+ 
+
+  z-index: 1000; /* 👈 siempre encima */
+}
+
+.pick-user-filter-bar-inner {
+  width: 100%;
+  max-width: 1000px; /* ajusta a tu layout */
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pick-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  max-width: 280px;
+
+  padding: 16px 20px;
+  border-radius: 12px;
+
+  font-size: 18px;
+  font-weight: 600;
+
+  background-color: #4CAF50;
+  color: white;
+
+  border: none;
+  cursor: pointer;
+
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+
+  transition: 
+    background-color 0.2s ease,
+    transform 0.08s ease,
+    box-shadow 0.15s ease;
+
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.pick-button:hover {
+  background-color: #43a047; /* un poco más oscuro */
+}
+
+.pick-button:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.pick-button:disabled {
+  background-color: #a5d6a7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* CONTENEDOR */
+.pick-user-location-card {
+  border: 1px solid #efefef;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background-color: #efefef;
+  box-sizing: border-box;
+}
+
+/* HEADER */
+.pick-user-location-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-direction: column;
+  width: 100%;
+  
+}
+
+.pick-user-location-label {
+  display: flex;
+  justify-content: flex-start; /* izquierda */
+  align-items: center;
+
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* CODIGO DERECHA */
+.pick-user-location-code {
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-weight: 900;
+  color: #212121;
+  letter-spacing: 1px;
+
+  /* 🔥 estilo tipo badge */
+  background: #212121;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+/* ESTADO VACÍO */
+.pick-user-location-empty {
+  background: #FFD54F;
+  border: 2px dashed #212121;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* MOBILE */
+@media (max-width: 600px) {
+
+
+  .picking-user-order-name {
+  position: absolute;
+  top: 16px;
+  right: 15px;
+  background: #ff3b30;
+  width: 80px;
+  height: 40px;
+  border-radius: 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+}
+
+/* HOVER (desktop) */
+@media (hover: hover) {
+  .pill-btn:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* 📱 PDA / MÓVIL */
+@media (max-width: 768px) {
+  .pill-btn {
+    padding: 16px 24px;
+    font-size: 17px;
+  }
+
+  .pill-btn .icon {
+    width: 22px;
+    height: 22px;
+  }
+}

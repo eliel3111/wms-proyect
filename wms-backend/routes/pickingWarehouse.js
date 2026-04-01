@@ -1,5 +1,5 @@
 import express from "express";
-import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings} from "../controllers/pickingController.js"
+import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode } from "../controllers/pickingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
@@ -26,7 +26,30 @@ router.get("/all-pickers", authMiddleware, getAllPickers);
 router.post("/active-today", authMiddleware, updatePickerActiveToday);
 
 // obtiene todos los picking de despacho y sus asignaciones
-router.get("/active-orders", getPickings);
+router.get("/active-orders",authMiddleware,  getPickings);
+
+// Cancela una orden 
+router.post("/cancel",authMiddleware , cancelPicking);
+
+//Obtener todos los pickers activos unicamente
+router.get("/active-pickers", getActivePickers);
+
+//Reasignar un picking
+router.post("/reassign", reassignPicking);
+
+//Obtener todos los pickings asignados a un usuario
+router.get("/assigned", authMiddleware, getAssignedPickings);
+
+//Calcular ruta ideal de un pedido
+router.get(
+  "/:pickingId/products-locations",
+  getPickingProductsWithLocations
+);
+
+//Reasignar un picking
+router.post("/scan", scanPickingCode);
+
+
 
 
 export default router;

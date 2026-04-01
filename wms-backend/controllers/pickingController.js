@@ -1,10 +1,1037 @@
 import { db } from "../db.js";
-import { buildReceiptHtml } from "../templates/build-nota-recepcion.js";
-import { generatePdf } from "../templates/generate-nota-recepcion.js";
-import { randomUUID } from "crypto";
-import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
-import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
-import { runFullSync } from "../cron/cronJobs.js";
+import { getActiveStorageLocationByCode} from "../services/locationService.js";
+import { reserveInventoryForMove } from "../services/pickingBestRoute.js"
+import { getPickingProductsWithLocationsService } from "../services/pickingBestRoute.js";
+import { selectBestLocation, getMoveLinesOrderedByLocation } from "../services/pickingBestRoute.js";
+
+
+export async function scanPickingCode(req, res) {
+  console.log("🟦 [START] scanPickingCode");
+
+  const client = await db.connect();
+
+  try {
+    const { code, pickingId } = req.body;
+
+    console.log("📥 INPUT:", req.body);
+
+    // ==============================
+    // 1️⃣ VALIDACIÓN
+    // ==============================
+    if (!code || !pickingId) {
+      return res.status(400).json({
+        success: false,
+        message: "code y pickingId son requeridos",
+      });
+    }
+
+    const normalized = code.trim().toUpperCase();
+
+    console.log("🔎 Código normalizado:", normalized);
+
+    let detectedType = null;
+    let detectedData = null;
+
+    // ==============================
+    // 2️⃣ VALIDAR UBICACIÓN
+    // ==============================
+    const locationResult = await getActiveStorageLocationByCode(
+      client,
+      normalized
+    );
+
+    if (locationResult.rowCount > 0) {
+      detectedType = "location";
+      detectedData = locationResult.rows[0];
+
+      console.log("📍 UBICACIÓN DETECTADA:", detectedData);
+    }
+
+    // ==============================
+    // 3️⃣ VALIDAR PRODUCTO
+    // ==============================
+    let productId = null;
+
+    if (!detectedType) {
+      const productResult = await client.query(
+        `
+        SELECT p.id, p.sku
+        FROM product_barcodes pb
+        JOIN products p ON p.sku = pb.product_sku
+        WHERE UPPER(pb.barcode) = $1
+        LIMIT 1
+      `,
+        [normalized]
+      );
+
+      if (productResult.rowCount === 0) {
+        console.log("❌ Código inválido");
+
+        return res.json({
+          success: false,
+          code: "INVALID_CODE",
+          message: "El código no corresponde a una ubicación ni a un producto",
+        });
+      }
+
+      detectedType = "product";
+      detectedData = productResult.rows[0];
+      productId = detectedData.id;
+
+      console.log("📦 PRODUCTO DETECTADO:", detectedData);
+    }
+
+    // ==============================
+    // 4️⃣ VALIDAR QUE PERTENECE AL PICKING
+    // ==============================
+    const moveLinesResult = await client.query(
+      `
+      SELECT product_id, location_id
+      FROM stock_move_line
+      WHERE picking_id = $1
+    `,
+      [pickingId]
+    );
+
+    if (!moveLinesResult.rows.length) {
+      console.log("⚠️ No hay líneas en el picking");
+
+      return res.json({
+        success: false,
+        message: "El picking no tiene líneas",
+      });
+    }
+
+    let isValid = false;
+
+    for (const row of moveLinesResult.rows) {
+      // 🔹 Validar producto
+      if (detectedType === "product" && row.product_id == productId) {
+        isValid = true;
+        break;
+      }
+
+      // 🔹 Validar ubicación
+      if (
+        detectedType === "location" &&
+        row.location_id == detectedData.id
+      ) {
+        isValid = true;
+        break;
+      }
+    }
+
+    if (!isValid) {
+      console.log("❌ No pertenece al picking");
+
+      return res.json({
+        success: false,
+        code: "NOT_IN_PICKING",
+        title: "Código no válido",
+        message: "El código escaneado no pertenece a este pedido",
+      });
+    }
+
+    // ==============================
+    // 5️⃣ RESPUESTA FINAL
+    // ==============================
+    console.log("✅ VALIDACIÓN EXITOSA");
+
+    return res.json({
+      success: true,
+      type: detectedType,
+      data: detectedData,
+    });
+
+  } catch (error) {
+    console.error("🔥 [ERROR scanPickingCode]:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno",
+      error: error.message,
+    });
+
+  } finally {
+    client.release();
+    console.log("🔚 [END] scanPickingCode");
+  }
+}
+
+
+
+
+export async function getPickingProductsWithLocations(req, res) {
+  console.log("🟦 ----[START] Controller----");
+
+  const client = await db.connect();
+
+  try {
+    const { pickingId } = req.params;
+
+    if (!pickingId) {
+      return res.status(400).json({
+        success: false,
+        message: "pickingId es requerido",
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const result = await getPickingProductsWithLocationsService(
+      client,
+      pickingId
+    );
+
+
+
+
+
+    const enrichedData = result.data.map(product => {
+      const bestLocation = selectBestLocation(product);
+
+      return {
+        ...product,
+        selected_location: bestLocation
+      };
+    });
+
+    console.log("enricheddata ", enrichedData);
+
+
+    let totalReserved = 0;
+    let results = [];
+
+    /* ==============================
+       1️⃣ RESERVAR INVENTARIO
+    ============================== */
+
+    for (const move of enrichedData) {
+  console.log("🟡 Probando producto:", move.product_id);
+
+  const pickingId = move.picking_id;
+  const productId = move.product_id;
+  const requiredQty = move.moves[0].product_qty;
+
+  // 🔍 1. Buscar líneas existentes en stock_move_line
+  const query = `
+    SELECT COALESCE(SUM(product_uom_qty), 0) AS total_qty
+    FROM stock_move_line
+    WHERE picking_id = $1
+      AND product_id = $2
+  `;
+
+  const { rows } = await client.query(query, [pickingId, productId]);
+
+  const totalQty = parseFloat(rows[0].total_qty) || 0;
+
+  console.log("📦 Total ya procesado en move_line:", totalQty);
+  console.log("📦 Cantidad requerida:", requiredQty);
+  
+    if (totalQty === requiredQty) {
+    console.log("⛔ Ya está completamente procesado, se omite reserva");
+
+    results.push({
+      product_id: productId,
+      reserved: 0,
+      skipped: true
+    });
+
+    continue;
+  }
+
+
+  // 🚫 2. Validación para NO ejecutar reserva
+  if (totalQty > 0) {
+    console.log("⛔ Ya existen líneas, se omite reserva");
+    
+    results.push({
+      product_id: productId,
+      reserved: 0,
+      skipped: true
+    });
+
+    continue; // 👈 salta al siguiente move
+  }
+
+
+
+  // 🔥 3. Ejecutar reserva SOLO si no hay líneas
+  const result = await reserveInventoryForMove(client, move);
+
+  console.log("Resultado reserva real:", result);
+
+  totalReserved += result.reserved;
+
+  results.push({
+    product_id: move.product_id,
+    reserved: result.reserved
+  });
+}
+
+    /* ==============================
+       2️⃣ VALIDACIÓN
+    ============================== */
+
+    const finalResult = await getMoveLinesOrderedByLocation(client, pickingId);
+
+    if (totalReserved === 0) {
+      console.log("⚠️ No se reservó nada");
+
+      await client.query("ROLLBACK");
+
+      return res.status(200).json({
+        success: false,
+        message: "No se pudo reservar inventario",
+        finalResult
+      });
+    }
+
+    
+
+    await client.query("COMMIT");
+
+    return res.json({
+      success: true,
+      message: result.message,
+      data: finalResult,
+    });
+
+  } catch (error) {
+    console.error("🔥 [ERROR Controller]:", error);
+
+    await client.query("ROLLBACK");
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno",
+      error: error.message,
+    });
+
+  } finally {
+    client.release();
+    console.log("🔚 [END Controller]");
+  }
+}
+
+
+
+
+export async function getAssignedPickings(req, res) {
+  console.log("🟦 ----[START] Get Assigned Pickings Endpoint----");
+
+  const client = await db.connect();
+
+  try {
+    const userId = req.user?.id;
+
+    console.log("📥 userId recibido desde req.user:", userId);
+
+    if (!userId) {
+      console.log("❌ Usuario no autenticado o id no disponible");
+
+      return res.status(401).json({
+        success: false,
+        title: "No autorizado",
+        message: "No se pudo identificar el usuario",
+      });
+    }
+
+    await client.query("BEGIN");
+    console.log("🔐 BEGIN TRANSACTION");
+
+    // 1) Buscar picker por user_id
+    const pickerResult = await client.query(
+      `
+      SELECT id
+      FROM pickers
+      WHERE user_id = $1
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (!pickerResult.rows.length) {
+      console.log("⚠️ Usuario sin permiso de picker");
+
+      await client.query("ROLLBACK");
+
+      return res.status(403).json({
+        success: false,
+        title: "Usuario sin permiso",
+        message: "Tú no eres un picker",
+      });
+    }
+
+    const pickerId = pickerResult.rows[0].id;
+    console.log("✅ Picker encontrado:", pickerId);
+
+    // 2) Buscar todos los stock_picking_id asignados a ese picker
+    const assignmentsResult = await client.query(
+      `
+      SELECT stock_picking_id
+      FROM picking_assignments
+      WHERE picker_id = $1
+      `,
+      [pickerId]
+    );
+
+    if (!assignmentsResult.rows.length) {
+      console.log("ℹ️ No hay asignaciones para este picker");
+
+      await client.query("ROLLBACK");
+
+      return res.json({
+        success: true,
+        title: "No hay recogidas pendientes",
+        message: "Está todo al día, excelente trabajo",
+        data: [],
+      });
+    }
+
+    const stockPickingIds = assignmentsResult.rows.map(
+      (row) => row.stock_picking_id
+    );
+
+    console.log("📦 stockPickingIds encontrados:", stockPickingIds);
+
+    // 3) Buscar masivamente en stock_picking
+    const pickingsResult = await client.query(
+      `
+      SELECT
+        id,
+        name,
+        order_name,
+        erp_cliente
+      FROM stock_picking
+      WHERE id = ANY($1::int[])
+        AND state NOT IN ('cancel', 'done')
+        AND picking_type = 'outgoing'
+      ORDER BY id DESC
+      `,
+      [stockPickingIds]
+    );
+
+    if (!pickingsResult.rows.length) {
+      console.log("ℹ️ No hay pickings pendientes luego del filtro");
+
+      await client.query("ROLLBACK");
+
+      return res.json({
+        success: true,
+        title: "No hay recogidas pendientes",
+        message: "Está todo al día, excelente trabajo",
+        data: [],
+      });
+    }
+
+    await client.query("COMMIT");
+    console.log("✅ [SUCCESS] Pickings asignados obtenidos correctamente");
+    console.log("📊 Total pickings devueltos:", pickingsResult.rows.length);
+
+    return res.json({
+      success: true,
+      title: "Recogidas obtenidas",
+      message: "Pedidos asignados cargados correctamente",
+      data: pickingsResult.rows,
+    });
+  } catch (error) {
+    console.error("🔥 [ERROR] Get Assigned Pickings:", error);
+
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("🔥 [ROLLBACK ERROR]:", rollbackError);
+    }
+
+    return res.status(500).json({
+      success: false,
+      title: "Error interno",
+      message: "Ocurrió un error obteniendo los pedidos asignados",
+      error: error.message,
+    });
+  } finally {
+    client.release();
+    console.log("🔚 [END] Get Assigned Pickings Endpoint");
+  }
+}
+
+
+
+//Reasignar un picking
+export async function reassignPicking(req, res) {
+  console.log("🟥----[START] Reassign Picking Endpoint----");
+
+  const client = await db.connect(); // 👈 importante para transacción
+
+  try {
+    const { selectedPicker, selectedItem } = req.body;
+
+    console.log("📥 Input:", { selectedPicker, selectedItem });
+
+    // 🔹 Validación básica
+    if (!selectedPicker || !selectedItem?.id) {
+      console.log("❌ Datos inválidos");
+      return res.json({
+        success: false,
+        message: "Datos inválidos",
+      });
+    }
+
+    const pickingId = selectedItem.id;
+    const newPickerId = selectedPicker;
+
+    // 🔥 INICIAR TRANSACCIÓN
+    await client.query("BEGIN");
+    console.log("🔐 BEGIN TRANSACTION");
+
+    // 🔹 1. Traer estado + usuario actual en UNA sola query
+    const pickingResult = await client.query(`
+    SELECT *
+    FROM stock_picking
+    WHERE id = $1
+    FOR UPDATE
+  `, [pickingId]);
+
+
+    if (!pickingResult.rows.length) {
+      console.log("❌ Picking no encontrado");
+
+      await client.query("ROLLBACK");
+
+      return res.json({
+        success: false,
+        message: "Picking no encontrado",
+      });
+    }
+
+    const { state, user_id: currentUserId } = pickingResult.rows[0];
+
+    console.log("📦 Estado:", state, "| Actual user:", currentUserId);
+
+    // 🔹 2. Validar estado
+    if (state === "done" || state === "cancel") {
+      console.log("⚠️ Picking bloqueado");
+
+      await client.query("ROLLBACK");
+
+      return res.json({
+        success: true,
+        message: "Picking ya está en estado done/cancel",
+      });
+    }
+
+
+
+
+
+
+
+
+
+
+    //LOCK PICKING FOR UPDATe
+    if (state === "confirmed") {
+      // buscar moves
+      const moves = await client.query(`
+        SELECT sm.*, p.sku
+        FROM stock_move sm
+        JOIN products p ON p.id = sm.product_id
+        WHERE sm.picking_id = $1
+        AND sm.state IN ('confirmed', 'partially_available')
+    `, [pickingId]);
+
+      console.log("NUMERO DE PRODUCTOS EN UN PEDIDO", moves.rowCount);
+
+      let totalReserved = 0;
+
+      /* ==============================
+         1️⃣ RESERVAR INVENTARIO
+      ============================== */
+
+      for (const move of moves.rows) {
+        //console.log("🚨🚨 ALERTA", move);
+        const result = await reserveInventoryForMove(client, move);
+
+        console.log("Resultado reserva:", result);
+
+        totalReserved += result.reserved;
+      }
+
+      /* ==============================
+         2️⃣ VERIFICAR SI SE RESERVÓ ALGO
+      ============================== */
+
+      if (totalReserved === 0) {
+        console.log("⚠️ No se pudo reservar inventario");
+
+        await client.query("ROLLBACK");
+
+        return res.json({
+          success: false,
+          message: "No se pudo reservar inventario",
+        });
+      }
+
+    }
+    /// 🔹 4. Obtener user_id desde pickers
+    console.log("🔍 Buscando picker en tabla pickers");
+
+    const pickerResult = await client.query(
+      `
+  SELECT user_id, active
+  FROM pickers
+  WHERE id = $1
+  `,
+      [newPickerId]
+    );
+
+    if (!pickerResult.rows.length) {
+      console.log("❌ Picker no encontrado");
+
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        success: false,
+        message: "Picker no encontrado",
+      });
+    }
+
+    const { user_id: userIdObtenido, active } = pickerResult.rows[0];
+
+    // 🔹 Validar activo
+    if (!active) {
+      console.log("⚠️ Picker inactivo");
+
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "El picker está inactivo",
+      });
+    }
+
+    //console.log("👤 user_id obtenido:", userIdObtenido);
+    //console.log("👤 current:", userIdObtenido);
+    // 🧪 VALIDACIÓN PRO: evitar doble update innecesario
+    if (currentUserId == userIdObtenido) {
+      console.log("ℹ️ Ya asignado al mismo usuario (desde picker)");
+
+      await client.query("ROLLBACK");
+
+      return res.json({
+        success: true,
+        message: "El picking ya está asignado a este usuario",
+      });
+    }
+
+    // 🔹 5. Update stock_picking con user_id REAL
+    console.log("✏️ Actualizando stock_picking.user_id");
+
+    await client.query(
+      `
+  UPDATE stock_picking 
+  SET user_id = $1 
+  WHERE id = $2
+  `,
+      [userIdObtenido, pickingId]
+    );
+
+    // 🔹 6. Upsert eficiente en picking_assignments
+    console.log("🔄 Upsert picking_assignments");
+
+    await client.query(
+      `
+      INSERT INTO picking_assignments (stock_picking_id, picker_id)
+      VALUES ($1, $2)
+      ON CONFLICT (stock_picking_id)
+      DO UPDATE SET picker_id = EXCLUDED.picker_id
+      `,
+      [pickingId, newPickerId]
+    );
+
+    // 🔥 COMMIT
+    await client.query("COMMIT");
+
+    console.log("✅ [SUCCESS] Reasignación completada");
+
+    return res.json({
+      success: true,
+      message: "Picking reasignado correctamente",
+    });
+
+  } catch (error) {
+    console.error("🔥 [ERROR]", error);
+
+    // 🔥 ROLLBACK en error
+    await client.query("ROLLBACK");
+
+    return res.json({
+      success: false,
+      message: "Error interno",
+      error: error.message,
+    });
+
+  } finally {
+    client.release(); // 👈 MUY IMPORTANTE
+    console.log("🔚 [END] Reassign Picking Endpoint");
+  }
+}
+
+
+
+//Obtener todos los pickers activos unicamente
+export async function getActivePickers(req, res) {
+
+  const client = await db.connect();
+
+  console.log("🟥 Endpoint GET /picking/active-pickers [getActivePickers()] iniciado");
+
+  try {
+
+    /* ==============================
+       1️⃣ BUSCAR PICKERS ACTIVOS
+    ============================== */
+
+    const pickersResult = await client.query(`
+      SELECT id, user_id
+      FROM pickers
+      WHERE active = true
+      AND active_today = true
+    `);
+
+    if (pickersResult.rowCount === 0) {
+      console.log("🟨 No hay pickers activos disponibles");
+
+      return res.status(200).json({
+        success: false,
+        title: "Sin pickers",
+        message: "No hay pickers disponibles en este momento."
+      });
+    }
+
+    /* ==============================
+       2️⃣ JOIN CON USERS
+    ============================== */
+
+    const usersResult = await client.query(`
+      SELECT 
+        p.id AS picker_id,
+        p.user_id,
+        u.full_name,
+        u.is_active
+      FROM pickers p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.active = true
+      AND p.active_today = true
+    `);
+
+    let activos = [];
+    let inactivos = [];
+
+    for (const row of usersResult.rows) {
+
+      if (row.is_active) {
+        activos.push({
+          picker_id: row.picker_id,
+          user_id: row.user_id,
+          full_name: row.full_name
+        });
+      } else {
+        inactivos.push({
+          picker_id: row.picker_id,
+          user_id: row.user_id,
+          full_name: row.full_name
+        });
+      }
+    }
+
+    /* ==============================
+       3️⃣ VALIDACIONES
+    ============================== */
+
+    if (activos.length === 0) {
+      console.log("🟨 Pickers encontrados pero usuarios inactivos");
+
+      return res.status(200).json({
+        success: false,
+        title: "Usuarios no disponibles",
+        message: "Los pickers encontrados no tienen usuarios activos.",
+        detail: inactivos
+      });
+    }
+
+    /* ==============================
+       LOG RESUMEN
+    ============================== */
+
+    console.log(
+      `🟨 Pickers activos: ${activos.length} | ` +
+      `Usuarios inactivos filtrados: ${inactivos.length} | ` +
+      `Total encontrados: ${usersResult.rowCount}`
+    );
+
+    console.log("🟩 Endpoint GET /picking/active-pickers [getActivePickers()] terminado");
+
+    return res.status(200).json({
+      success: true,
+      data: activos,
+      message: "Pickers activos obtenidos correctamente."
+    });
+
+  } catch (error) {
+
+    console.error("🟥 ERROR en getActivePickers:", error);
+
+    return res.status(500).json({
+      success: false,
+      title: "Error interno",
+      message: "Ocurrió un error al obtener los pickers."
+    });
+
+  } finally {
+    client.release();
+  }
+};
+
+
+
+export async function cancelPicking(req, res) {
+
+  const client = await db.connect();
+
+  console.log("🟥 Endpoint POST /picking/cancel [cancelPicking()] iniciado");
+
+  try {
+    const picking = req.body;
+    const userId = req.user && req.user.id;
+
+    /* ==============================
+       1️⃣ VALIDACIONES BÁSICAS
+    ============================== */
+
+    if (!userId) {
+      console.log("🟨 cancelPicking() detenido | usuario no autenticado");
+      return res.status(401).json({
+        success: false,
+        title: "Usuario no autenticado",
+        message: "No se pudo identificar el usuario.",
+      });
+    }
+
+    if (!picking || !picking.id) {
+      console.log("🟨 cancelPicking() detenido | falta picking.id");
+      return res.status(400).json({
+        success: false,
+        title: "ID requerido",
+        message: "Debes enviar el id del picking.",
+      });
+    }
+
+    await client.query("BEGIN");
+
+    /* ==============================
+       2️⃣ VALIDAR PERMISOS
+    ============================== */
+
+    const userResult = await client.query(
+      `
+      SELECT permissions
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (userResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      console.log("🟨 usuario no existe");
+      return res.status(404).json({
+        success: false,
+        title: "Usuario no encontrado",
+        message: "No se encontró el usuario.",
+      });
+    }
+
+    const permissions = userResult.rows[0].permissions || {};
+
+    const canCancel =
+      permissions.picking_warehouse &&
+      permissions.picking_warehouse.cancel_orders === true;
+
+    if (!canCancel) {
+      await client.query("ROLLBACK");
+      console.log("🟨 sin permisos para cancelar");
+      return res.status(403).json({
+        success: false,
+        title: "Sin permisos",
+        message: "No tienes permiso para anular pedidos.",
+      });
+    }
+
+    /* ==============================
+       3️⃣ BLOQUEAR PICKING
+    ============================== */
+
+    const pickingResult = await client.query(
+      `
+      SELECT id, state
+      FROM stock_picking
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [picking.id]
+    );
+
+    if (pickingResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      console.log("🟨 picking no encontrado");
+      return res.status(404).json({
+        success: false,
+        title: "Picking no encontrado",
+        message: "No existe el picking.",
+      });
+    }
+
+    const currentState = pickingResult.rows[0].state;
+
+    if (currentState === "done") {
+      await client.query("ROLLBACK");
+      console.log("🟨 picking en estado done");
+      return res.status(200).json({
+        success: true,
+        title: "Picking completado",
+        message: "No se puede anular un picking completado.",
+      });
+    }
+
+    if (currentState === "cancel") {
+      await client.query("ROLLBACK");
+      console.log("🟨 picking ya cancelado");
+      return res.status(200).json({
+        success: true,
+        title: "Ya cancelado",
+        message: "El picking ya estaba anulado.",
+      });
+    }
+
+    /* ==============================
+       4️⃣ CONTAR MOVE LINES
+    ============================== */
+
+    const moveLinesResult = await client.query(
+      `
+      SELECT COUNT(*) AS count
+      FROM stock_move_line
+      WHERE picking_id = $1
+      `,
+      [picking.id]
+    );
+
+    const moveLinesCount = moveLinesResult.rows[0].count;
+
+    /* ==============================
+       5️⃣ LIBERAR INVENTARIO (MASIVO)
+    ============================== */
+
+    const inventoryUpdate = await client.query(
+      `
+      UPDATE inventory_by_location ibl
+      SET qty_reserved = GREATEST(ibl.qty_reserved - sub.total_qty, 0)
+      FROM (
+        SELECT
+          sml.location_id,
+          p.sku,
+          SUM(sml.product_uom_qty) AS total_qty
+        FROM stock_move_line sml
+        JOIN products p ON p.id = sml.product_id
+        WHERE sml.picking_id = $1
+        GROUP BY sml.location_id, p.sku
+      ) sub
+      WHERE ibl.location_id = sub.location_id
+      AND ibl.product_sku = sub.sku
+      `,
+      [picking.id]
+    );
+
+    /* ==============================
+       6️⃣ CANCELAR MOVE LINES
+    ============================== */
+
+    const cancelMoveLines = await client.query(
+      `
+      UPDATE stock_move_line
+      SET state = 'cancel'
+      WHERE picking_id = $1
+      `,
+      [picking.id]
+    );
+
+    /* ==============================
+       7️⃣ CANCELAR MOVES
+    ============================== */
+
+    const cancelMoves = await client.query(
+      `
+      UPDATE stock_move
+      SET state = 'cancel'
+      WHERE picking_id = $1
+      `,
+      [picking.id]
+    );
+
+    /* ==============================
+       8️⃣ CANCELAR PICKING
+    ============================== */
+
+    const cancelPicking = await client.query(
+      `
+      UPDATE stock_picking
+      SET state = 'cancel',
+          user_id = NULL
+      WHERE id = $1
+      `,
+      [picking.id]
+    );
+
+    await client.query("COMMIT");
+
+    /* ==============================
+       LOG FINAL
+    ============================== */
+
+    console.log(
+      `🟨 Picking ID: ${picking.id} | Estado: ${currentState} | MoveLines: ${moveLinesCount} | ` +
+      `Reservas liberadas: ${inventoryUpdate.rowCount} | ` +
+      `Moves cancelados: ${cancelMoves.rowCount} | ` +
+      `MoveLines canceladas: ${cancelMoveLines.rowCount}`
+    );
+
+    console.log("🟩 Endpoint POST /picking/cancel [cancelPicking()] terminado");
+
+    return res.status(200).json({
+      success: true,
+      title: "Picking anulado",
+      message: "El picking fue anulado correctamente.",
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error("🟥 ERROR cancelPicking:", error);
+
+    return res.status(500).json({
+      success: false,
+      title: "Error",
+      message: "Ocurrió un error al anular el picking.",
+    });
+  } finally {
+    client.release();
+  }
+};
+
+
 
 
 // obtiene todos los picking de despacho y sus asignaciones
@@ -70,16 +1097,16 @@ export async function getPickings(req, res) {
 
     assignmentResult.rows.forEach(row => {
       assignmentMap.set(
-  Number(row.stock_picking_id),
-  Number(row.picker_id)
-);
+        Number(row.stock_picking_id),
+        Number(row.picker_id)
+      );
     });
 
     /* =========================
        5️⃣ PICKERS
     ========================= */
     const pickerIds = [...new Set(assignmentResult.rows.map(r => r.picker_id))];
-   //console.log("PICKERS IDS:", pickerIds)
+    //console.log("PICKERS IDS:", pickerIds)
     let pickerMap = new Map();
 
     if (pickerIds.length > 0) {
@@ -121,14 +1148,14 @@ export async function getPickings(req, res) {
        7️⃣ ENRIQUECER DATA
     ========================= */
     const result = pickings.map(p => {
-//console.log(p.id);
-//console.log(assignmentMap);
+      //console.log(p.id);
+      //console.log(assignmentMap);
       const pickerId = assignmentMap.get(Number(p.id)) || null;
       const picker = pickerMap.get(pickerId);
 
       let pickerActive = false;
       let pickerName = null;
-//console.log(picker);
+      //console.log(picker);
       if (picker) {
         //console.log("eliel");
         pickerActive = picker.active && picker.active_today;
@@ -145,9 +1172,9 @@ export async function getPickings(req, res) {
       };
     });
     console.log(
-  `🟨 Pickings: ${pickings.length} | Total: ${total} | Page: ${page} | Limit: ${limit} | Offset: ${offset} | Assignments: ${assignmentMap.size} | Pickers: ${pickerMap.size} | Users: ${userMap.size}`
-);
-console.log("🟩 Endpoint GET /picking/available-users [getPickings()] terminado");
+      `🟨 Pickings: ${pickings.length} | Total: ${total} | Page: ${page} | Limit: ${limit} | Offset: ${offset} | Assignments: ${assignmentMap.size} | Pickers: ${pickerMap.size} | Users: ${userMap.size}`
+    );
+    console.log("🟩 Endpoint GET /picking/available-users [getPickings()] terminado");
     /* =========================
        8️⃣ RESPUESTA
     ========================= */

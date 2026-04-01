@@ -36,7 +36,7 @@ export async function assignmentService() {
 
             /* ==============================
                1️⃣ RESERVAR INVENTARIO
-            ============================== */
+            ============================== 
 
             for (const move of moves.rows) {
                 //console.log("🚨🚨 ALERTA", move);
@@ -46,17 +46,18 @@ export async function assignmentService() {
 
                 totalReserved += result.reserved;
             }
-
+                
             /* ==============================
                2️⃣ VERIFICAR SI SE RESERVÓ ALGO
-            ============================== */
+            ============================== 
 
             if (totalReserved === 0) {
 
                 console.log("⚠️ No se pudo reservar inventario para este picking");
 
                 continue;
-            }
+            }*/
+
 
 
             /* ==============================
@@ -81,12 +82,36 @@ export async function assignmentService() {
 
 
 
+/* ==============================
+   5️⃣ CREAR ASIGNACIÓN
+============================== */
 
-            /* ==============================
-               4️⃣ ACTUALIZAR PICKING
-            ============================== */
+const existing = await client.query(`
+  SELECT 1
+  FROM picking_assignments
+  WHERE stock_picking_id = $1
+`, [picking.id]);
 
-            await client.query(`
+if (existing.rowCount === 0) {
+
+  await client.query(`
+    INSERT INTO picking_assignments (
+      stock_picking_id,
+      picker_id,
+      assignment_datetime,
+      assignment_day,
+      line_count
+    )
+    VALUES ($1, $2, NOW(), CURRENT_DATE, $3)
+  `, [picking.id, elElegido, moves.rowCount]);
+
+  console.log("✅ Picking asignado correctamente");
+
+  /* ==============================
+     4️⃣ ACTUALIZAR PICKING (SOLO SI INSERTÓ)
+  ============================== */
+
+  await client.query(`
     UPDATE stock_picking sp
     SET 
         state = 'assigned',
@@ -94,35 +119,9 @@ export async function assignmentService() {
     FROM pickers p
     WHERE sp.id = $1
     AND p.id = $2
-`, [picking.id, elElegido]);
+  `, [picking.id, elElegido]);
 
-            /* ==============================
-               5️⃣ CREAR ASIGNACIÓN
-            ============================== */
-
-            const existing = await db.query(`
-  SELECT 1
-  FROM picking_assignments
-  WHERE stock_picking_id = $1
-`, [picking.id]);
-
-            if (existing.rowCount === 0) {
-                await db.query(`
-    INSERT INTO picking_assignments (
-      stock_picking_id,
-      picker_id,
-      assignment_date,
-      assignment_day,
-      line_count
-    )
-    VALUES ($1, $2, NOW(), CURRENT_DATE, $3)
-  `, [picking.id, elElegido, move.rowscount]);
-
-                console.log("✅ Picking asignado correctamente");
-
-
-            }
-
+}
 
         }
 
@@ -140,139 +139,7 @@ export async function assignmentService() {
 }
 
 
-//Sevicio de reserva de inventario
-export async function reserveInventoryForMove(client, move, elElegido) {
 
-    const productSku = move.sku;
-    const cantidadElegida = move.product_qty;
-    let cantidadReservada = 0;
-
-    console.log("🔍 Reservando inventario para:", productSku);
-
-    /* ===============================
-       1️⃣ BUSCAR INVENTARIO Y BLOQUEAR
-    =============================== */
-
-    const inventoryResult = await client.query(`
-    SELECT 
-        id,
-        warehouse_id,
-        location_id,
-        qty_available,
-        qty_reserved
-    FROM inventory_by_location
-    WHERE product_sku = $1
-    ORDER BY location_id
-    FOR UPDATE
-`, [productSku]);
-
-    const inventoryRows = inventoryResult.rows;
-
-    if (inventoryRows.length === 0) {
-
-        console.log("⚠️ No existe inventario para este producto");
-
-        return {
-            reserved: 0,
-            note: "Cantidad no reservada"
-        };
-    }
-
-    /* ===============================
-       2️⃣ RECORRER INVENTARIO
-    =============================== */
-
-    for (const row of inventoryRows) {
-
-        const disponible = row.qty_available - row.qty_reserved;
-
-        if (disponible <= 0) continue;
-
-        const restante = cantidadElegida - cantidadReservada;
-
-        const reservar = Math.min(disponible, restante);
-
-        if (reservar <= 0) break;
-
-        /* ===============================
-           3️⃣ ACTUALIZAR RESERVA
-        =============================== */
-
-        await client.query(`
-            UPDATE inventory_by_location
-            SET qty_reserved = qty_reserved + $1
-            WHERE id = $2
-        `, [reservar, row.id]);
-
-        /* ===============================
-           4️⃣ CREAR STOCK MOVE LINE
-        =============================== */
-
-        // crear move line con warehouse y location
-        await client.query(`
-    INSERT INTO stock_move_line
-    (move_id, picking_id, product_id, product_uom_id, warehouse_id, location_id, product_uom_qty, state)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-`, [
-            move.id,
-            move.picking_id,
-            move.product_id,
-            move.product_uom_id,
-            row.warehouse_id,
-            row.location_id,
-            reservar,
-            "assigned"   // ✅ CORRECTO
-        ]);
-        cantidadReservada += reservar;
-
-        console.log(`📦 Reservado ${reservar} en location ${row.location_id}`);
-
-        if (cantidadReservada === cantidadElegida) break;
-    }
-
-    /* ===============================
-       5️⃣ DETERMINAR RESULTADO
-    =============================== */
-
-    let note = "";
-
-    if (cantidadReservada === parseInt(cantidadElegida)) {
-
-        note = "Cantidad completa reservada";
-
-    } else if (cantidadReservada > 0) {
-
-        note = "Cantidad parcialmente reservada";
-
-    } else {
-
-        note = "Cantidad no reservada";
-    }
-
-    /* ===============================
-       6️⃣ ACTUALIZAR STOCK MOVE
-    =============================== */
-    let state = "confirmed";
-    if (cantidadReservada === parseInt(move.product_qty)) {
-        state = "assigned";
-    } else if (cantidadReservada > 0) {
-        state = "partially_available";
-    }
-
-    await client.query(`
-    UPDATE stock_move
-    SET 
-        reserved_qty = $1,
-        note = $2,
-        state = $3
-    WHERE id = $4
-`, [cantidadReservada, note, state, move.id]);
-
-    return {
-        reserved: cantidadReservada,
-        note
-    };
-}
 
 
 async function getActivePickers(client) {

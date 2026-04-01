@@ -14,19 +14,17 @@ export default function ScanModal({ open, title, children }: ScanModalProps) {
   return (
     <div className="modal-backdrop">
       <div className="modal-fullscreen" role="dialog" aria-modal="true">
-        
-        
+
+
 
         {/* BODY */}
         <div className="modal-body fullscreen-body">
           {/* HEADER */}
-        <div className="modal-header">
-          <div className="modal-title">{title ?? "Detalle"}</div>
-
-          {/*<button className="modal-close" onClick={onClose} aria-label="Cerrar">
-            ✕
-          </button>*/}
-        </div>
+          {title && (
+  <div className="modal-header">
+    <div className="modal-title">{title}</div>
+  </div>
+)}
           {children}
         </div>
 

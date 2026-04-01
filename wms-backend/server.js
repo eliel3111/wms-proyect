@@ -15,13 +15,15 @@ import { startMainCron, runFullSync } from "./cron/cronJobs.js";
 import { assignmentService } from "./services/saleAssignmentService.js";
 import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
 
+import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
+
 
 
 
 import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get("/test-purchase-orders", async (req, res) => {
+/*app.get("/test-purchase-orders", async (req, res) => {
   //console.log("🚨CPO CHECK 1");
   const data = await syncAllPurchaseOrders();
 
@@ -29,9 +31,94 @@ app.get("/test-purchase-orders", async (req, res) => {
     success: true,
     data
   });
+});*/
+app.use(express.json());
+app.post("/test/reserve-real", async (req, res) => {
+  const client = await db.connect();
+
+  console.log("🟥 Endpoint POST /test/reserve-real iniciado");
+
+  try {
+    await client.query("BEGIN");
+ console.log(req.body);
+    const { data } = req.body;
+
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({
+        success: false,
+        message: "Data inválida"
+      });
+    }
+
+    let totalReserved = 0;
+    let results = [];
+
+    /* ==============================
+       1️⃣ PROBAR FUNCIÓN REAL
+    ============================== */
+
+    for (const move of data) {
+
+      console.log("🟡 Probando producto:", move.product_id);
+
+      // 🔥 AQUÍ LLAMAS TU FUNCIÓN REAL
+      const result = await reserveInventoryForMove(client, move);
+
+      console.log("Resultado reserva real:", result);
+
+      totalReserved += result.reserved;
+
+      results.push({
+        product_id: move.product_id,
+        reserved: result.reserved
+      });
+    }
+
+    /* ==============================
+       2️⃣ VALIDACIÓN
+    ============================== */
+
+    if (totalReserved === 0) {
+      console.log("⚠️ No se reservó nada");
+
+      await client.query("ROLLBACK");
+
+      return res.status(200).json({
+        success: false,
+        message: "No se pudo reservar inventario",
+        results
+      });
+    }
+
+    await client.query("COMMIT");
+
+    console.log(
+      `🟨 Total reservado: ${totalReserved} | Productos: ${data.length}`
+    );
+
+    console.log("🟩 Endpoint POST /test/reserve-real terminado");
+
+    return res.status(200).json({
+      success: true,
+      totalReserved,
+      results
+    });
+
+  } catch (error) {
+
+    await client.query("ROLLBACK");
+
+    console.error("🟥 ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error en prueba de reserva"
+    });
+
+  } finally {
+    client.release();
+  }
 });
-
-
 
 
 

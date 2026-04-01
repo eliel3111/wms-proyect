@@ -21,6 +21,8 @@ import ReceiveWareTransferStart from "./pages/receive_warehouse_reception.tsx"
 import ReceiveWareValidation from "./pages/receive_warehouse_validation.tsx"
 import ReceiveWareFinal from "./pages/receive_warehouse_final.tsx"
 import MonitorPicking from "./pages/picking_monitor_selection.tsx";
+import GetAssignedPickings from "./pages/Picking_pending_assigned.tsx";
+import PickingRoute from "./pages/Picking_user_working.tsx"
 
 
 
@@ -72,6 +74,8 @@ function App() {
 
           {/*WAREHOUSE PICKING */}
           <Route path="/picking-monitor" element={<MonitorPicking />} />
+          <Route path="/picking-user-init" element={<GetAssignedPickings />} />
+          <Route path="/picking/:id" element={<PickingRoute />} />
 
         </Route>
 
