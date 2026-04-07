@@ -23,6 +23,8 @@ import ReceiveWareFinal from "./pages/receive_warehouse_final.tsx"
 import MonitorPicking from "./pages/picking_monitor_selection.tsx";
 import GetAssignedPickings from "./pages/Picking_pending_assigned.tsx";
 import PickingRoute from "./pages/Picking_user_working.tsx"
+import PickingValidation from "./pages/picking_user_validation.tsx";
+import PickingFinal from "./pages/picking_user_final.tsx"
 
 
 
@@ -76,6 +78,8 @@ function App() {
           <Route path="/picking-monitor" element={<MonitorPicking />} />
           <Route path="/picking-user-init" element={<GetAssignedPickings />} />
           <Route path="/picking/:id" element={<PickingRoute />} />
+          <Route path="/picking/validation/:id" element={<PickingValidation />} />
+          <Route path="/picking/final/:id" element={<PickingFinal />} />
 
         </Route>
 

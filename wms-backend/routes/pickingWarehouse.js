@@ -1,5 +1,5 @@
 import express from "express";
-import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode } from "../controllers/pickingController.js"
+import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode, confirmPickingLine, getPickingDifferences, getBestShippingLocation, closePicking } from "../controllers/pickingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
@@ -49,7 +49,17 @@ router.get(
 //Reasignar un picking
 router.post("/scan", scanPickingCode);
 
+//Confirmar una linea
+router.post("/confirm-line", confirmPickingLine);
 
+//Confirmar una linea
+router.get("/:pickingId/differences", getPickingDifferences);
+
+// Obtener mejor ubicación de despacho
+router.get("/best-location/:pickingId", getBestShippingLocation);
+
+//Cerrar recogida de un pedido y mover cantidades
+router.post("/close", closePicking);
 
 
 export default router;

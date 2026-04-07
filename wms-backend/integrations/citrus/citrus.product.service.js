@@ -1,5 +1,5 @@
 // services/product.service.js
-
+// #6Esta función se encarga de sincronizar un producto que viene desde un ERP hacia tu base de datos. Primero valida que el objeto recibido sea válido y obtiene su identificador (erp_id). Luego revisa si el producto ya existe en la tabla products usando ese erp_id: si existe, lo actualiza con la información más reciente; si no existe, lo inserta como un nuevo registro. Durante este proceso, si el producto no trae un SKU, la función genera uno automáticamente basado en el último SKU registrado. También mapea campos del ERP como nombre, descripción, unidad de medida y estado (activo o inactivo). Finalmente, si el producto incluye un código de barras, lo guarda en una tabla separada evitando duplicados. En resumen, garantiza que los productos del ERP estén correctamente creados o actualizados en tu sistema sin generar duplicados y manteniendo la información sincronizada.
 export async function insertProductFromERP(client, item) {
 
     if (!item) {
@@ -135,14 +135,23 @@ export async function insertProductFromERP(client, item) {
     if (barcode) {
 
         await client.query(`
-            INSERT INTO product_barcodes
-            (product_sku, barcode, is_primary, created_at)
-            VALUES ($1,$2,true,now())
-            ON CONFLICT (barcode) DO NOTHING
-        `, [
-            productSku,
-            barcode
-        ]);
+    INSERT INTO product_barcodes
+(product_sku, barcode, is_primary, created_at)
+SELECT
+    $1::text,
+    $2::text,
+    NOT EXISTS (
+        SELECT 1
+        FROM product_barcodes
+        WHERE product_sku = $1::text
+          AND is_primary = true
+    ),
+    now()
+ON CONFLICT (barcode) DO NOTHING;
+`, [
+    productSku,
+    barcode
+]);
     }
 
     return product;

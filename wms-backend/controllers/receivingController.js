@@ -6,8 +6,12 @@ import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
 import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 import { runFullSync } from "../cron/cronJobs.js";
 
+
+
+
+
 export async function CloseReception(req, res) {
-  console.log("END END END END POINT POINT");
+  //console.log("END END END END POINT POINT");
   const { purchaseOrderId, receivingLocationId } = req.body;
   console.log("ID DE LA ORDEN DE COMPRA: ", purchaseOrderId);
   console.log("ID LA UBICACION: ", receivingLocationId);
@@ -146,7 +150,7 @@ WHERE r.id = $1;
     }
 
     const header = headerResult.rows[0];
-    console.log(header);
+    //console.log(header);
     // 3️⃣ Validaciones mínimas
     if (!header.receipt_code) throw new Error("RECEIPT_CODE_MISSING");
     if (!header.purchase_order_number) throw new Error("PO_NUMBER_MISSING");
@@ -192,7 +196,7 @@ WHERE r.id = $1;
       };
     });
 
-    console.log("LINES FINAL", enrichedLines);
+    //console.log("LINES FINAL", enrichedLines);
 
     //CREAR STOCKLINES
 
@@ -219,8 +223,8 @@ WHERE r.id = $1;
       company_slug: header.company_slug,
     };
 
-    console.log("📄 HEADER PDF:", headerPDF);
-    console.log("📄 HEADER PDF:", headerPDF);
+   // console.log("📄 HEADER PDF:", headerPDF);
+    //console.log("📄 HEADER PDF:", headerPDF);
 
     //-------------------------------------------------
     // 4️⃣ Marcar la recepción como completed

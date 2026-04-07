@@ -1,11 +1,11 @@
 .order-lines-header {
     display: grid;
     grid-template-columns:
-        150px
+        140px
         /* Código */
         1fr
         /* Descripción */
-        140px
+        120px
         /* Cantidad recibida */
         120px;
     /* Diferencia */
@@ -112,6 +112,7 @@
     margin-top: 6px;
     font-size: 14px;
     opacity: 0.9;
+
 }
 
 .line-bottom {
@@ -143,7 +144,7 @@
             /* Código */
             1fr
             /* Descripción */
-            70px
+            50px
             /* Cantidad recibida */
             80px;
         /* Diferencia */
@@ -151,7 +152,7 @@
 
     .order-line {
         grid-template-columns:
-            70px
+            65px
             /* SKU */
             1fr
             /* descripción */
@@ -159,5 +160,6 @@
             /* qty */
             60px;
         /* diferencia */
+        gap: 7px;
     }
 }

@@ -18,21 +18,25 @@ import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
 import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
 
 
-
+import { moveInventory } from "./services/inventoryService.js";
 
 import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
 const app = express();
+
+
 const PORT = process.env.PORT || 3000;
-/*app.get("/test-purchase-orders", async (req, res) => {
-  //console.log("🚨CPO CHECK 1");
+app.get("/test-purchase-orders", async (req, res) => {
+  console.log("🚨CPO CHECK 1");
   const data = await syncAllPurchaseOrders();
 
   res.json({
     success: true,
     data
   });
-});*/
+});
 app.use(express.json());
+
+/*
 app.post("/test/reserve-real", async (req, res) => {
   const client = await db.connect();
 
@@ -55,7 +59,7 @@ app.post("/test/reserve-real", async (req, res) => {
 
     /* ==============================
        1️⃣ PROBAR FUNCIÓN REAL
-    ============================== */
+    ============================== 
 
     for (const move of data) {
 
@@ -76,7 +80,7 @@ app.post("/test/reserve-real", async (req, res) => {
 
     /* ==============================
        2️⃣ VALIDACIÓN
-    ============================== */
+    ============================== 
 
     if (totalReserved === 0) {
       console.log("⚠️ No se reservó nada");
@@ -119,6 +123,7 @@ app.post("/test/reserve-real", async (req, res) => {
     client.release();
   }
 });
+*/
 
 
 
@@ -136,7 +141,7 @@ app.post("/test/reserve-real", async (req, res) => {
 
 
 
-
+app.post("/inventory/move", moveInventory);
 
 
 

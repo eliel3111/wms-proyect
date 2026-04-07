@@ -337,7 +337,7 @@ AREA DE ALMACEN COMPRIMIDO*/
 .container-receive-transfer {
   padding: 30px;
   background: #cfd3da;
-  min-height: 100vh;
+  min-height: 100%;
   color: white;
   font-family: "Inter", sans-serif;
   display: flex;
@@ -441,9 +441,7 @@ AREA DE ALMACEN COMPRIMIDO*/
 /* MOBILE */
 @media (max-width: 600px) {
 
-  .container-receive-transfer {
-    padding: 18px;
-  }
+
 
 
   .card {

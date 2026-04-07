@@ -40,16 +40,25 @@ export default function PickingRoute() {
     };
 
     //STATES
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
     const { openModal } = useModal();
     const [pickings, setPickings] = useState<StockMoveLine[]>([]);
     const [pickingId, setPickingId] = useState<number | null>(null);
     const pickingIdRef = useRef<number | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const isModalOpenRef = useRef(false);
+const [goNext, setGoNext] = useState(false);
+
     const [fromLocation, setFromLocation] = useState<Location | null>(null);
     const fromLocationRef = useRef<Location | null>(null);
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
+
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const selectedProductRef = useRef<Product | null>(null);
+
+
+    const [startedPicking, setStartedPicking] = useState(false);
     const [currentLine, setCurrentLine] = useState<StockMoveLine | null>(null);
     const currentLineRef = useRef<StockMoveLine | null>(null);
     const scanBuffer = useRef<string>("");
@@ -71,6 +80,15 @@ export default function PickingRoute() {
     useEffect(() => {
         pickingIdRef.current = pickingId;
     }, [pickingId]);
+    useEffect(() => {
+        selectedProductRef.current = selectedProduct;
+    }, [selectedProduct]);
+    useEffect(() => {
+  if (goNext && pickings.length > 0) {
+    selectNextLine();
+    setGoNext(false);
+  }
+}, [pickings]);
 
 
     /* 1️⃣ Obtener ID desde la URL */
@@ -90,7 +108,12 @@ export default function PickingRoute() {
         // 🔹 1. Validar que exista pickingId
         if (!pickingId) return;
 
-        const fetchData = async () => {
+        fetchData();
+        
+
+    }, [pickingId]);
+
+    const fetchData = async () => {
             try {
                 // 🔹 2. Hacer request
                 const response = await apiClient.get(
@@ -100,15 +123,12 @@ export default function PickingRoute() {
                 // 🔹 3. Log del resultado
                 console.log("📦 Products Locations:", response.data.finalResult);
                 setPickings(response.data.finalResult);
+                setLoading(false);   
 
             } catch (error) {
                 console.error("❌ Error fetching products locations:", error);
             }
         };
-
-        fetchData();
-
-    }, [pickingId]);
 
 
     /* =======================
@@ -117,6 +137,14 @@ export default function PickingRoute() {
     useEffect(() => {
         async function handleKeyDown(e: KeyboardEvent) {
             const isEndKey = e.key === "Enter" || e.key === "Tab";
+
+            if (!isModalOpenRef.current) {
+                openModal({
+                    title: "INICIE LA RECOGIDA",
+                    message: "Primero debe iniciar la ruta dando click a Recoger."
+                });
+                return;
+            }
 
             if (isEndKey) {
                 const scanned = scanBuffer.current
@@ -242,7 +270,6 @@ export default function PickingRoute() {
 
 
         setFromLocation(location);   // ✅ guardar ubicación
-        setCurrentLine(null);              // 🔥 limpiar producto
         setQty("");                        // 🔥 limpiar cantidad
     }
 
@@ -265,6 +292,7 @@ export default function PickingRoute() {
 
 
         console.log("📍 UBICACIÓN ACTUAL:", fromLocationRef.current);
+        console.log("📍 LIINEA ACTUAL:", currentLineRef.current);
 
         setSelectedProduct({
             id: Number(product.id),
@@ -287,37 +315,172 @@ export default function PickingRoute() {
 
 
     // FUNCION PARA CERRAR MODAL
+    async function sendModal() {
+        try {
+            // 🔴 VALIDAR QUE TODO EXISTA
+            if (
+                !currentLineRef.current ||
+                !fromLocationRef.current ||
+                !selectedProductRef.current ||
+                !qtyRef.current
+            ) {
+                openModal({
+                    title: "Datos incompletos",
+                    message: "Debe escanear ubicación, producto y cantidad"
+                });
+                return;
+            }
+
+            // 🔴 VALIDAR QTY
+            if (Number(qtyRef.current) <= 0) {
+                openModal({
+                    title: "Cantidad inválida",
+                    message: "La cantidad debe ser mayor a 0"
+                });
+                return;
+            }
+
+            // 🔥 CALL API
+            const res = await apiClient.post("/picking/confirm-line", {
+                id: currentLineRef.current.id,
+                locationId: fromLocationRef.current.id,
+                productId: selectedProductRef.current.id,
+                qty: Number(qtyRef.current),
+            });
+
+            console.log("✅ RESPONSE:", res.data);
+
+            // 🔴 SI FALLA
+            if (!res.data.success) {
+                openModal({
+                    title: res.data.title,
+                    message: res.data.message
+                });
+                return;
+            }
+
+            // ✅ TODO BIEN → LIMPIAR UI
+          
+            await fetchData();
+setGoNext(true);
+            setFromLocation(null);
+            setSelectedProduct(null);
+            setQty("");
+
+            
+            setStartedPicking(false);
+
+
+        } catch (error) {
+            console.error("🔥 ERROR confirm-line:", error);
+
+            openModal({
+                title: "Error",
+                message: "No se pudo guardar la información"
+            });
+        }
+    }
+
     function closeModal() {
-        //Hacer que no se cierre si es menor a cero
+        // ✅ TODO BIEN → LIMPIAR UI
+        setFromLocation(null);
+        setSelectedProduct(null);
+        setQty("");
 
         setIsModalOpen(false);
+        isModalOpenRef.current = false;
+        setStartedPicking(false);
     }
+
     function handleOpenModal() {
         selectNextLine();
         setIsModalOpen(true);
+        isModalOpenRef.current = true;
+        setStartedPicking(true);
     };
 
+    const SkeletonLine = () => (
+  <div className="skeleton-line">
+    <div className="skeleton-code"></div>
+    <div className="skeleton-text"></div>
+    <div className="skeleton-qty"></div>
+  </div>
+);
 
 
 
-    //Elegir proxima parada
-    function selectNextLine() {
-        const nextLine = pickings.find(line => {
-            const done = Number(line.qty_done || 0);
-            const required = Number(line.product_uom_qty || 0);
 
-            return done < required; // pendiente o parcial
-        });
+   function selectNextLine() {
 
-        if (nextLine) {
-            setCurrentLine(nextLine);
-        }
+  // 🔥 1. BUSCAR PRIMERO LAS QUE ESTÁN EN 0
+  const zeroLine = pickings.find(line => {
+    const done = Number(line.qty_done || 0);
+    return done === 0;
+  });
 
-        return nextLine; // opcional por si quieres usarla fuera
+  if (zeroLine) {
+    console.log("🎯 ZERO LINE", zeroLine);
+    setCurrentLine(zeroLine);
+    return zeroLine;
+  }
+
+  // 🔥 2. SI NO HAY EN 0 → BUSCAR PARCIALES
+  const partialLine = pickings.find(line => {
+    const done = Number(line.qty_done || 0);
+    const required = Number(line.product_uom_qty || 0);
+
+    return done < required;
+  });
+
+  if (partialLine) {
+    console.log("🟡 PARTIAL LINE", partialLine);
+    setCurrentLine(partialLine);
+    return partialLine;
+  }
+
+  // 🔴 3. NO HAY MÁS
+  console.log("✅ TODAS COMPLETAS");
+  return null;
+}
+
+const handleFinish = async () => {
+  if (!pickingIdRef.current) return;
+
+  try {
+    const response = await apiClient.get(
+      `/picking/${pickingIdRef.current}/differences`
+    );
+
+    const result = response.data;
+
+    if (!result.success) {
+      openModal({
+        title: "Error",
+        message: "No se pudo validar el picking"
+      });
+      return;
     }
 
+    const lines = result.data.lines;
 
+    // 🔴 SI HAY DIFERENCIAS → IR A VALIDACIÓN
+    if (lines.length > 0) {
+      navigate(`/picking/validation/${pickingIdRef.current}`);
+      return;
+    }
 
+    // ✅ SI NO HAY DIFERENCIAS → FINALIZAR DIRECTO
+    navigate(`/picking/final/${pickingIdRef.current}`);
+
+  } catch (error) {
+    console.error(error);
+
+    openModal({
+      title: "Error",
+      message: "Error al validar el picking"
+    });
+  }
+};
 
 
 
@@ -342,15 +505,14 @@ export default function PickingRoute() {
 
 
                     {/* ✅ FINALIZAR */}
-                    <button className="picking-user-finish">
-                        <span className="icon">
-                            {/* ICONO CHECK */}
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z" />
-                            </svg>
-                        </span>
-                        <span className="label">Finalizar</span>
-                    </button>
+                <button className="picking-user-finish" onClick={handleFinish}>
+  <span className="icon">
+    <svg viewBox="0 0 24 24">
+      <path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z" />
+    </svg>
+  </span>
+  <span className="label">Finalizar</span>
+</button>
                 </div>
             </div>
 
@@ -363,20 +525,34 @@ export default function PickingRoute() {
                 </div>
 
                 <div className="lines-list">
-                    {pickings.map((line) => (
-                        <OrderLineCard
-                            line={{
-                                id: line.product_id,
-                                sku: line.sku,
-                                description: line.description,
-                                ordered_qty: Math.trunc(Number(line.product_uom_qty)),
-                                received_qty: Math.trunc(Number(line.qty_done)),
-                                product_exists: true,
-                                barcodes: [],
-                            }}
-                        />
-                    ))}
-                </div>
+
+  {loading ? (
+    <>
+      <SkeletonLine />
+      <SkeletonLine />
+      <SkeletonLine />
+      <SkeletonLine />
+    </>
+  ) : pickings.length === 0 ? (
+    <div>No hay líneas</div>
+  ) : (
+    pickings.map((line) => (
+      <OrderLineCard
+        key={line.id}
+        line={{
+          id: line.product_id,
+          sku: line.sku,
+          description: line.description,
+          ordered_qty: Math.trunc(Number(line.product_uom_qty)),
+          received_qty: Math.trunc(Number(line.qty_done)),
+          product_exists: true,
+          barcodes: [],
+        }}
+      />
+    ))
+  )}
+
+</div>
             </div>
 
 
@@ -397,7 +573,12 @@ export default function PickingRoute() {
                     <div className="transfer-card">
 
                         {/* ORIGEN */}
-                        <section className={`pick-user-location-card ${1 < 2 ? "pick-user-location-empty" : ""}`}>
+                        <section
+                            className={`pick-user-location-card ${!fromLocation || fromLocation.code !== currentLine?.code
+                                ? "pick-user-location-empty"
+                                : ""
+                                }`}
+                        >
                             <span className="pick-user-location-label">
                                 Lea la ubicación:
                             </span>
@@ -413,62 +594,63 @@ export default function PickingRoute() {
 
                         {/* 1) PRODUCTO */}
                         <section
-                            className={`block block-product 
-    ${2 > 1 ? "empty" : ""} 
-    ${1 > 2 ? "has-product" : ""}
-  `}
+                            className={`pick-user-location-card ${!selectedProduct ||
+                                Number(selectedProduct.id) !== Number(currentLine?.product_id)
+                                ? "pick-user-product-empty"
+                                : ""
+                                }`}
                         >
 
-                            {1 > 2 ? (
-                                /* 🟢 Hay producto */
-                                <>
-                                    <div className="product-desc">
-                                        currentLine.description
-                                    </div>
+                            <span className="pick-user-location-label">
+                                Lea el producto:
+                            </span>
+                            <div className="pick-user-location-header">
 
-                                    <div className="product-top">
-                                        <div className="product-meta">
-                                            <span className="label">Código del producto:</span>
-                                            <span className="value">
-                                                currentLine.sku
-                                            </span>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : 3 > 2 ? (
-                                /* 🟡 Hay ubicación, falta producto */
-                                <div className="scan-product-hint">
-                                    LEA UN PRODUCTO
-                                </div>
-                            ) : (
-                                /* 🔵 Estado inicial */
-                                <>
-                                    <div className="product-desc"></div>
-                                    <div className="product-top">
-                                        <div className="product-meta">
-                                            <span className="label">Código del producto:</span>
-                                            <span className="value"></span>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+
+                                <span className="pick-user-location-code">
+                                    {currentLine?.sku}
+                                </span>
+                            </div>
+
 
                         </section>
 
 
                         {/* CANTIDAD */}
                         <section
-                            className={`block ${currentLine && !qty ? "ready" : ""}`}
+                            className={`section-qty block ${currentLine && !qty ? "ready" : ""}`}
                         >
+                            <div className="pick-user-qty-div-a">
+                                <div className="block-title">Cantidad:</div>
+                                <input
+                                    className="qty-input"
+                                    type="number"
+                                    value={qty}
+                                    onChange={(e) => {
+                                        const value = Number(e.target.value);
+                                        const max = Math.trunc(Number(currentLine?.product_uom_qty || 0));
 
-                            <div className="block-title">Cantidad</div>
-                            <input
-                                /*ref={/*qtyInputRef}*/
-                                className="qty-input"
-                                type="number"
-                                value={qty}
-                                onChange={(e) => setQty(e.target.value)}
-                            />
+                                        if (value > max) {
+                                            setQty(String(max));
+                                            return;
+                                        }
+
+                                        if (value < 0) {
+                                            setQty("0");
+                                            return;
+                                        }
+
+                                        setQty(e.target.value);
+                                    }}
+                                />
+                            </div>
+
+                            <div>
+                                <div className="block-title">Pedido:</div>
+                                <div className="qty-display">
+                                    {Math.trunc(Number(currentLine?.product_uom_qty || 0))}
+                                </div>
+                            </div>
                         </section>
 
                         {/* BOTONES */}
@@ -478,8 +660,8 @@ export default function PickingRoute() {
                             </button>
 
                             {Number(qty) > 0 && (
-                                <button className="btn btn-save pop-in" onClick={closeModal}>
-                                    Guardar
+                                <button className="btn btn-save pop-in" onClick={sendModal}>
+                                    Siguiente
                                 </button>
                             )}
                         </section>
