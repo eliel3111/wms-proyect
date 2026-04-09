@@ -92,7 +92,7 @@ console.log("FECHA DE FINAL: ",fechaFinFormatted);
 
 
 //Filtro para quitar y poner la fecha.
-const useDateFilter = false;
+const useDateFilter = true;
 const dateFilter = useDateFilter
   ? `
     <tem:EsFecha>true</tem:EsFecha>

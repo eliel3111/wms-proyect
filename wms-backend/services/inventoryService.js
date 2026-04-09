@@ -146,6 +146,9 @@ export async function moveInventoryBetweenLocationsV2(
     };
   }
 
+  console.log(qty_promised);
+  console.log(Number(fromInv.qty_reserved));
+
   if (qty_promised > Number(fromInv.qty_reserved)) {
     throw {
       code: "PROMISED_EXCEEDS_RESERVED",

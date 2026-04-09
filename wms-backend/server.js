@@ -6,8 +6,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
-import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
-import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
+//import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
+//import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
 import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
 import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 //import { startWarehouseCron } from "./cron/cronJobs.js";
@@ -200,7 +200,7 @@ app.get("/test-sale-orders", async (req, res) => {
 
 
 //CITRUS SYNC
-//startCitrusCron();
+startCitrusCron();
 
 
 

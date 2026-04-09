@@ -97,14 +97,14 @@ export default function PickingFinal() {
                 locationId: Number(location.location_id),
             });
             console.log("RESULTADO: ", result);
-           /* if (result.success) {
+           if (result.success) {
                 console.log("FUNCIONO")
                 setConfirmation({
                     show: true,
                     receiptCode: result.receiptCode
                 });
                 setLoading(false);
-            }*/
+            }
         } else {
 
             openModal({

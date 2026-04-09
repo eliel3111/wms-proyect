@@ -1,29 +1,49 @@
 import cron from "node-cron";
 import { syncAllItems } from "./citrus.sync.js";
+import {syncAllPurchaseOrders} from "./citrus.sync.js"
 
-let running = false; // evita doble ejecución
+
+let running = false;
+let lastRunAt = null;
+
+const MIN_INTERVAL = 10000; // 10 segundos
 
 export function startCitrusCron() {
-  console.log("🟢 Citrus cron started (cada 30s)");
+  console.log("🟢 Citrus cron started");
 
   cron.schedule("*/10 * * * * *", async () => {
-    if (running) {
-      console.log("⏳ Sync ya corriendo... skip");
+    const now = Date.now();
+
+    // 🚫 Evitar ejecuciones simultáneas o muy seguidas
+    if (running || (lastRunAt && now - lastRunAt < MIN_INTERVAL)) {
+      console.log("⏳ Skip: ejecución en progreso o muy reciente");
       return;
     }
 
-    try {
-      running = true;
+    running = true;
+    lastRunAt = now;
 
-      console.log("⏱ Ejecutando Citrus Sync...");
-      console.time("⏱ Tiempo total sync");   // 👈 inicia timer
+    console.log("⏱ Ejecutando Citrus Sync...");
+    console.time("⏱ Tiempo total sync");
+
+    // 🔹 Sync Items
+    try {
+      console.log("🔄 Sync Items...");
       await syncAllItems();
-      //await testSpeed();
-      console.timeEnd("⏱ Tiempo total sync"); // 👈 muestra tiempo
-    } catch (error) {
-      console.error("🔴 Citrus cron error:", error.message);
-    } finally {
-      running = false;
+    } catch (err) {
+      console.error("❌ Error en syncAllItems:", err.message);
     }
+
+    // 🔹 Sync Purchase Orders
+    try {
+      console.log("🔄 Sync Purchase Orders...");
+      await syncAllPurchaseOrders();
+    } catch (err) {
+      console.error("❌ Error en syncAllPurchaseOrders:", err.message);
+    }
+
+    console.timeEnd("⏱ Tiempo total sync");
+
+    running = false;
   });
 }

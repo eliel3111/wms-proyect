@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
 import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 import { runFullSync } from "../cron/cronJobs.js";
+import { buildWarehouseEntry, createWarehouseEntry } from "../integrations/citrus/citrus.warehouseEntry.js"
 
 
 
@@ -187,7 +188,8 @@ WHERE r.id = $1;
       const difference_qty = line.received_qty - line.ordered_qty;
 
       return {
-        line_no: index + 1,                // 🔢 1,2,3...
+        line_no: index + 1,
+        id: line.id,                // 🔢 1,2,3...
         sku: line.sku,
         description: productMap[line.sku] || "SIN DESCRIPCIÓN",
         ordered_qty: line.ordered_qty,
@@ -342,6 +344,21 @@ WHERE r.id = $1;
 
       await client.query(insertMovementsSQL, moveParams);
     }
+
+
+    //INTEGRACION 🟨🟨🟨🟨🟨🟨🟨
+const payloadERP = await buildWarehouseEntry(
+      client,
+      stockLines,
+      purchaseOrderId
+    );
+
+      if (payloadERP) {
+        const response = await createWarehouseEntry(payloadERP);
+
+console.log("🟨🟨",response);
+
+}
 
 
 
