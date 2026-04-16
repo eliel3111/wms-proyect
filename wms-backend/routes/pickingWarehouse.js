@@ -32,34 +32,34 @@ router.get("/active-orders",authMiddleware,  getPickings);
 router.post("/cancel",authMiddleware , cancelPicking);
 
 //Obtener todos los pickers activos unicamente
-router.get("/active-pickers", getActivePickers);
+router.get("/active-pickers", authMiddleware, getActivePickers);
 
 //Reasignar un picking
-router.post("/reassign", reassignPicking);
+router.post("/reassign", authMiddleware, reassignPicking);
 
 //Obtener todos los pickings asignados a un usuario
 router.get("/assigned", authMiddleware, getAssignedPickings);
 
 //Calcular ruta ideal de un pedido
 router.get(
-  "/:pickingId/products-locations",
+  "/:pickingId/products-locations", authMiddleware,
   getPickingProductsWithLocations
 );
 
 //Reasignar un picking
-router.post("/scan", scanPickingCode);
+router.post("/scan", authMiddleware, scanPickingCode);
 
 //Confirmar una linea
-router.post("/confirm-line", confirmPickingLine);
+router.post("/confirm-line", authMiddleware, confirmPickingLine);
 
 //Confirmar una linea
-router.get("/:pickingId/differences", getPickingDifferences);
+router.get("/:pickingId/differences", authMiddleware, getPickingDifferences);
 
 // Obtener mejor ubicación de despacho
-router.get("/best-location/:pickingId", getBestShippingLocation);
+router.get("/best-location/:pickingId", authMiddleware, getBestShippingLocation);
 
 //Cerrar recogida de un pedido y mover cantidades
-router.post("/close", closePicking);
+router.post("/close", authMiddleware, closePicking);
 
 
 export default router;

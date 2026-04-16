@@ -65,7 +65,7 @@ const xml = `
       console.log("🔴 ERP respondió error:", data?.Mensaje);
       return [];
     }
-    console.log(data?.Data?.Items);
+    console.log("resultado items", data?.Data?.Items);
     return data?.Data?.Items || [];
 
   } catch (error) {

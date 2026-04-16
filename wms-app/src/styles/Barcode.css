@@ -1,0 +1,694 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: auto; /* 🔥 cambiar esto */
+}
+
+.barcode-container {
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+
+.barcode-container {
+  flex-direction: column;
+  min-height: 100dvh; /* 🔥 clave moderna */
+  justify-content: start;
+}
+
+/* Cada sección ocupa todo el ancho */
+.section {
+  width: 100%;
+  
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+.barcode-section-search {
+  width: 100%;
+  padding: 10px 0;
+  background: #D1D5DB;
+border-bottom: 1px solid #939393;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* contenedor */
+.section-content {
+  width: 100%;
+  max-width: 500px;
+ padding: 0 10px;
+  box-sizing: border-box;
+
+}
+
+/* 🔥 SEARCH INPUT */
+.barcode-search-input {
+  width: 100%;
+  height: 56px; /* 👈 ideal para touch */
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: #FFFFFF;
+  border-radius: 14px;
+
+  padding: 0 16px;
+
+  /* 🎯 borde elegante */
+  border: 1px solid #E5E7EB;
+  border-bottom: 2px solid #D1D5DB;
+
+  /* sombra suave */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+
+  transition: all 0.2s ease;
+}
+
+/* focus estado pro */
+.barcode-search-input:focus-within {
+  border: 1px solid #2F6FED;
+  border-bottom: 2px solid #2F6FED;
+  box-shadow: 0 0 0 2px rgba(47,111,237,0.1);
+}
+
+/* input */
+.barcode-search-input input {
+  flex: 1;
+  border: none;
+  outline: none;
+
+  font-size: 16px;
+  background: red;
+  color: #1F2937;
+}
+
+/* icono */
+.barcode-search-input .icon {
+  font-size: 18px;
+  color: #6B7280;
+}
+
+/* botón clear */
+.barcode-search-input .clear {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #ebebec;
+}
+
+/* hover UX */
+.barcode-search-input .clear:hover {
+  color: #EF4444;
+}
+
+.barcode-search-dark {
+  width: 100%;
+  height: 56px; /* 🔥 touch-friendly */
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 0 16px;
+
+  /* 🌑 DARK */
+  background: #0F0F10;
+
+  border-radius: 14px;
+
+  /* borde sutil */
+  border: 1px solid #1F2937;
+
+  /* profundidad */
+  box-shadow: 
+    inset 0 0 0 1px rgba(255,255,255,0.02),
+    0 2px 6px rgba(0,0,0,0.3);
+
+  transition: all 0.2s ease;
+}
+
+/* 🔵 FOCUS (branding) */
+.barcode-search-dark:focus-within {
+  border: 1px solid #2F6FED;
+  box-shadow: 0 0 0 2px rgba(47,111,237,0.2);
+}
+
+/* input */
+.barcode-search-dark input {
+  flex: 1;
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  font-size: 16px;
+  color: #E5E7EB;
+}
+
+/* placeholder */
+.barcode-search-dark input::placeholder {
+  color: #6B7280;
+}
+
+/* icon */
+.barcode-search-dark .icon {
+  font-size: 18px;
+  color: #9CA3AF;
+}
+
+/* clear */
+.barcode-search-dark .clear {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #9CA3AF;
+}
+
+.barcode-search-dark .clear:hover {
+  color: #FFFFFF;
+}
+
+/* 🔥 DESKTOP (por defecto) */
+.barcode-container-grid {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 columnas */
+
+  gap: 16px;
+
+  padding: 15px 50px; /* 👈 lo que pediste */
+  box-sizing: border-box;
+
+}
+
+.barcode-product-card {
+  width: 100%; /* 👈 ocupa todo el ancho del grid */
+
+  min-height: 100px; /* 🔥 altura mínima fija */
+
+
+  background: #FFFFFF;
+ 
+  border: 1px solid #D1D5DB;
+
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+
+    cursor: pointer;
+  gap: 6px;
+
+  transition: transform 0.1s ease;
+}
+
+.barcode-product-card:hover {
+ border: 2px solid #0F0F10;
+ border-radius: 5px;
+  transition: transform 0.1s ease;
+}
+
+/* touch feedback */
+.barcode-product-card:active {
+  transform: scale(0.98);
+  border: 1px solid #0F0F10;
+}
+
+
+.barcode-description {
+  width: 100%;
+ height: 100%;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1F2937;
+ padding: 5px 15px;
+  /* 👇 evita que rompa layout */
+  word-break: break-word;
+}
+
+.barcode-details {
+  width: 100%;
+ padding: 10px 15px;
+  font-size: 14px;
+  color: #6B7280;
+border-top: 1px solid #D1D5DB;
+  word-break: break-word;
+}
+
+
+
+.empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #9ca3af; /* gris elegante */
+  opacity: 0.6;
+}
+
+.empty-state p {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.barcode-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.50);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 9999;
+}
+
+
+/* 📦 Container base */
+.barcode-modal-container {
+  display: flex;
+  flex-direction: column;
+  width: 80%;
+  max-width: 800px;
+  background: #fff;
+  margin-top: 15vh;
+  border-radius: 12px;
+  overflow: hidden; /* 👈 para que respete bordes */
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+/* 🔹 Secciones */
+.barcode-container-header,
+.barcode-container-center,
+.barcode-container-footer {
+  width: 100%;
+  padding: 5px;
+}
+
+
+
+/* Header como flex */
+.barcode-container-header {
+  display: flex;
+  background: #afb1b3; /* gris muy claro */
+  justify-content: space-between; /* 👈 separa */
+  align-items: center;
+  width: 100%;
+  padding-bottom: 0;
+}
+
+/* Ambos lados ocupan espacio */
+.barcode-header-left,
+.barcode-header-right {
+  flex: 1; /* 👈 cada uno ocupa espacio */
+}
+
+/* Alineaciones opcionales */
+.barcode-header-left {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* Contenedor tabs */
+.barcode-header-left {
+  display: flex;
+  gap: 0; /* pegados */
+}
+
+/* Tab base */
+.barcode-tab {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  height: 50px;
+  color: #0F0F10;
+}
+
+/* Hover */
+.barcode-tab:hover {
+  background: #F9FAFB;
+}
+
+/* Activo (el que pediste 🔥) */
+.barcode-tab.active {
+  background: #fff; /* gris suave */
+  border-left: 1px solid #0F0F10;
+  border-top: 1px solid #0F0F10;
+  border-right: 1px solid #0F0F10;
+  border-bottom: none; /* 👈 clave */
+ gap: 10px;
+  color: #111827;
+  font-weight: 500;
+}
+
+.barcode-header-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.barcode-close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 15px;
+  border-radius: 6px;
+  color: #111827; /* gris suave */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hover */
+.barcode-close-btn:hover {
+  background: #F3F4F6;
+  color: #111827;
+}
+
+.barcode-container-center {
+  background: #FFFFFF; /* blanco limpio */
+  flex: 1; /* 👈 ocupa espacio disponible */
+}
+
+/* CONTENEDOR */
+.barcode-print-view {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.barcode-print-content {
+  width: 100%;
+  max-width: 500px;
+  padding: 10px;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .barcode-print-content {
+    max-width: none;
+    padding: 0;
+  }
+}
+
+/* TITLES */
+.barcode-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #374151;
+}
+.barcode-title-product {
+  font-size: 20px;
+  font-weight: 500;
+  color: #283954;
+}
+.barcode-mt {
+  margin-top: 20px;
+}
+
+/* OPCIONES */
+.barcode-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 2px solid #E5E7EB;
+  border-radius: 10px;
+  margin-top: 10px;
+  cursor: pointer;
+  background: #F9FAFB;
+  transition: all 0.2s ease;
+}
+
+.barcode-option:hover {
+  background: #F3F4F6;
+}
+
+/* ACTIVO */
+.barcode-option-active {
+  border-color: #2563EB;
+  background: #EFF6FF;
+}
+
+/* RADIO */
+.barcode-radio {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #9CA3AF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.barcode-radio-dot {
+  width: 10px;
+  height: 10px;
+  background: #2563EB;
+  border-radius: 50%;
+}
+
+/* TEXTO */
+.barcode-option-text {
+  font-size: 14px;
+  color: #111827;
+}
+
+/* CANTIDAD */
+.barcode-quantity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 2px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.barcode-quantity-input {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+}
+
+/* ACCIONES */
+.barcode-quantity-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.barcode-qty-btn {
+  border: none;
+  background: #F3F4F6;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.barcode-qty-btn:hover {
+  background: #E5E7EB;
+}
+
+.barcode-qty-value {
+  font-weight: 500;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* BOTÓN */
+.barcode-submit {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px;
+  background: #2563EB;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.barcode-cancel {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px;
+  background: #111827;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.barcode-submit:hover {
+  background: #1D4ED8;
+}
+
+.barcode-container-footer {
+
+  display: flex;
+  gap: 15px;
+}
+
+.barcode-option-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .barcode-container-header,
+  .barcode-container-center,
+  .barcode-container-footer {
+    padding: 0; /* 👈 quita padding en móvil */
+  }
+}
+@media (max-width: 768px) {
+  .barcode-modal-overlay {
+    align-items: stretch;
+  }
+
+  .barcode-modal-container {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    margin-top: 0;
+    border-radius: 0;
+  }
+}
+
+@media (hover: hover) {
+  .barcode-product-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+}
+
+@media (max-width: 768px) {
+  .barcode-product-card {
+    min-height: 90px;
+  }
+
+  .barcode-description {
+    font-size: 16px;
+  }
+
+  .barcode-details {
+    font-size: 13px;
+  }
+}
+
+
+@media (max-width: 768px) {
+  .barcode-container-grid {
+    grid-template-columns: 1fr; /* 🔥 una sola columna */
+    
+    padding: 10px 16px; /* 👈 mejor para móvil */
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  
+  .barcode-search-dark {
+    height: 64px; /* 🔥 más grande para dedo */
+    padding: 0 18px;
+    border-radius: 16px;
+  }
+
+  .barcode-search-dark input {
+    font-size: 18px; /* 🔥 más legible */
+    width: 50px;
+  }
+
+  .barcode-search-dark .icon {
+    font-size: 22px; /* 🔥 más tocable */
+  }
+
+  .barcode-search-dark .clear {
+    font-size: 22px;
+    width: 40px;
+    height: 40px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+/* 🔥 evita zoom raro en iPhone/PDA */
+input {
+  font-size: 16px;
+}
+
+/* 🔥 mejora interacción táctil */
+.barcode-search-dark {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 🔥 mejor area táctil */
+.barcode-search-dark .clear {
+  touch-action: manipulation;
+}
+
+}
+
+
+/* Ajustes para pantallas con altura típica de laptop de 15" */
+@media screen and (min-height: 600px) and (max-height: 950px) {
+  .barcode-container {
+  min-height: 500px; /* 👈 ocupa toda la pantalla mínimo */
+}
+
+
+}
+
+
+/* Dispositivos móviles típicos (Portrait) */
+@media screen and (max-width: 480px) {
+  .barcode-container {
+  min-height: calc(100dvh - 40px);
+  height: calc(100dvh - 40px);
+
+}
+
+  .barcode-quantity-input {
+  height: 40px;
+  font-size: 18px;
+}
+
+.barcode-option {
+    height: 80px;
+}
+
+.barcode-submit {
+     height: 60px;
+  font-size: 18px;
+}
+
+.barcode-cancel {
+ height: 60px;
+  font-size: 18px;
+}
+
+.barcode-print-tab {
+  display: none;
+}
+
+}

@@ -127,7 +127,7 @@ export async function callERP(endpoint, soapAction, xmlBody) {
             console.log("HEADERS:", error.response.headers);
             console.log("BODY:", error.response.data); // ← XML real error
         } else {
-            console.log(error.message);
+            console.log("ERROR", error.message);
         }
 
         throw error;

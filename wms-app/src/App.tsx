@@ -25,6 +25,7 @@ import GetAssignedPickings from "./pages/Picking_pending_assigned.tsx";
 import PickingRoute from "./pages/Picking_user_working.tsx"
 import PickingValidation from "./pages/picking_user_validation.tsx";
 import PickingFinal from "./pages/picking_user_final.tsx"
+import BarcodePage from "./pages/Barcode-main.tsx"
 
 
 
@@ -80,6 +81,9 @@ function App() {
           <Route path="/picking/:id" element={<PickingRoute />} />
           <Route path="/picking/validation/:id" element={<PickingValidation />} />
           <Route path="/picking/final/:id" element={<PickingFinal />} />
+
+          {/*BARCODE */}
+          <Route path="/barcode-scanner" element={<BarcodePage />} />
 
         </Route>
 

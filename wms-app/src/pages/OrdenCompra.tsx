@@ -300,16 +300,27 @@ export default function OrdenCompra() {
         setIsModalOpen(false);
 
         // 3️⃣ Buscar producto cuyo barcodes[] incluya el código
-        const foundProduct = productsRef.current.find((product) =>
+        let foundProduct = productsRef.current.find((product) =>
             Array.isArray(product.barcodes) &&
             product.barcodes.length > 0 &&
             product.barcodes.includes(barcode)
         );
-        const index = productsRef.current.findIndex((product) =>
+        let index = productsRef.current.findIndex((product) =>
             Array.isArray(product.barcodes) &&
             product.barcodes.length > 0 &&
             product.barcodes.includes(barcode)
         );
+
+        // 🔥 fallback a SKU
+if (!foundProduct) {
+  foundProduct = productsRef.current.find(
+    (product) => product.sku === barcode
+  );
+
+  index = productsRef.current.findIndex(
+    (product) => product.sku === barcode
+  );
+}
         console.log(productsRef.current);
         console.log("Producto encontrado:", foundProduct);
         if (index === -1) {

@@ -1,11 +1,13 @@
 console.log("🚨 SERVER NUEVO EJECUTANDO 🚨");
-import dotenv from "dotenv";
-dotenv.config();
+import "./env.js"; // 🔥 PRIMERO
+
 import { db } from "./db.js";
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
+
 //import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
 //import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
 import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
@@ -18,9 +20,17 @@ import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
 import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
 
 
-import { moveInventory } from "./services/inventoryService.js";
+import { searchProducts } from "./controllers/barcodeController.js";
 
 import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
+
+
+
+
+
+
+
+
 const app = express();
 
 
@@ -141,7 +151,7 @@ app.post("/test/reserve-real", async (req, res) => {
 
 
 
-app.post("/inventory/move", moveInventory);
+app.post("/barcode", searchProducts);
 
 
 
@@ -200,7 +210,7 @@ app.get("/test-sale-orders", async (req, res) => {
 
 
 //CITRUS SYNC
-startCitrusCron();
+//startCitrusCron();
 
 
 

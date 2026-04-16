@@ -71,7 +71,7 @@ export async function syncAllPurchaseOrders() {
 
 
             console.log("new date", erpDateObj);
-            console.log(newMaxWriteDate);
+            console.log("new MAX  date",newMaxWriteDate);
             if (!newMaxWriteDate || erpDateObj > new Date(newMaxWriteDate)) {
                 console.log("PRUEBA 1");
                 newMaxWriteDate = erpDateObj.toISOString();

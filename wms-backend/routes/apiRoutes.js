@@ -7,6 +7,7 @@ import transferRoutes from "./transferRoutes.js"
 import odooRoutes from "./odoo.routes.js"
 import warehouseTransfer from "./warehouseTransfer.routes.js"
 import pickingWarehouse from "./pickingWarehouse.js"
+import barcodeRoutes from "./barcodeRoutes.js"
 
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.use("/transfer", transferRoutes);
 router.use("/odoo", odooRoutes);
 router.use("/warehouse-transfers", warehouseTransfer);
 router.use("/picking", pickingWarehouse);
+router.use("/barcode", barcodeRoutes)
 
 export default router;
