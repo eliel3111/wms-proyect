@@ -59,6 +59,7 @@ const [goNext, setGoNext] = useState(false);
 
 
     const [startedPicking, setStartedPicking] = useState(false);
+    console.log(startedPicking);
     const [currentLine, setCurrentLine] = useState<StockMoveLine | null>(null);
     const currentLineRef = useRef<StockMoveLine | null>(null);
     const scanBuffer = useRef<string>("");
@@ -307,9 +308,7 @@ const [goNext, setGoNext] = useState(false);
 
 
 
-    const goToOrder = (id: number) => {
-        navigate(`/warehouse-transfer-recepcion/${id}`);
-    };
+   
 
 
 

@@ -5,9 +5,9 @@ import type {
   AxiosRequestConfig
 } from "axios";
 
+import API_URL from "../config/api";
 
-
-
+console.log("URL QUE SE USA PARA HABLAR AL BACKEND",API_URL);
 // ---------------------------
 // Tipos
 // ---------------------------
@@ -28,9 +28,9 @@ export function setAuthStore(authStore: AuthStore): void {
 // ---------------------------
 // Crear instancia de Axios
 // ---------------------------
-
+//VITE_API_URL=http://localhost:3000/api
 const apiClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: API_URL || "/api",
   withCredentials: true, // si usas cookies HttpOnly
 });
 

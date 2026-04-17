@@ -1,10 +1,8 @@
-import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+
+import { useState, useRef } from "react";
 import "../styles/Barcode.css"
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
-import { LoadingScreen } from "../components/LoadingScreen.tsx";
-import ConfirmationScreen from "../components/ConfirmationScreen.tsx"
 import { Search } from 'lucide-react';
 import { Printer } from "lucide-react";
 import { X } from "lucide-react";
