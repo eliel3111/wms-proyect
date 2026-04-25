@@ -8,6 +8,7 @@ import { Printer } from "lucide-react";
 import { X } from "lucide-react";
 import { Plus } from "lucide-react";
 import { getPrinter, sendZpl } from "../services/zebra.ts";
+import { LoadingScreen } from "../components/LoadingScreen.tsx";
 
 export interface Product {
     id: string;
@@ -35,6 +36,7 @@ export default function BarcodePage() {
     const [quantity, setQuantity] = useState("");
     const { openModal } = useModal();
 
+    const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const handleClear = () => {
         setValue("");
@@ -47,6 +49,7 @@ export default function BarcodePage() {
 
     async function handleSearch() {
         try {
+            setLoading(true);
             if (!value.trim()) return;
 
             console.log("🔍 Buscando:", value);
@@ -59,8 +62,16 @@ export default function BarcodePage() {
             inputRef.current?.blur();
 
             console.log("✅ Result:", res.data);
+            if (res.data.data.length === 0) {
+                openModal({
+                    title: "Producto no encontrado",
+                    message: "No se encontró el producto escaneado.",
+                });
+            }
+            setLoading(false);
         } catch (error) {
             console.error("❌ Error:", error);
+
         }
     }
 
@@ -246,7 +257,9 @@ export default function BarcodePage() {
         );
     }
 
-
+    if (loading) {
+        return <LoadingScreen />;
+    }
 
     return (
         <div
@@ -304,6 +317,8 @@ export default function BarcodePage() {
             </div>
 
             <div className="section">
+
+
 
                 {products.length === 0 && (
                     <div className="empty-state">

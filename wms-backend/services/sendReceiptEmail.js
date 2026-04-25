@@ -1,4 +1,68 @@
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+export async function sendReceiptEmail({
+  to,
+  pdfBuffer,
+  receiptCode,
+  companyName,
+}) {
+ 
+
+
+
+
+  const realBuffer = Buffer.isBuffer(pdfBuffer)
+  ? pdfBuffer
+  : Buffer.from(pdfBuffer.data || pdfBuffer);
+
+    
+  console.log("PDF TYPE:", typeof pdfBuffer);
+console.log("IS BUFFER:", Buffer.isBuffer(pdfBuffer));
+
+await sgMail.send({
+  to,
+  from: {
+    email: "no-reply@sidialwms.com",
+    name: companyName || "Sidial WMS",
+  },
+  subject: `Receipt ${receiptCode}`,
+  text: `Receipt ${receiptCode}`,
+  html: `<p>Adjunto tu recibo <b>${receiptCode}</b></p>`,
+  attachments: [
+    {
+      content: realBuffer.toString("base64"),
+      filename: `receipt-${receiptCode}.pdf`,
+      type: "application/pdf",
+      disposition: "attachment",
+    },
+  ],
+});
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*import nodemailer from "nodemailer";
 
 
 const transporter = nodemailer.createTransport({
@@ -13,7 +77,7 @@ const transporter = nodemailer.createTransport({
 
 /**
  * Envía la nota de recepción por correo con PDF adjunto
- */
+ 
 export async function sendReceiptEmail({
   to,
   pdfBuffer,
@@ -69,4 +133,4 @@ export async function sendTransferEmail({
     ],
   });
 
-}
+}*/

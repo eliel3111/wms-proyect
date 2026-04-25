@@ -262,3 +262,132 @@ export async function callERPPurchase(endpoint, soapAction, xmlBody) {
     throw error;
   }
 }
+
+
+
+
+// 🔥 SOLO PARA VENTAS
+export async function callERPSales(xmlBody) {
+  try {
+    let auth = await getERPAuth();
+
+    const url =
+      "https://testapi.citrus.com.do/40/Facturacion/OrdenVentaService.asmx";
+
+    const soapAction = "http://tempuri.org/BuscarOrdenesVentas";
+
+    /* ===============================
+       📡 REQUEST
+    =============================== */
+    const response = await axios({
+      method: "post",
+      url,
+      data: xmlBody,
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: soapAction,
+        Authorization: auth.token.trim(),
+        UsuarioTicketId: String(auth.ticket).trim(),
+      },
+      timeout: 20000,
+      transformRequest: [(data) => data],
+    });
+
+    /* ===============================
+       🔥 XML → JSON
+    =============================== */
+    const parsed = await parseStringPromise(response.data, {
+      explicitArray: false,
+      ignoreAttrs: true,
+    });
+
+    const envelopeKey = Object.keys(parsed)[0];
+    const bodyKey = Object.keys(parsed[envelopeKey])[0];
+    const body = parsed[envelopeKey][bodyKey];
+
+    /* ===============================
+       🔥 RESPONSE VENTAS
+    =============================== */
+    const responseNode = body["BuscarOrdenesVentasResponse"];
+
+    if (!responseNode) {
+      console.log("❌ No existe BuscarOrdenesVentasResponse");
+      console.log(JSON.stringify(body, null, 2));
+      return null;
+    }
+
+    const raw = responseNode["BuscarOrdenesVentasResult"];
+
+    if (!raw) {
+      console.log("❌ No existe BuscarOrdenesVentasResult");
+      return null;
+    }
+
+    /* ===============================
+       🔥 STRING → JSON
+    =============================== */
+    let data;
+
+    if (typeof raw === "string" && raw.trim().startsWith("{")) {
+      data = JSON.parse(raw);
+    } else {
+      data = raw;
+    }
+
+    /* ===============================
+       🔁 RELOGIN AUTO
+    =============================== */
+    if (data?.SesionExpirada === 1 || data?.TicketInvalido === 1) {
+      console.log("🔄 ERP SALES session expired → re-login");
+
+      auth = await refreshERPToken();
+
+      const retry = await axios.post(url, xmlBody, {
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: soapAction,
+          Authorization: auth.token.trim(),
+          UsuarioTicketId: String(auth.ticket).trim(),
+        },
+      });
+
+      const parsedRetry = await parseStringPromise(retry.data, {
+        explicitArray: false,
+        ignoreAttrs: true,
+      });
+
+      const envelopeRetry = Object.keys(parsedRetry)[0];
+      const bodyRetryKey = Object.keys(parsedRetry[envelopeRetry])[0];
+      const bodyRetry = parsedRetry[envelopeRetry][bodyRetryKey];
+
+      const responseRetry =
+        bodyRetry["BuscarOrdenesVentasResponse"];
+
+      const rawRetry =
+        responseRetry["BuscarOrdenesVentasResult"];
+
+      if (typeof rawRetry === "string") {
+        return JSON.parse(rawRetry);
+      }
+
+      return rawRetry;
+    }
+
+    /* ===============================
+       ✅ RESULT
+    =============================== */
+    return data;
+
+  } catch (error) {
+    console.log("🔴 ERP SALES ERROR:");
+
+    if (error.response) {
+      console.log("STATUS:", error.response.status);
+      console.log("BODY:", error.response.data);
+    } else {
+      console.log(error.message);
+    }
+
+    throw error;
+  }
+}

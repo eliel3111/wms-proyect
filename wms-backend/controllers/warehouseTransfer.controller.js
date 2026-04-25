@@ -9,7 +9,7 @@ import { buildTransferHtml } from "../templates/build-nota-recepcion.js";
 import { generatePdf } from "../templates/generate-nota-recepcion.js";
 import { randomUUID } from "crypto";
 import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
-import { sendTransferEmail } from "../services/sendReceiptEmail.js";
+import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 
 // CloseWarehouseTransferReceptionFinal.js (controller)
 export async function closeWarehouseTransferReceptionFinal(req, res) {
@@ -1943,7 +1943,7 @@ ORDER BY sm.id;
         console.log("✅ PDF guardado en picking:", updateResult.rows[0].id);
 
         await client.query("COMMIT");
-        await sendTransferEmail({
+        await sendReceiptEmail({
             receiptEmail,
             pdfBuffer: pdf, // el buffer que generaste
             transferCode: picking.name,

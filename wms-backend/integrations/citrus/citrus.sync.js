@@ -118,24 +118,6 @@ export async function syncAllPurchaseOrders() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
 #1Se declara el model, luego de usa lockSyncControl para bloquiar ese modelo en la sincronizacion. Si esta lock anteriormente entonces no se continua, pero si todo bien se define el la fecha de inicio del sync. Luego se usa fetchAllItems para buscar todos los items usando la fecha de inicio.
 

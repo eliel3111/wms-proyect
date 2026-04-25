@@ -344,3 +344,315 @@ export async function createInventoryMovement(client, {
     ]
   );
 }
+
+
+
+
+
+
+export async function updateInventoryByCount(client, {
+  locationSelected,
+  productSelected,
+  qty,
+  userId = null,
+  referenceId = null,
+  note = "Ajuste por conteo físico"
+}) {
+  // 1) Validar datos básicos
+  if (!locationSelected || !productSelected || qty == null) {
+    return {
+      success: false,
+      title: "No se pudo guardar conteo",
+      message: "Debe enviar ubicación, producto y cantidad."
+    };
+  }
+
+  const countedQty = Number(qty);
+
+  if (Number.isNaN(countedQty) || countedQty < 0) {
+    return {
+      success: false,
+      title: "No se pudo guardar conteo",
+      message: "La cantidad contada no es válida."
+    };
+  }
+
+  // 2) Validar ubicación y obtener warehouse_id
+  const locationResult = await client.query(
+    `
+    SELECT id, warehouse_id
+    FROM locations
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [locationSelected]
+  );
+
+  if (locationResult.rows.length === 0) {
+    return {
+      success: false,
+      title: "No se pudo guardar conteo",
+      message: "La ubicación que leíste no es correcta."
+    };
+  }
+
+  const { id: locationId, warehouse_id: warehouseId } = locationResult.rows[0];
+
+  // 3) Validar producto
+  const productResult = await client.query(
+    `
+    SELECT id, sku
+    FROM products
+    WHERE id = $1
+      AND status = 'ACTIVE'
+      AND deleted_erp = false
+    LIMIT 1
+    `,
+    [productSelected]
+  );
+
+  if (productResult.rows.length === 0) {
+    return {
+      success: false,
+      title: "No se pudo guardar conteo",
+      message: "El producto no existe o no está activo."
+    };
+  }
+
+  const { id: productId, sku: productSku } = productResult.rows[0];
+
+  // 4) Buscar línea actual con lock
+  const invResult = await client.query(
+    `
+    SELECT id, qty_on_hand, qty_reserved
+    FROM inventory_by_location
+    WHERE location_id = $1
+      AND product_sku = $2
+    FOR UPDATE
+    `,
+    [locationId, productSku]
+  );
+
+  let action = "SKIP";
+  let difference = 0;
+  let oldQtyOnHand = 0;
+  let inventoryRowId = null;
+
+  if (invResult.rows.length > 0) {
+    const row = invResult.rows[0];
+    inventoryRowId = row.id;
+    oldQtyOnHand = Number(row.qty_on_hand || 0);
+
+    const qtyReserved = Number(row.qty_reserved || 0);
+
+    // 5) Validar reservado > contado
+    if (qtyReserved > countedQty) {
+      return {
+        success: false,
+        title: "No se pudo guardar conteo",
+        message: "La cantidad reservada es mayor la contada."
+      };
+    }
+
+    difference = countedQty - oldQtyOnHand;
+
+    if (difference < 0) action = "LOSS";
+    else if (difference > 0) action = "GAIN";
+    else action = "SKIP";
+
+    // 6) Actualizar línea
+    await client.query(
+      `
+      UPDATE inventory_by_location
+      SET
+        old_qty_on_hand = qty_on_hand,
+        qty_on_hand = $1,
+        updated_at = NOW()
+      WHERE id = $2
+      `,
+      [countedQty, inventoryRowId]
+    );
+  } else {
+    // 7) No existe línea: crearla
+    difference = countedQty;
+    oldQtyOnHand = 0;
+    action = countedQty > 0 ? "GAIN" : "SKIP";
+
+    const insertResult = await client.query(
+      `
+      INSERT INTO inventory_by_location (
+        warehouse_id,
+        location_id,
+        product_sku,
+        qty_on_hand,
+        qty_reserved,
+        old_qty_on_hand,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, 0, 0, NOW())
+      RETURNING id
+      `,
+      [warehouseId, locationId, productSku, countedQty]
+    );
+
+    inventoryRowId = insertResult.rows[0].id;
+  }
+
+  // 8) Si no hubo diferencia, no crear movimiento
+  if (action === "SKIP") {
+
+    const gainResult = await client.query(
+      `
+      INSERT INTO locations (
+        warehouse_id,
+        code,
+        description,
+        is_active,
+        location_type
+      )
+      VALUES ($1, $2, $3, true, $4)
+      ON CONFLICT (warehouse_id, code)
+DO UPDATE SET code = EXCLUDED.code
+      RETURNING id
+      `,
+      [
+        warehouseId,
+        "INV-GAIN",
+        "Ubicación virtual para ganancias de inventario",
+        "VIRTUAL_GAIN"
+      ]
+    );
+
+    const gainLocationId = gainResult.rows[0].id;
+
+    fromLocationId = gainLocationId;
+    toLocationId = locationId;
+    referenceType = "INV-GAIN";
+
+    // 10) Crear movimiento
+  await createInventoryMovement(client, {
+    productSku,
+    fromLocationId,
+    toLocationId,
+    qty: Math.abs(difference),
+    movementType: "INVENTORY",
+    referenceType,
+    referenceId,
+    createdBy: userId,
+    note
+  });
+
+
+    return {
+      success: true,
+      title: "Conteo guardado",
+      message: "No hubo diferencia de inventario.",
+      data: {
+        action,
+        difference,
+        productId,
+        productSku,
+        locationId,
+        warehouseId,
+        inventoryRowId,
+        oldQtyOnHand,
+        newQtyOnHand: countedQty
+      }
+    };
+  }
+
+  // 9) Crear / obtener ubicación virtual
+  let fromLocationId = null;
+  let toLocationId = null;
+  let referenceType = null;
+
+  if (action === "LOSS") {
+    const lossResult = await client.query(
+      `
+      INSERT INTO locations (
+        warehouse_id,
+        code,
+        description,
+        is_active,
+        location_type
+      )
+      VALUES ($1, $2, $3, true, $4)
+      ON CONFLICT (warehouse_id, code)
+DO UPDATE SET code = EXCLUDED.code
+      RETURNING id
+      `,
+      [
+        warehouseId,
+        "INV-LOSS",
+        "Ubicación virtual para pérdidas de inventario",
+        "VIRTUAL_LOSS"
+      ]
+    );
+
+    const lossLocationId = lossResult.rows[0].id;
+
+    fromLocationId = locationId;
+    toLocationId = lossLocationId;
+    referenceType = "INV-LOSS";
+  }
+
+  if (action === "GAIN") {
+    const gainResult = await client.query(
+      `
+      INSERT INTO locations (
+        warehouse_id,
+        code,
+        description,
+        is_active,
+        location_type
+      )
+      VALUES ($1, $2, $3, true, $4)
+      ON CONFLICT (warehouse_id, code)
+DO UPDATE SET code = EXCLUDED.code
+      RETURNING id
+      `,
+      [
+        warehouseId,
+        "INV-GAIN",
+        "Ubicación virtual para ganancias de inventario",
+        "VIRTUAL_GAIN"
+      ]
+    );
+
+    const gainLocationId = gainResult.rows[0].id;
+
+    fromLocationId = gainLocationId;
+    toLocationId = locationId;
+    referenceType = "INV-GAIN";
+  }
+
+  // 10) Crear movimiento
+  await createInventoryMovement(client, {
+    productSku,
+    fromLocationId,
+    toLocationId,
+    qty: Math.abs(difference),
+    movementType: "INVENTORY",
+    referenceType,
+    referenceId,
+    createdBy: userId,
+    note
+  });
+
+  return {
+    success: true,
+    title: "Conteo guardado",
+    message: "El conteo fue aplicado correctamente.",
+    data: {
+      action,
+      difference,
+      productId,
+      productSku,
+      locationId,
+      warehouseId,
+      inventoryRowId,
+      oldQtyOnHand,
+      newQtyOnHand: countedQty
+    }
+  };
+}

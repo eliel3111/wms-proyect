@@ -196,7 +196,7 @@ if (existingBarcode.rows.length > 0) {
       `, [skusFromBarcode]);
 
       productsFromBarcode = resProducts.rows;
-    }
+    } 
 
      // 🔥 NUEVO: construir búsqueda dinámica
     let conditions = [];

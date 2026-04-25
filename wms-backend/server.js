@@ -9,7 +9,7 @@ import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
 
 //import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
-//import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
+// [ODOO] import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
 import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
 import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 //import { startWarehouseCron } from "./cron/cronJobs.js";
@@ -20,24 +20,59 @@ import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
 import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
 
 
-import { searchProducts } from "./controllers/barcodeController.js";
-
 import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
 
+//ALEGRA
+import { alegraItemsService, alegraItemCategoriesService, alegraWarehousesService } from "./integrations/alegra/alegraItemService.js";
+import {getActiveSaleOrders} from "./integrations/citrus/citrus.saleOrder.js"
+import {upsertWarehouses} from "./integrations/alegra/alegra.wharehouse.js"
 
 
-
-
+import { inventoryScan } from "./controllers/inventoryController.js";
 
 
 
 const app = express();
 
+app.get("/alegra", async (req, res) => {
+  try {
+
+//ALMACEN
+const warehouses = await alegraWarehousesService.getWarehouses({status: 'active'});
+await upsertWarehouses(warehouses);
+
+console.log(warehouses);
+
+    
+//PRODUCTOS
+/*const products = await alegraItemsService.getItems({
+  start: 0,
+  limit: 30,
+  metadata: true,
+  status: 'active',
+});*/
+
+
+    res.json({
+      success: true,
+      data: warehouses,
+    });
+  } catch (error) {
+    console.error("❌ Error en /test:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Error obteniendo productos de Alegra",
+      error: error.message,
+    });
+  }
+});
+
 
 const PORT = process.env.PORT || 3000;
 app.get("/test-purchase-orders", async (req, res) => {
   console.log("🚨CPO CHECK 1");
-  const data = await syncAllPurchaseOrders();
+  const data = await getActiveSaleOrders();
 
   res.json({
     success: true,
@@ -46,119 +81,9 @@ app.get("/test-purchase-orders", async (req, res) => {
 });
 app.use(express.json());
 
-/*
-app.post("/test/reserve-real", async (req, res) => {
-  const client = await db.connect();
-
-  console.log("🟥 Endpoint POST /test/reserve-real iniciado");
-
-  try {
-    await client.query("BEGIN");
- console.log(req.body);
-    const { data } = req.body;
-
-    if (!data || !Array.isArray(data)) {
-      return res.status(400).json({
-        success: false,
-        message: "Data inválida"
-      });
-    }
-
-    let totalReserved = 0;
-    let results = [];
-
-    /* ==============================
-       1️⃣ PROBAR FUNCIÓN REAL
-    ============================== 
-
-    for (const move of data) {
-
-      console.log("🟡 Probando producto:", move.product_id);
-
-      // 🔥 AQUÍ LLAMAS TU FUNCIÓN REAL
-      const result = await reserveInventoryForMove(client, move);
-
-      console.log("Resultado reserva real:", result);
-
-      totalReserved += result.reserved;
-
-      results.push({
-        product_id: move.product_id,
-        reserved: result.reserved
-      });
-    }
-
-    /* ==============================
-       2️⃣ VALIDACIÓN
-    ============================== 
-
-    if (totalReserved === 0) {
-      console.log("⚠️ No se reservó nada");
-
-      await client.query("ROLLBACK");
-
-      return res.status(200).json({
-        success: false,
-        message: "No se pudo reservar inventario",
-        results
-      });
-    }
-
-    await client.query("COMMIT");
-
-    console.log(
-      `🟨 Total reservado: ${totalReserved} | Productos: ${data.length}`
-    );
-
-    console.log("🟩 Endpoint POST /test/reserve-real terminado");
-
-    return res.status(200).json({
-      success: true,
-      totalReserved,
-      results
-    });
-
-  } catch (error) {
-
-    await client.query("ROLLBACK");
-
-    console.error("🟥 ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Error en prueba de reserva"
-    });
-
-  } finally {
-    client.release();
-  }
-});
-*/
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-app.post("/barcode", searchProducts);
-
-
-
-
-
-
-
+//app.post("/inventory", inventoryScan);
 
 
 
@@ -170,19 +95,19 @@ console.log("🔥 CRON NUEVO EJECUTANDO 🔥");
 // 🔥 Cron automático
 //startMainCron();
 
-// 🔥 Ejecutar manual al iniciar (opcional)
-// await runFullSync();
-
+// [ODOO]
+//await runFullSync();
+//[ODOO] SALES ORDER
 app.get("/test-sale-orders", async (req, res) => {
 
   try {
 
     const picking = await getActiveSaleOrders();
-   console.log("RESULTADO FINAL 🚨🚨🚨🚨 ", picking);
+   console.log("🟩TERMINO PROCESO");
 
-    const moves = await getActiveSaleMoves(picking);
+    //const moves = await getActiveSaleMoves(picking);
 
-    await assignmentService();
+    //await assignmentService();
 
     res.json({
       success: true,
@@ -201,6 +126,7 @@ app.get("/test-sale-orders", async (req, res) => {
 });
 
 
+
 //startCronJobs();
 //productsCronJobs();
 //console.log("🔥 LLAMANDO CRON 🔥");
@@ -209,7 +135,7 @@ app.get("/test-sale-orders", async (req, res) => {
 
 
 
-//CITRUS SYNC
+//[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
 //startCitrusCron();
 
 
@@ -221,18 +147,11 @@ const res = await db.query("SELECT current_database()");
 console.log("USANDO DB:", res.rows[0].current_database);
 
 
-/*app.use(
-  cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,// Necesario para enviar cookies al frontend
-  })
-);*/
-
 
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "http://192.168.1.44:5173",
+  "http://192.168.1.43:5173",
   "https://wms-proyect.vercel.app",
   "https://www.sidialwms.com"
 ];
@@ -262,21 +181,6 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser()); // ← ahora sí, en el orden correcto
-
-// -----------------------------
-// 2. Rutas de API
-// -----------------------------
-app.post("/webhook/products", async (req, res) => {
-  console.log("Webhook product:", req.body);
-
-  // guardar o sync
-  //await syncProduct(req.body);
-
-  res.sendStatus(200);
-});
-
-
-
 app.use("/api", apiRoutes);
 app.get("/health", (req, res) => res.json({ ok: true }));
 app.get("/__ping", (req, res) => res.send("pong"));

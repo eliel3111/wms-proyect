@@ -6,6 +6,8 @@ import { uploadPdfToS3 } from "../services/s3UploadPdf.js";
 import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 import { runFullSync } from "../cron/cronJobs.js";
 import { buildWarehouseEntry, createWarehouseEntry } from "../integrations/citrus/citrus.warehouseEntry.js"
+import { syncAllItems, syncAllPurchaseOrders } from "../integrations/citrus/citrus.sync.js";
+
 
 
 
@@ -1105,7 +1107,25 @@ export async function gettingOpenOrders(req, res) {
   try {
 
     // 1️⃣ Ejecutar sync
-    await runFullSync();
+     console.time("⏱ Tiempo total sync");
+
+    // 🔹 Sync Items
+    try {
+      console.log("🔄 Sync Items...");
+      await syncAllItems();
+    } catch (err) {
+      console.error("❌ Error en syncAllItems:", err.message);
+    }
+
+    // 🔹 Sync Purchase Orders
+    try {
+      console.log("🔄 Sync Purchase Orders...");
+      await syncAllPurchaseOrders();
+    } catch (err) {
+      console.error("❌ Error en syncAllPurchaseOrders:", err.message);
+    }
+
+    console.timeEnd("⏱ Tiempo total sync");
 
     // 2️⃣ Traer órdenes actualizadas
     const result = await db.query(`
