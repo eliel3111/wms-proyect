@@ -1,14 +1,14 @@
 import { db } from "../db.js";
 import { getActiveStorageLocationByCode } from "../services/locationService.js";
 import { reserveInventoryForMove } from "../services/pickingBestRoute.js"
-import { getPickingProductsWithLocationsService } from "../services/pickingBestRoute.js";
+import { getPickingProductsWithLocationsService, getPickingConfig } from "../services/pickingBestRoute.js";
 import { selectBestLocation, getMoveLinesOrderedByLocation } from "../services/pickingBestRoute.js";
 import { createInventoryMovement, moveInventoryBetweenLocationsV2 } from "../services/inventoryService.js"
 
 
 export async function closePicking(req, res) {
   const { pickingId, locationId } = req.body;
-  console.log("PICKING Y LOCAIPN",req.body);
+  console.log("PICKING Y LOCAIPN", req.body);
 
   if (!pickingId || !locationId) {
     return res.status(400).json({
@@ -656,7 +656,38 @@ export async function getPickingProductsWithLocations(req, res) {
     );
 
 
+    // 🔴 VALIDAR SI NO HAY DATA
+    if (!result.data || result.data.length === 0) {
 
+      return res.status(200).json({
+        success: false,
+        message: result.message || "El producto no tiene cantidad en ninguna ubicación",
+      });
+
+    }
+
+    //console.log("🟥🟥🚨🚨 RESULT ERROR: ", result);
+
+
+    result.data.forEach((item) => {
+
+      console.log("=================================");
+      console.log("📦 SKU:", item.sku);
+      console.log("🆔 PRODUCT ID:", item.product_id);
+
+      console.log("🚚 MOVES:");
+
+      item.moves.forEach((move, index) => {
+        console.log(`Move #${index + 1}`, move);
+      });
+
+      console.log("📍 LOCATIONS:");
+
+      item.locations.forEach((location, index) => {
+        console.log(`Location #${index + 1}`, location);
+      });
+
+    });
 
 
     const enrichedData = result.data.map(product => {
@@ -727,7 +758,7 @@ export async function getPickingProductsWithLocations(req, res) {
       }
 
 
-
+      console.log("RESERVAR MOVE: ", move);
       // 🔥 3. Ejecutar reserva SOLO si no hay líneas
       const result = await reserveInventoryForMove(client, move);
 
@@ -747,15 +778,20 @@ export async function getPickingProductsWithLocations(req, res) {
 
     const finalResult = await getMoveLinesOrderedByLocation(client, pickingId);
 
-    if (totalReserved === 0) {
+    console.log("FINAL RESULT: ", finalResult);
+
+    const config = await getPickingConfig(client);
+
+    if (!config.allow_picking_without_locations && totalReserved === 0) {
+
       console.log("⚠️ No se reservó nada");
 
       await client.query("ROLLBACK");
 
       return res.status(200).json({
-        success: false,
+        success: true,
         message: "No se pudo reservar inventario",
-        finalResult
+        data: finalResult,
       });
     }
 

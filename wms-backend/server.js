@@ -7,9 +7,12 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./routes/apiRoutes.js";
+import http from "http";
+import { Server } from "socket.io";
+import { setIO } from "./socket.js";
 
 //import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
-// [ODOO] import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
+//[ODOO] import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
 import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
 import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 //import { startWarehouseCron } from "./cron/cronJobs.js";
@@ -26,36 +29,84 @@ import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
 import { alegraItemsService, alegraItemCategoriesService, alegraWarehousesService } from "./integrations/alegra/alegraItemService.js";
 import {getActiveSaleOrders} from "./integrations/citrus/citrus.saleOrder.js"
 import {upsertWarehouses} from "./integrations/alegra/alegra.wharehouse.js"
+import {chunkArray,  processInParallel} from "./integrations/alegra/alegra.item.js"
 
 
-import { inventoryScan } from "./controllers/inventoryController.js";
+
 
 
 
 const app = express();
-
+//🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
 app.get("/alegra", async (req, res) => {
   try {
 
-//ALMACEN
+/*ALMACEN
 const warehouses = await alegraWarehousesService.getWarehouses({status: 'active'});
-await upsertWarehouses(warehouses);
+await upsertWarehouses(warehouses);*/
 
-console.log(warehouses);
 
-    
+
+  /*  
 //PRODUCTOS
-/*const products = await alegraItemsService.getItems({
+let allProducts = [];
+  let start = 0;
+  const limit = 30;
+  let total = 0;
+
+  do {
+    const response = await alegraItemsService.getItems({
+      start,
+      limit,
+      metadata: true,
+      status: 'active',
+    });
+
+    const data = response.data;
+    const metadata = response.metadata;
+    console.log(data);
+    total = metadata.total;
+
+    allProducts = allProducts.concat(data);
+
+    console.log(`📦 Traídos: ${allProducts.length} / ${total}`);
+
+    start += limit;
+
+  } while (allProducts.length < total);
+
+
+ //console.log("TOTAL DE PRODUCTOS", allProducts);*/
+
+ //PRUEBA DE 30
+ let allProducts = [];
+
+const response = await alegraItemsService.getItems({
   start: 0,
   limit: 30,
   metadata: true,
   status: 'active',
-});*/
+});
+
+allProducts = response.data;
+
+//console.log(allProducts);
+
+const BATCH_SIZE = 100;
+const CONCURRENCY = 1;
+
+
+const chunks = chunkArray(allProducts, BATCH_SIZE);
+
+await processInParallel(chunks, CONCURRENCY);
+
+console.log("🎉 Todos los batches procesados");
+
 
 
     res.json({
       success: true,
-      data: warehouses,
+      data: allProducts,
     });
   } catch (error) {
     console.error("❌ Error en /test:", error.message);
@@ -67,12 +118,13 @@ console.log(warehouses);
     });
   }
 });
-
+//🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
 
 const PORT = process.env.PORT || 3000;
 app.get("/test-purchase-orders", async (req, res) => {
   console.log("🚨CPO CHECK 1");
   const data = await getActiveSaleOrders();
+  await assignmentService();
 
   res.json({
     success: true,
@@ -83,7 +135,7 @@ app.use(express.json());
 
 
 
-//app.post("/inventory", inventoryScan);
+//app.get("/ashley", emitInventorySummary);
 
 
 
@@ -105,7 +157,7 @@ app.get("/test-sale-orders", async (req, res) => {
     const picking = await getActiveSaleOrders();
    console.log("🟩TERMINO PROCESO");
 
-    //const moves = await getActiveSaleMoves(picking);
+    const moves = await getActiveSaleMoves(picking);
 
     //await assignmentService();
 
@@ -188,6 +240,30 @@ app.get("/__ping", (req, res) => res.send("pong"));
 // -----------------------------
 // 3. Iniciar servidor
 // -----------------------------
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*", // luego puedes restringir igual que tu CORS
+  },
+});
+
+// Guardar instancia global
+setIO(io);
+
+io.on("connection", (socket) => {
+  console.log("🟢 Cliente conectado:", socket.id);
+
+  socket.on("join_inventory_summary", () => {
+    socket.join("inventory_summary");
+    console.log(`📦 ${socket.id} joined inventory_summary`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Cliente desconectado:", socket.id);
+  });
+});
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server + Socket corriendo en puerto ${PORT}`);
 });

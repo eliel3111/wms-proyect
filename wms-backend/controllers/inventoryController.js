@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { updateInventoryByCount } from "../services/inventoryService.js";
+import { emitInventorySummary } from "../services/inventory.count.js";
 
 export async function inventoryScan(req, res) {
   try {
@@ -140,7 +141,7 @@ export async function applyInventoryCount(req, res) {
 
   try {
     const { locationSelected, productSelected, qty } = req.body;
-    const userId = req.user?.id ?? 1;
+    const userId = req.user?.id ?? 1; //🟥🟥 quitar en produccion #QUITARPRODUCCION
 
     await client.query("BEGIN");
 
@@ -157,6 +158,9 @@ export async function applyInventoryCount(req, res) {
       await client.query("ROLLBACK");
       return res.json(result);
     }
+
+    const summary = await emitInventorySummary(client);
+console.log("Resumen 🟥🟩🟨🟪", summary);
 
     await client.query("COMMIT");
     return res.json(result);

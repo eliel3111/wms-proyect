@@ -354,7 +354,7 @@ export async function updateInventoryByCount(client, {
   locationSelected,
   productSelected,
   qty,
-  userId = null,
+  userId,
   referenceId = null,
   note = "Ajuste por conteo físico"
 }) {
@@ -437,6 +437,9 @@ export async function updateInventoryByCount(client, {
   let difference = 0;
   let oldQtyOnHand = 0;
   let inventoryRowId = null;
+  let fromLocationId = null;
+  let toLocationId = null;
+  let referenceType = null;
 
   if (invResult.rows.length > 0) {
     const row = invResult.rows[0];
@@ -462,109 +465,70 @@ export async function updateInventoryByCount(client, {
 
     // 6) Actualizar línea
     await client.query(
-      `
-      UPDATE inventory_by_location
-      SET
-        old_qty_on_hand = qty_on_hand,
-        qty_on_hand = $1,
-        updated_at = NOW()
-      WHERE id = $2
-      `,
-      [countedQty, inventoryRowId]
-    );
+  `
+  UPDATE inventory_by_location
+  SET
+    old_qty_on_hand = qty_on_hand,
+    qty_on_hand = $1,
+    inventory_quantity = $1,
+    counted_by = $2,
+    counted_at = NOW(),
+    updated_at = NOW()
+  WHERE id = $3
+  `,
+  [countedQty, userId, inventoryRowId]
+);
   } else {
     // 7) No existe línea: crearla
     difference = countedQty;
     oldQtyOnHand = 0;
     action = countedQty > 0 ? "GAIN" : "SKIP";
 
-    const insertResult = await client.query(
-      `
-      INSERT INTO inventory_by_location (
-        warehouse_id,
-        location_id,
-        product_sku,
-        qty_on_hand,
-        qty_reserved,
-        old_qty_on_hand,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, 0, 0, NOW())
-      RETURNING id
-      `,
-      [warehouseId, locationId, productSku, countedQty]
-    );
+   const insertResult = await client.query(
+  `
+  INSERT INTO inventory_by_location (
+    warehouse_id,
+    location_id,
+    product_sku,
+    qty_on_hand,
+    inventory_quantity,
+    qty_reserved,
+    old_qty_on_hand,
+    counted_by,      -- 🔥 agregada
+    counted_at,      -- 🔥 recomendado también
+    updated_at
+  )
+  VALUES ($1, $2, $3, $4, $4, 0, 0, $5, NOW(), NOW())
+  RETURNING id
+  `,
+  [warehouseId, locationId, productSku, countedQty, userId]
+);
 
     inventoryRowId = insertResult.rows[0].id;
   }
 
   // 8) Si no hubo diferencia, no crear movimiento
   if (action === "SKIP") {
-
-    const gainResult = await client.query(
-      `
-      INSERT INTO locations (
-        warehouse_id,
-        code,
-        description,
-        is_active,
-        location_type
-      )
-      VALUES ($1, $2, $3, true, $4)
-      ON CONFLICT (warehouse_id, code)
-DO UPDATE SET code = EXCLUDED.code
-      RETURNING id
-      `,
-      [
-        warehouseId,
-        "INV-GAIN",
-        "Ubicación virtual para ganancias de inventario",
-        "VIRTUAL_GAIN"
-      ]
-    );
-
-    const gainLocationId = gainResult.rows[0].id;
-
-    fromLocationId = gainLocationId;
-    toLocationId = locationId;
-    referenceType = "INV-GAIN";
-
-    // 10) Crear movimiento
-  await createInventoryMovement(client, {
-    productSku,
-    fromLocationId,
-    toLocationId,
-    qty: Math.abs(difference),
-    movementType: "INVENTORY",
-    referenceType,
-    referenceId,
-    createdBy: userId,
-    note
-  });
-
-
-    return {
-      success: true,
-      title: "Conteo guardado",
-      message: "No hubo diferencia de inventario.",
-      data: {
-        action,
-        difference,
-        productId,
-        productSku,
-        locationId,
-        warehouseId,
-        inventoryRowId,
-        oldQtyOnHand,
-        newQtyOnHand: countedQty
-      }
-    };
-  }
+  return {
+    success: true,
+    title: "Conteo guardado",
+    message: "No hubo diferencia de inventario.",
+    data: {
+      action,
+      difference,
+      productId,
+      productSku,
+      locationId,
+      warehouseId,
+      inventoryRowId,
+      oldQtyOnHand,
+      newQtyOnHand: countedQty
+    }
+  };
+}
 
   // 9) Crear / obtener ubicación virtual
-  let fromLocationId = null;
-  let toLocationId = null;
-  let referenceType = null;
+  
 
   if (action === "LOSS") {
     const lossResult = await client.query(

@@ -17,7 +17,7 @@ export async function getActiveSaleOrders() {
 
   try {
     console.log("🚀 Sync SALE ORDERS iniciado");
-//🟨🟨
+    //🟨🟨
     lock = await lockSyncControl(model);
 
     if (!lock) {
@@ -30,7 +30,7 @@ export async function getActiveSaleOrders() {
     /* ==========================
        1️⃣ FETCH ERP
     ========================== */
-//🟨🟨
+    //🟨🟨
     const saleOrders = await fetchSalesOrdersTest(maxWriteDate);
 
     const orders = saleOrders || [];
@@ -60,12 +60,15 @@ export async function getActiveSaleOrders() {
 
       // 🔹 UPSERT
       for (const so of orders) {
-//🟨🟨      
-console.log("🟥 ORDEN: ", so);
+        //🟨🟨      
+        console.log("🟥 ORDEN: ", so);
         const picking = await syncSalesOrder(clientDb, so);
+        console.log("PICKING COMPLETO QUE SALE DE syncSalesOrder: ", picking);
+        console.log("🆔 ID:", picking.id);
+        console.log("📦 NAME:", picking.name);
 
-console.log("🆔 ID:", picking.id);
-console.log("📦 NAME:", picking.name);
+        // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
+        await syncSalesOrderLines(clientDb, so, picking.id);
 
         const writeDate = so.FechaActualizacion || so.Fecha;
 
@@ -136,34 +139,34 @@ console.log("📦 NAME:", picking.name);
 
 
 export async function lockSyncControl(model) {
-    const client = await db.connect();
+  const client = await db.connect();
 
-    try {
-        await client.query("BEGIN");
+  try {
+    await client.query("BEGIN");
 
-        // 1️⃣ Buscar registro con lock
-        const result = await client.query(
-            `
+    // 1️⃣ Buscar registro con lock
+    const result = await client.query(
+      `
       SELECT id, last_write_date, status
       FROM sync_control
       WHERE model = $1
       FOR UPDATE
       `,
-            [model]
-        );
+      [model]
+    );
 
-        // 2️⃣ Si existe y está corriendo → salir
-        if (result.rowCount > 0) {
-            const row = result.rows[0];
+    // 2️⃣ Si existe y está corriendo → salir
+    if (result.rowCount > 0) {
+      const row = result.rows[0];
 
-            if (row.status === "running") {
-                await client.query("ROLLBACK");
-                return null; // ocupado
-            }
+      if (row.status === "running") {
+        await client.query("ROLLBACK");
+        return null; // ocupado
+      }
 
-            // 3️⃣ Existe y NO está corriendo → marcar running
-            await client.query(
-                `
+      // 3️⃣ Existe y NO está corriendo → marcar running
+      await client.query(
+        `
         UPDATE sync_control
 SET status = 'running',
     updated_at = now(),
@@ -174,55 +177,60 @@ AND (
   OR updated_at < now() - interval '10 minutes'
 )
         `,
-                [model]
-            );
+        [model]
+      );
 
-            await client.query("COMMIT");
+      await client.query("COMMIT");
 
-            return {
-                id: row.id,
-                lastWriteDate: row.last_write_date
-            };
-        }
+      return {
+        id: row.id,
+        lastWriteDate: row.last_write_date
+      };
+    }
 
-        // 4️⃣ No existe → crear registro
-        const insertResult = await client.query(
-            `
+    // 4️⃣ No existe → crear registro
+    const insertResult = await client.query(
+      `
       INSERT INTO sync_control (model, last_write_date, status)
       VALUES ($1, $2, 'running')
       RETURNING id, last_write_date
       `,
-            [model, OLD_DATE]
-        );
+      [model, OLD_DATE]
+    );
 
-        await client.query("COMMIT");
+    await client.query("COMMIT");
 
-        return {
-            id: insertResult.rows[0].id,
-            lastWriteDate: insertResult.rows[0].last_write_date
-        };
+    return {
+      id: insertResult.rows[0].id,
+      lastWriteDate: insertResult.rows[0].last_write_date
+    };
 
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-    } finally {
-        client.release();
-    }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 
 export async function fetchSalesOrdersTest(lastWriteDate) {
   try {
     const fechaInicio = new Date(lastWriteDate)
-      .toISOString()
-      .slice(0, 19);
+    .toLocaleString("sv-SE", {
+      timeZone: "America/New_York"
+    })
+    .replace(" ", "T");
 
-    const fechaFin = new Date()
-      .toISOString()
-      .slice(0, 19);
+  const fechaFin = new Date()
+    .toLocaleString("sv-SE", {
+      timeZone: "America/New_York"
+    })
+    .replace(" ", "T");
 
-    console.log("FECHA INICIO:", fechaInicio);
-    console.log("FECHA FIN:", fechaFin);
+  console.log("FECHA INICIO:", fechaInicio);
+
+  console.log("FECHA FIN:", fechaFin);
 
     // 🔥 Toggle filtros
     const useCreatedDate = false;
@@ -263,8 +271,8 @@ export async function fetchSalesOrdersTest(lastWriteDate) {
         </soapenv:Body>
         </soapenv:Envelope>
         `;
-//🟨🟨
- const data = await callERPSales(xml);
+    //🟨🟨
+    const data = await callERPSales(xml);
 
     const orders = data?.Data?.OrdenesVentas || [];
 
@@ -324,7 +332,7 @@ async function syncSalesOrder(clientDb, order) {
         order_name = $5,
         erp_cliente = $6
       WHERE erp_id = $7
-      RETURNING id, name
+      RETURNING id, order_name
     `, [
       saleId,
       state,
@@ -362,7 +370,7 @@ async function syncSalesOrder(clientDb, order) {
         erp_cliente
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      RETURNING id, name
+      RETURNING id, order_name
     `, [
       erpId,
       saleId,
@@ -383,4 +391,397 @@ async function syncSalesOrder(clientDb, order) {
     console.error("❌ Error upserting picking:", error);
     throw error;
   }
+}
+
+
+
+
+async function syncSalesOrderLines(clientDb, order, pickingId) {
+
+  const lines = order.OrdenVentaDetalle || [];
+
+  const maxRetries = 3;
+  let attempt = 0;
+
+  console.log("LINEAS DE SALE ORDER:", lines);
+
+  if (!lines.length) {
+    console.log("⚠️ Orden sin líneas");
+    return;
+  }
+
+  while (attempt < maxRetries) {
+
+
+
+    try {
+
+      console.log(
+        `🚀 syncSalesOrderLines intento ${attempt + 1}`
+      );
+
+  
+
+      /* =====================================
+         1️⃣ RECORRER LÍNEAS
+      ===================================== */
+
+      for (const line of lines) {
+
+        const erp_move_id = line.Id;
+
+        const erp_product_id =
+          line.Item?.Id || null;
+
+        const product_qty =
+          parseInt(line.ItemCantidad || 0);
+
+        const name =
+          `MOVE-${line.Id}`;
+
+        let state = null;
+
+        // 🔥 SOLO SI ESTÁ CANCELADO
+        if (line.EstatusDespacho === "C") {
+          state = "cancel";
+        }
+        const pickingIdInt = parseInt(pickingId);
+
+        console.log("🟨 PROCESANDO:", {
+          erp_move_id,
+          erp_product_id,
+          product_qty,
+          state,
+          pickingIdInt
+        });
+
+        /* =====================================
+           2️⃣ QUERY ÚNICO
+        ===================================== */
+
+       /* =====================================
+   1️⃣ BUSCAR PICKING
+===================================== */
+
+const pickingResult = await clientDb.query(
+  `
+  SELECT
+    id,
+    name
+  FROM stock_picking
+  WHERE id = $1
+  `,
+  [pickingIdInt]
+);
+
+if (!pickingResult.rows.length) {
+
+  console.log(
+    "⚠️ Picking no encontrado:",
+    pickingIdInt
+  );
+
+  continue;
+
+}
+ console.log("BUSCAR PICKING", pickingResult.rows[0]);
+const picking = pickingResult.rows[0];
+
+const reference = picking.name;
+
+/* =====================================
+   2️⃣ BUSCAR PRODUCTO
+===================================== */
+
+const productResult = await clientDb.query(
+  `
+  SELECT
+    id,
+    uom_id
+  FROM products
+  WHERE erp_id = $1
+  LIMIT 1
+  `,
+  [erp_product_id]
+);
+
+if (!productResult.rows.length) {
+
+  console.log(
+    "❌ Producto no encontrado:",
+    erp_product_id
+  );
+
+  continue;
+
+}
+
+ console.log("BUSCAR PRODUCTO", productResult.rows[0]);
+
+const product = productResult.rows[0];
+
+const product_id =
+  product.id;
+
+const product_uom_id =
+  product.uom_id;
+
+/* =====================================
+   3️⃣ VALIDAR SI MOVE EXISTE
+===================================== */
+
+const moveResult = await clientDb.query(
+  `
+  SELECT EXISTS (
+    SELECT 1
+    FROM stock_move
+    WHERE erp_product_id = $1
+    AND picking_id = $2
+  ) AS move_exists
+  `,
+  [
+    erp_product_id,
+    pickingIdInt
+  ]
+);
+
+const moveExists =
+  moveResult.rows[0].move_exists;
+
+  console.log("VALIDAR SI MOVE EXISTE", moveExists);
+
+console.log("RESULTADOS:", {
+  reference,
+  product_id,
+  product_uom_id,
+  moveExists
+});
+
+        console.log("🟥 PICKING:", pickingResult.rows);
+
+console.log("🟥 PRODUCT:", productResult.rows);
+
+console.log("🟥 MOVE:", moveResult.rows);
+
+
+
+       /* if (!result.rows.length) {
+
+          console.log(
+            "⚠️ Picking no encontrado:",
+            pickingIdInt
+          );
+
+          continue;
+
+        }
+
+        const row = result.rows[0];
+
+        const reference =
+          row.reference;
+
+        const product_id =
+          row.product_id;
+
+        const product_uom_id =
+          row.product_uom_id;
+
+        const moveExists =
+          row.move_exists;*/
+
+          /* =====================================
+   VALIDAR PRODUCTO
+===================================== */
+
+if (!product_id) {
+
+  console.log(
+    "❌ Producto no encontrado:",
+    erp_product_id
+  );
+
+  continue;
+
+}
+
+        
+
+        /* =====================================
+           3️⃣ UPDATE
+        ===================================== */
+
+        if (moveExists) {
+
+          console.log(
+            "🟦 UPDATE MOVE:",
+            erp_move_id
+          );
+
+          const updateFields = [
+            `product_qty = $1`,
+            `reference = $2`,
+            `product_id = $3`,
+            `product_uom_id = $4`,
+            `write_date = now()`
+          ];
+
+          const params = [
+            product_qty,
+            reference,
+            product_id,
+            product_uom_id
+          ];
+
+          // 🔥 SOLO UPDATE STATE SI TIENE VALOR
+          if (state) {
+            updateFields.push(`state = $5`);
+
+            params.push(state);
+          }
+
+          params.push(
+            erp_move_id,
+            pickingIdInt
+          );
+
+          const whereIndex1 =
+            params.length - 1;
+
+          const whereIndex2 =
+            params.length;
+
+          await clientDb.query(
+            `
+            UPDATE stock_move
+            SET
+              ${updateFields.join(", ")}
+
+            WHERE erp_move_id = $${whereIndex1}
+            AND picking_id = $${whereIndex2}
+            `,
+            params
+          );
+
+        }
+
+        /* =====================================
+           4️⃣ INSERT
+        ===================================== */
+
+        else {
+
+          console.log(
+            "🟩 INSERT MOVE:",
+            erp_move_id
+          );
+
+          const columns = [
+            `erp_move_id`,
+            `picking_id`,
+            `name`,
+            `reference`,
+            `erp_product_id`,
+            `product_id`,
+            `product_uom_id`,
+            `product_qty`
+          ];
+
+          console.log("VALORES DEL INSERT O UPDATE: ", columns);
+
+          const placeholders = [
+            `$1`,
+            `$2`,
+            `$3`,
+            `$4`,
+            `$5`,
+            `$6`,
+            `$7`,
+            `$8`
+          ];
+
+          const values = [
+            erp_move_id,
+            pickingIdInt,
+            name,
+            reference,
+            erp_product_id,
+            product_id,
+            product_uom_id,
+            product_qty
+          ];
+
+          // 🔥 SOLO INSERT STATE SI TIENE VALOR
+          if (state) {
+
+            columns.push(`state`);
+
+            placeholders.push(`$9`);
+
+            values.push(state);
+
+          }
+
+          await clientDb.query(
+            `
+            INSERT INTO stock_move (
+              ${columns.join(", ")}
+            )
+            VALUES (
+              ${placeholders.join(", ")}
+            )
+            `,
+            values
+          );
+
+        }
+
+      }
+
+      /* =====================================
+         5️⃣ COMMIT
+      ===================================== */
+
+     
+
+
+
+      console.log("✅ Líneas sincronizadas");
+
+      return;
+
+    } catch (error) {
+
+
+      attempt++;
+
+      console.error(
+        `❌ Error intento ${attempt}:`,
+        error.message
+      );
+
+      if (attempt >= maxRetries) {
+
+        console.error(
+          "🔥 Máximo de reintentos alcanzado"
+        );
+
+        throw error;
+
+      }
+
+      const wait = 2000 * attempt;
+
+      console.log(
+        `⏳ Reintentando en ${wait / 1000}s...`
+      );
+
+      await new Promise(resolve =>
+        setTimeout(resolve, wait)
+      );
+
+    }
+
+  }
+
 }

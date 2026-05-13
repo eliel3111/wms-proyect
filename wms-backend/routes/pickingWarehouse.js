@@ -42,7 +42,7 @@ router.get("/assigned", authMiddleware, getAssignedPickings);
 
 //Calcular ruta ideal de un pedido
 router.get(
-  "/:pickingId/products-locations", authMiddleware,
+  "/:pickingId/products-locations", 
   getPickingProductsWithLocations
 );
 

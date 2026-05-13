@@ -188,6 +188,11 @@ export async function createPutawayLine(req, res) {
 export async function scanPutawayProduct(req, res) {
   try {
     const { barcode } = req.body;
+    console.log("================================");
+    console.log("📦 PUT AWAY | PRODUCTO ESCANEADO");
+    console.log("BARCODE:", barcode);
+    console.log("TIPO:", typeof barcode);
+    console.log("================================");
 
     if (!barcode) {
       return res.status(400).json({
@@ -764,7 +769,7 @@ export async function dropPutaway(req, res) {
     /* -----------------------------
        8️⃣ Registrar movimiento de inventario
     ------------------------------*/
-    console.log("CANTIDAD",qty);
+    console.log("CANTIDAD", qty);
     await createInventoryMovement(client, {
       productSku: product.sku,
       fromLocationId: dockLocationId,

@@ -19,8 +19,9 @@ export async function upsertSupplierBarcode(req, res) {
 
     const cleanBarcode = barcode.trim();
 
+    console.log("🟥 BARCODE: ", cleanBarcode);
 
-  
+
     // 🔹 2. BUSCAR PRODUCTO
     const productRes = await db.query(`
       SELECT sku, status, deleted_erp
@@ -50,37 +51,37 @@ export async function upsertSupplierBarcode(req, res) {
 
     const sku = product.sku;
 
-      // 🔥 1. VALIDAR SI EL BARCODE YA EXISTE
-const existingBarcode = await db.query(`
+    // 🔥 1. VALIDAR SI EL BARCODE YA EXISTE
+    const existingBarcode = await db.query(`
   SELECT product_sku, barcode_type
   FROM product_barcodes
   WHERE barcode = $1
   LIMIT 1
 `, [cleanBarcode]);
 
-if (existingBarcode.rows.length > 0) {
-  const existing = existingBarcode.rows[0];
+    if (existingBarcode.rows.length > 0) {
+      const existing = existingBarcode.rows[0];
 
-  // ❌ si pertenece a OTRO producto → error
-  if (existing.product_sku !== sku) {
-    return res.status(400).json({
-      success: false,
-      title: "Código duplicado",
-      message: `Este código ya pertenece al producto ${existing.product_sku}`,
-    });
-  }
+      // ❌ si pertenece a OTRO producto → error
+      if (existing.product_sku !== sku) {
+        return res.status(400).json({
+          success: false,
+          title: "Código duplicado",
+          message: `Este código ya pertenece al producto ${existing.product_sku}`,
+        });
+      }
 
-  // ⚠️ si es el mismo producto pero otro tipo → opcional bloquear
-  if (existing.barcode_type !== "supplier") {
-    return res.status(400).json({
-      success: false,
-      title: "Código ya registrado",
-      message: `Este código ya existe como ${existing.barcode_type}`,
-    });
-  }
+      // ⚠️ si es el mismo producto pero otro tipo → opcional bloquear
+      if (existing.barcode_type !== "supplier") {
+        return res.status(400).json({
+          success: false,
+          title: "Código ya registrado",
+          message: `Este código ya existe como ${existing.barcode_type}`,
+        });
+      }
 
-  // 🔁 si es el mismo producto y tipo → simplemente actualiza (o ignora)
-}
+      // 🔁 si es el mismo producto y tipo → simplemente actualiza (o ignora)
+    }
 
     // 🔹 3. BUSCAR SI YA EXISTE barcode supplier
     const existingRes = await db.query(`
@@ -141,20 +142,20 @@ if (existingBarcode.rows.length > 0) {
     });
 
   } catch (error) {
-  console.error("❌ Error guardando:", error);
+    console.error("❌ Error guardando:", error);
 
-  if (error.response) {
-    console.log("🔥 BACKEND RESPONSE:", error.response.data);
+    if (error.response) {
+      console.log("🔥 BACKEND RESPONSE:", error.response.data);
 
-    alert(error.response.data.message); // 👈 clave
-  }
-} finally {
+      alert(error.response.data.message); // 👈 clave
+    }
+  } finally {
     console.log("🏁 END → upsertSupplierBarcode");
   }
 }
 
 
- export async function searchProducts(req, res) {
+export async function searchProducts(req, res) {
   try {
     const { text } = req.body;
 
@@ -167,51 +168,82 @@ if (existingBarcode.rows.length > 0) {
       });
     }
 
+    let productsFromBarcode = [];
+
     const cleanText = text.trim();
 
-     // 🔥 NUEVO: dividir palabras
+    // 🔥 NUEVO: dividir palabras
     const words = cleanText
       .split(" ")
       .map(w => w.trim())
       .filter(Boolean);
 
     // 🔹 1. Buscar en barcode
-    const barcodeRes = await db.query(`
-      SELECT DISTINCT product_sku
-      FROM product_barcodes
-      WHERE barcode ILIKE $1
-      LIMIT 20
-    `, [`%${cleanText}%`]);
+    // 🔥 0. BUSCAR BARCODE EXACTO (PRIORIDAD MÁXIMA)
+    const exactBarcodeRes = await db.query(`
+  SELECT DISTINCT product_sku
+  FROM product_barcodes
+  WHERE barcode = $1
+  LIMIT 20
+`, [cleanText]);
 
-    const skusFromBarcode = barcodeRes.rows.map(r => r.product_sku);
+    console.log("🟥 SE ENCOTRO BARCODE EXACTO: ", exactBarcodeRes.rows.length);
 
-    let productsFromBarcode = [];
+    if (exactBarcodeRes.rows.length > 0) {
+      const skus = exactBarcodeRes.rows.map(r => r.product_sku);
 
-    if (skusFromBarcode.length > 0) {
-      const resProducts = await db.query(`
-        SELECT id, sku, description, erp_sku, erp_name
-        FROM products
-        WHERE sku = ANY($1)
-        LIMIT 20
-      `, [skusFromBarcode]);
+      const exactProducts = await db.query(`
+    SELECT id, sku, description, erp_sku, erp_name, erp_id
+    FROM products
+    WHERE sku = ANY($1)
+  `, [skus]);
 
-      productsFromBarcode = resProducts.rows;
-    } 
+      // 🔥 supplier barcode también
+      let supplierMap = new Map();
 
-     // 🔥 NUEVO: construir búsqueda dinámica
+      const supplierRes = await db.query(`
+    SELECT product_sku, barcode
+    FROM product_barcodes
+    WHERE product_sku = ANY($1)
+      AND barcode_type = 'supplier'
+  `, [skus]);
+
+      supplierRes.rows.forEach(row => {
+        if (!supplierMap.has(row.product_sku)) {
+          supplierMap.set(row.product_sku, row.barcode);
+        }
+      });
+
+      const finalProducts = exactProducts.rows.map(p => ({
+        ...p,
+        supplier_barcode: supplierMap.get(p.sku) || null
+      }));
+
+      // 🔥 ⛔ IMPORTANTE: RETORNAR AQUÍ
+      return res.json({
+        success: true,
+        data: finalProducts
+      });
+    }
+
+    // 🔥 NUEVO: construir búsqueda dinámica
     let conditions = [];
     let values = [];
 
     words.forEach((word, index) => {
       const paramIndex = index + 1;
 
-      conditions.push(`
-        (
-          sku ILIKE $${paramIndex} OR
-          erp_sku ILIKE $${paramIndex} OR
-          REPLACE(description, '^', '') ILIKE $${paramIndex}
-        )
-      `);
+    conditions.push(`
+(
+  sku ILIKE $${paramIndex} OR
+  erp_sku ILIKE $${paramIndex} OR
+  erp_name ILIKE $${paramIndex} OR
+  REPLACE(description, '^', '') ILIKE $${paramIndex} OR
+  status ILIKE $${paramIndex} OR
+  reference ILIKE $${paramIndex} OR
+  erp_id::text ILIKE $${paramIndex}
+)
+`);
 
       values.push(`%${word}%`);
     });
@@ -221,7 +253,7 @@ if (existingBarcode.rows.length > 0) {
       : "1=1";
 
     const directRes = await db.query(`
-      SELECT id, sku, description, erp_sku, erp_name
+      SELECT id, sku, description, erp_sku, erp_name, erp_id
       FROM products
       WHERE ${whereClause}
       LIMIT 20
@@ -235,39 +267,39 @@ if (existingBarcode.rows.length > 0) {
     });
 
     // 🔥 👇 AQUÍ CONVIERTES A ARRAY
-const products = Array.from(map.values());
+    const products = Array.from(map.values());
 
-// 🔥 👇 OBTENER SKUS
-const skus = products.map(p => p.sku);
+    // 🔥 👇 OBTENER SKUS
+    const skus = products.map(p => p.sku);
 
-// 🔥 👇 NUEVO: buscar supplier barcodes
-let supplierMap = new Map();
+    // 🔥 👇 NUEVO: buscar supplier barcodes
+    let supplierMap = new Map();
 
-if (skus.length > 0) {
-  const supplierRes = await db.query(`
+    if (skus.length > 0) {
+      const supplierRes = await db.query(`
     SELECT product_sku, barcode
     FROM product_barcodes
     WHERE product_sku = ANY($1)
       AND barcode_type = 'supplier'
   `, [skus]);
 
-  supplierRes.rows.forEach(row => {
-    if (!supplierMap.has(row.product_sku)) {
-      supplierMap.set(row.product_sku, row.barcode);
+      supplierRes.rows.forEach(row => {
+        if (!supplierMap.has(row.product_sku)) {
+          supplierMap.set(row.product_sku, row.barcode);
+        }
+      });
     }
-  });
-}
 
-// 🔥 👇 PEGARLO AL RESULTADO
-const finalProducts = products.map(p => ({
-  ...p,
-  supplier_barcode: supplierMap.get(p.sku) || null
-}));
+    // 🔥 👇 PEGARLO AL RESULTADO
+    const finalProducts = products.map(p => ({
+      ...p,
+      supplier_barcode: supplierMap.get(p.sku) || null
+    }));
 
     return res.json({
-  success: true,
-  data: finalProducts
-});
+      success: true,
+      data: finalProducts
+    });
 
   } catch (error) {
     console.error("🔥 ERROR:", error);

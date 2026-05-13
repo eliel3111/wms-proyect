@@ -6,16 +6,11 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   // ==============================
   // 1️⃣ TRAER MOVES
   // ==============================
-  const movesResult = await client.query(
-    `
+  const movesResult = await client.query(`
     SELECT id, product_id, product_qty, product_uom_id
     FROM stock_move
     WHERE picking_id = $1
-    `,
-    [pickingId]
-  );
-
-  console.log("🚨🚨🚨", movesResult.rows);
+  `, [pickingId]);
 
   if (!movesResult.rows.length) {
     return {
@@ -25,8 +20,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   }
 
   const moves = movesResult.rows;
-
-
+  //console.log("STOCK MOVE DEL PICKING: ", moves);
 
   // ==============================
   // 2️⃣ PRODUCT IDS
@@ -36,44 +30,39 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   // ==============================
   // 3️⃣ SKUs
   // ==============================
-  const productsResult = await client.query(
-    `
+  const productsResult = await client.query(`
     SELECT id, sku
     FROM products
     WHERE id = ANY($1::int[])
-    `,
-    [productIds]
-  );
+  `, [productIds]);
 
   const skuMap = new Map();
   const skuList = [];
 
-  productsResult.rows.forEach(p => {
+  for (const p of productsResult.rows) {
     skuMap.set(p.id, p.sku);
     skuList.push(p.sku);
-  });
-
+  }
+  //console.log("TODOS LOS SKUS: ", skuList);
   // ==============================
   // 4️⃣ INVENTARIO + LOCATIONS
   // ==============================
-  const inventoryResult = await client.query(
-  `
-  SELECT
-    ibl.product_sku,
-    ibl.location_id,
-    ibl.warehouse_id,
-    ibl.qty_available,
-    l.tramo,
-    l.nivel
-  FROM inventory_by_location ibl
-  JOIN locations l 
-    ON l.id = ibl.location_id
-  WHERE ibl.product_sku = ANY($1::text[])
-    AND l.location_type = 'STORAGE'
-  `,
-  [skuList]
-);
+  const inventoryResult = await client.query(`
+    SELECT
+      ibl.product_sku,
+      ibl.location_id,
+      ibl.warehouse_id,
+      ibl.qty_available,
+      l.tramo,
+      l.nivel
+    FROM inventory_by_location ibl
+    JOIN locations l ON l.id = ibl.location_id
+    WHERE ibl.product_sku = ANY($1::text[])
+      AND l.location_type = 'STORAGE'
+  `, [skuList]);
 
+
+  //console.log("BUSQUEDA DE LOCATIONS POR STOCK MOVE: ", inventoryResult.rows);
   // ==============================
   // 5️⃣ MAP INVENTORY
   // ==============================
@@ -92,22 +81,68 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
       almacen: row.warehouse_id,
     });
   }
+  //console.log("QUE ES ESTO? ", inventoryMap);
+  // ==============================
+  // 6️⃣ CONFIG + FALLBACK
+  // ==============================
+  const config = await getPickingConfig(client);
+
+  let defaultLocation = null;
+
+  if (config.allow_picking_without_locations) {
+    const warehouseId = inventoryResult.rows[0]?.warehouse_id || 1;
+    defaultLocation = await getOrCreateDefaultLocation(client, warehouseId);
+  }
 
   // ==============================
-  // 6️⃣ RESULT FINAL
+  // 7️⃣ RESULT FINAL
   // ==============================
   const resultMap = new Map();
+  let hasAtLeastOneLocation = false;
 
   for (const move of moves) {
     const sku = skuMap.get(move.product_id);
 
+    // 🔴 VALIDACIÓN SKU
+    if (!sku) {
+      const error = new Error(`Producto ${move.product_id} no tiene SKU`);
+      error.code = "NO_SKU";
+      throw error;
+    }
+
+    const productLocations = inventoryMap.get(sku);
+
+    console.log("UBICACIONES DEL PRODUCTO: ", sku, "ES: ", productLocations);
+
+    let finalLocations = [];
+
+    if (productLocations?.length) {
+      // 🟢 Tiene ubicaciones reales
+      hasAtLeastOneLocation = true;
+      finalLocations = productLocations;
+
+    } else if (config.allow_picking_without_locations && defaultLocation) {
+      // 🟡 Fallback GENERAL
+      finalLocations = [{
+        location_id: defaultLocation.id,
+        quantity: 0,
+        tramo: defaultLocation.tramo,
+        nivel: defaultLocation.nivel,
+        almacen: defaultLocation.warehouse_id,
+        code: defaultLocation.code,
+        is_fallback: true
+      }];
+
+    } else {
+      continue;
+    }
     if (!resultMap.has(move.product_id)) {
       resultMap.set(move.product_id, {
         product_id: move.product_id,
         sku,
         picking_id: Number(pickingId),
         moves: [],
-        locations: inventoryMap.get(sku) || [],
+        locations: finalLocations,
       });
     }
 
@@ -117,6 +152,13 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
       move_product_uom_id: move.product_uom_id,
     });
   }
+
+  if (!hasAtLeastOneLocation) {
+  return {
+    data: [],
+    message: "Ningún producto tiene inventario en ubicaciones",
+  };
+}
 
   return {
     data: Array.from(resultMap.values()),
@@ -141,24 +183,24 @@ export function selectBestLocation(product) {
     loc => Number(loc.quantity) >= requiredQty
   );
 
- if (validLocations.length > 0) {
-  validLocations.sort((a, b) => {
-    if (a.tramo !== b.tramo) return a.tramo - b.tramo;
-    return a.nivel - b.nivel;
-  });
+  if (validLocations.length > 0) {
+    validLocations.sort((a, b) => {
+      if (a.tramo !== b.tramo) return a.tramo - b.tramo;
+      return a.nivel - b.nivel;
+    });
 
-  return {
-    sugerido: [
-      {
-        location_id: validLocations[0].location_id,
-        quantity_taken: requiredQty,
-        tramo: validLocations[0].tramo,
-        nivel: validLocations[0].nivel,
-        almacen: validLocations[0].almacen
-      }
-    ]
-  };
-}
+    return {
+      sugerido: [
+        {
+          location_id: validLocations[0].location_id,
+          quantity_taken: requiredQty,
+          tramo: validLocations[0].tramo,
+          nivel: validLocations[0].nivel,
+          almacen: validLocations[0].almacen
+        }
+      ]
+    };
+  }
 
   // ==============================
   // 🔥 CASO 2: SPLIT ENTRE UBICACIONES
@@ -224,50 +266,79 @@ function splitAcrossLocations(locations, requiredQty) {
 //Sevicio de reserva de inventario
 export async function reserveInventoryForMove(client, move) {
 
-    const productSku = move.sku;
-    const stockMove = move.moves[0];
-    const moveLines = Array.isArray(move.selected_location)
-  ? move.selected_location
-  : move.selected_location?.sugerido || [];
-    let cantidadReservada = 0;
+  const productSku = move.sku;
+  const stockMove = move.moves[0];
+  const moveLines = Array.isArray(move.selected_location)
+    ? move.selected_location
+    : move.selected_location?.sugerido || [];
+  let cantidadReservada = 0;
 
-        /* ===============================
-           3️⃣ ACTUALIZAR RESERVA
-        =============================== */
-const values = [];
-const updates = [];
 
-if (!moveLines || moveLines.length === 0) {
-  console.log("⚠️ No hay líneas para reservar");
-  return { reserved: 0, note: "Sin líneas" };
-}
+  /* ===============================
+     3️⃣ ACTUALIZAR RESERVA
+  =============================== */
+  const values = [];
+  const updates = [];
+  const config = await getPickingConfig(client);
 
-moveLines.forEach((row, index) => {
-  const i = index * 4;
- console.log("ROW ROW ROW ROW", row);
-  values.push(
-    Number(row.quantity_taken),
-    productSku,
-    Number(row.almacen),
-    Number(row.location_id)
-  );
 
-  updates.push(`
+  let resultQuery = null; // ✅ AQUÍ
+  console.log("🟨🟨 MOVE DE reserveInventoryForMove: ", move);
+
+  if (!moveLines || moveLines.length === 0) {
+    console.log("⚠️ No hay líneas para reservar");
+
+    // ==============================
+    // 6️⃣ CONFIG + FALLBACK
+    // ==============================
+
+
+    //let defaultLocation = null;
+
+    if (config.allow_picking_without_locations) {
+      /*const warehouseId = inventoryResult.rows[0]?.warehouse_id || 1;
+      defaultLocation = await getOrCreateDefaultLocation(client, warehouseId);*/
+      console.log("🟥🟨 CONTINUAMOS");
+    } else {
+      console.log("🟥🟨 DEVUELVES");
+      return { reserved: 0, note: "Sin líneas" };
+    }
+  }
+
+
+  if (config.allow_picking_without_locations) {
+    console.log("🟥🟨 CONTINUAMOS");
+  } else {
+    moveLines.forEach((row, index) => {
+      const i = index * 4;
+      console.log("ROW ROW ROW ROW", row);
+      values.push(
+        Number(row.quantity_taken),
+        productSku,
+        Number(row.almacen),
+        Number(row.location_id)
+      );
+
+      updates.push(`
     (product_sku = $${i + 2}
      AND warehouse_id = $${i + 3}
      AND location_id = $${i + 4})
   `);
-});
+    });
 
-const result = await client.query(
-  `
+    console.log("🟥🟥VALUES DE reserveInventoryForMove: ", values);
+
+
+
+    resultQuery = await client.query(
+      `
   UPDATE inventory_by_location ibl
   SET 
     qty_reserved = ibl.qty_reserved + LEAST(ibl.qty_available, data.qty)
   FROM (
     VALUES ${moveLines
-      .map((_, i) => `($${i * 4 + 1}::int, $${i * 4 + 2}::text, $${i * 4 + 3}::int, $${i * 4 + 4}::int)`)
-      .join(",")}
+        .map((_, i) => `($${i * 4 + 1}::int, $${i * 4 + 2}::text, $${i * 4 + 3}::int, $${i * 4 + 4}::int)`)
+        .join(",")}
   ) AS data(qty, sku, warehouse_id, location_id)
   WHERE ibl.product_sku = data.sku
     AND ibl.warehouse_id = data.warehouse_id
@@ -278,76 +349,158 @@ const result = await client.query(
     ibl.qty_reserved,
     ibl.qty_available
   `,
-  values
-);
+      values
+    );
 
-    /* ===============================
-       2️⃣ RECORRER INVENTARIO
-    =============================== */
-
-    for (const row of moveLines) {
+  }
 
 
 
 
-     
+  console.log("🟥🟥RESULT DE VALUES DE reserveInventoryForMove: ", resultQuery);
+  /* ===============================
+     2️⃣ RECORRER INVENTARIO
+  =============================== */
+  console.log("🟨🟨 MOVE LINES DE reserveInventoryForMove: ", moveLines);
+  // ===============================
+  // PICKING SIN UBICACIONES
+  // ===============================
+  if (config.allow_picking_without_locations) {
 
-        /* ===============================
-           4️⃣ CREAR STOCK MOVE LINE
-        =============================== */
+    console.log("⚠️ Picking sin ubicaciones habilitado");
 
-        // crear move line con warehouse y location
-        await client.query(`
-    INSERT INTO stock_move_line
-    (move_id, picking_id, product_id, product_uom_id, warehouse_id, location_id, product_uom_qty, state)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-`, [
-            Number(stockMove.move_id),
-            Number(move.picking_id),
-            Number(move.product_id),
-            Number(stockMove.move_product_uom_id),
-            row.almacen,
-            row.location_id,
-            row.quantity_taken,
-            "assigned"   // ✅ CORRECTO
-        ]);
-        cantidadReservada += row.quantity_taken;
 
-        console.log(`📦 Reservado ${row.quantity_taken} en location ${row.location_id}`);
+    // ===============================
+    // VALIDAR SI YA EXISTE MOVE LINE
+    // ===============================
+    const existingMoveLine = await client.query(`
+  SELECT id
+  FROM stock_move_line
+  WHERE move_id = $1
+`, [stockMove.move_id]);
 
-        if (cantidadReservada === stockMove.product_qty) break;
+    if (existingMoveLine.rows.length > 0) {
+      console.log("⚠️ Move line ya existe");
+
+      return {
+        reserved: 0,
+        note: "Move line ya existe"
+      };
     }
 
-    /* ===============================
-       5️⃣ DETERMINAR RESULTADO
-    =============================== */
 
-    let note = "";
-
-    if (cantidadReservada === parseInt(stockMove.product_qty)) {
-
-        note = "Cantidad completa reservada";
-
-    } else if (cantidadReservada > 0) {
-
-        note = "Cantidad parcialmente reservada";
-
-    } else {
-
-        note = "Cantidad no reservada";
-    }
-
-    /* ===============================
-       6️⃣ ACTUALIZAR STOCK MOVE
-    =============================== */
-    let state = "confirmed";
-    if (cantidadReservada === parseInt(stockMove.product_qty)) {
-        state = "assigned";
-    } else if (cantidadReservada > 0) {
-        state = "partially_available";
-    }
+    // ===============================
+    // PICKING SIN UBICACIONES
+    // ===============================
 
     await client.query(`
+    INSERT INTO stock_move_line
+    (
+      move_id,
+      picking_id,
+      product_id,
+      product_uom_id,
+      warehouse_id,
+      location_id,
+      product_uom_qty,
+      state
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+  `, [
+      Number(stockMove.move_id),
+      Number(move.picking_id),
+      Number(move.product_id),
+      Number(stockMove.move_product_uom_id),
+
+      // fallback location
+      Number(move.locations[0].almacen),
+      Number(move.locations[0].location_id),
+
+      // cantidad completa del move
+      Number(stockMove.product_qty),
+
+      "assigned"
+    ]);
+
+    cantidadReservada = Number(stockMove.product_qty);
+
+    console.log(`📦 Reservado SIN LOCATION ${stockMove.product_qty}`);
+
+  } else {
+
+    // ===============================
+    // PICKING NORMAL CON UBICACIONES
+    // ===============================
+    for (const row of moveLines) {
+
+      await client.query(`
+      INSERT INTO stock_move_line
+      (
+        move_id,
+        picking_id,
+        product_id,
+        product_uom_id,
+        warehouse_id,
+        location_id,
+        product_uom_qty,
+        state
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `, [
+        Number(stockMove.move_id),
+        Number(move.picking_id),
+        Number(move.product_id),
+        Number(stockMove.move_product_uom_id),
+
+        Number(row.almacen),
+        Number(row.location_id),
+        Number(row.quantity_taken),
+
+        "assigned"
+      ]);
+
+      cantidadReservada += Number(row.quantity_taken);
+
+      console.log(
+        `📦 Reservado ${row.quantity_taken} en location ${row.location_id}`
+      );
+
+      if (cantidadReservada >= Number(stockMove.product_qty)) {
+        break;
+      }
+    }
+  }
+
+  /* ===============================
+     5️⃣ DETERMINAR RESULTADO
+  =============================== */
+
+  let note = "";
+
+  if (cantidadReservada === parseInt(stockMove.product_qty)) {
+
+    note = "Cantidad completa reservada";
+
+  } else if (cantidadReservada > 0) {
+
+    note = "Cantidad parcialmente reservada";
+
+  } else {
+
+    note = "Cantidad no reservada";
+  }
+
+  /* ===============================
+     6️⃣ ACTUALIZAR STOCK MOVE
+  =============================== */
+  let state = "confirmed";
+  if (cantidadReservada === parseInt(stockMove.product_qty)) {
+    state = "assigned";
+  } else if (cantidadReservada > 0) {
+    state = "partially_available";
+  }
+
+  await client.query(`
     UPDATE stock_move
     SET 
         reserved_qty = $1,
@@ -356,10 +509,10 @@ const result = await client.query(
     WHERE id = $4
 `, [cantidadReservada, note, state, stockMove.move_id]);
 
-    return {
-        reserved: cantidadReservada,
-        note
-    };
+  return {
+    reserved: cantidadReservada,
+    note
+  };
 }
 
 
@@ -407,6 +560,75 @@ export async function getMoveLinesOrderedByLocation(client, pickingId) {
 
   } catch (error) {
     console.error("❌ Error obteniendo líneas de picking:", error);
+    throw error;
+  }
+}
+
+//Servicio para obtener congifuracion de picking inicial
+export async function getPickingConfig(client) {
+  try {
+    const result = await client.query(`
+      SELECT allow_picking_without_locations
+      FROM companies
+      LIMIT 1
+    `);
+
+    // 🔹 Si no hay registro → default
+    if (result.rows.length === 0) {
+      return {
+        allow_picking_without_locations: false
+      };
+    }
+
+    return {
+      allow_picking_without_locations:
+        result.rows[0].allow_picking_without_locations ?? false
+    };
+
+  } catch (error) {
+    console.error("❌ Error getPickingConfig:", error.message);
+
+    return {
+      allow_picking_without_locations: false
+    };
+  }
+}
+
+
+
+// SERVICIO PARA LOCATION DEFAULT SI NO HAY OTROS
+export async function getOrCreateDefaultLocation(client, warehouseId) {
+  const DEFAULT_CODE = "GENERAL";
+  const DEFAULT_TRAMO = 999;
+  const DEFAULT_NIVEL = 999;
+
+  try {
+    const result = await client.query(`
+      INSERT INTO locations (
+        warehouse_id,
+        code,
+        description,
+        location_type,
+        tramo,
+        nivel,
+        is_active
+      )
+      VALUES ($1, $2, $3, 'STORAGE', $4, $5, true)
+      ON CONFLICT (warehouse_id, code)
+      DO UPDATE SET code = EXCLUDED.code
+      RETURNING id, warehouse_id, code, tramo, nivel
+    `, [
+      warehouseId,
+      DEFAULT_CODE,
+      'Ubicación GENERAL / fallback',
+      DEFAULT_TRAMO,
+      DEFAULT_NIVEL
+    ]);
+
+    return result.rows[0];
+
+  } catch (error) {
+    console.error("❌ Error getOrCreateDefaultLocation:", error.message);
     throw error;
   }
 }
