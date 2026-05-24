@@ -20,7 +20,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   }
 
   const moves = movesResult.rows;
-  //console.log("STOCK MOVE DEL PICKING: ", moves);
+  console.log("STOCK MOVE DEL PICKING: ", moves);
 
   // ==============================
   // 2️⃣ PRODUCT IDS
@@ -153,7 +153,10 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
     });
   }
 
-  if (!hasAtLeastOneLocation) {
+  if (
+  !hasAtLeastOneLocation &&
+  !config.allow_picking_without_locations
+) {
   return {
     data: [],
     message: "Ningún producto tiene inventario en ubicaciones",
@@ -284,6 +287,7 @@ export async function reserveInventoryForMove(client, move) {
 
   let resultQuery = null; // ✅ AQUÍ
   console.log("🟨🟨 MOVE DE reserveInventoryForMove: ", move);
+  console.log("🟨🟨 stockMove DE reserveInventoryForMove: ", stockMove);
 
   if (!moveLines || moveLines.length === 0) {
     console.log("⚠️ No hay líneas para reservar");
@@ -377,7 +381,11 @@ export async function reserveInventoryForMove(client, move) {
   SELECT id
   FROM stock_move_line
   WHERE move_id = $1
-`, [stockMove.move_id]);
+  AND picking_id = $2
+`, [
+      stockMove.move_id,
+      move.picking_id
+    ]);
 
     if (existingMoveLine.rows.length > 0) {
       console.log("⚠️ Move line ya existe");

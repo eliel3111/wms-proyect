@@ -19,11 +19,9 @@ import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 import { startMainCron, runFullSync } from "./cron/cronJobs.js";
 import { assignmentService } from "./services/saleAssignmentService.js";
 import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
-
 import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
-
-
-import { fetchPurchaseOrdersTest } from "./integrations/citrus/citrus.items.js";
+import { fetchPurchaseOrdersTest, fetchAllItemsAndSync } from "./integrations/citrus/citrus.items.js";
+import { createConduce } from "./integrations/citrus/citrus.saleOrder.js";
 
 //ALEGRA
 import { alegraItemsService, alegraItemCategoriesService, alegraWarehousesService } from "./integrations/alegra/alegraItemService.js";
@@ -120,11 +118,65 @@ console.log("🎉 Todos los batches procesados");
 });
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
 
+//Sincroniza todos los productos con el ERO Citrus de prueba
+app.get("/test-sync-items", async (req, res) => {
+
+    try {
+
+        console.log("🚀 TEST SYNC ITEMS INICIADO");
+
+        // Obtener nombre de la BD actual
+    const result = await db.query(`
+        SELECT current_database() AS db
+    `);
+
+    const currentDb = result.rows[0].db;
+
+    console.log("DATABASE:", currentDb);
+
+    // Validar producción
+    if (currentDb !== "wms_db") {
+        return res.status(403).json({
+            success: false,
+            message: "Este endpoint solo funciona en PRODUCCIÓN"
+        });
+    }
+
+
+        const items = await fetchAllItemsAndSync();
+
+        console.log("✅ TEST FINALIZADO");
+
+       /* return res.json({
+            success: true,
+            total_items: items.length,
+            message: "Sync test completed"
+        });*/
+        return res.json({
+            success: true,
+            message: "Sync test completed"
+        });
+
+    } catch (error) {
+
+        console.error(
+            "🔥 ERROR TEST ENDPOINT:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.get("/test-purchase-orders", async (req, res) => {
   console.log("🚨CPO CHECK 1");
   const data = await getActiveSaleOrders();
-  await assignmentService();
+  //await assignmentService();
 
   res.json({
     success: true,
@@ -138,7 +190,93 @@ app.use(express.json());
 //app.get("/ashley", emitInventorySummary);
 
 
+/* ==================================================
+   TEST CREAR CONDUCE
+================================================== */
 
+app.post("/test-create-conduce", async (req, res) => {
+
+  try {
+
+    const payloadERP = {
+
+      ClienteId: 1,
+
+      ClienteNombre: "Cliente Consumidor Final",
+
+      ClienteDireccion: "Santo Domingo",
+
+      Fecha: new Date(),
+
+      Estatus: "A",
+
+      TiendaId: 1,
+
+      VendedorId: 1,
+
+      Nota: "Conduce creado desde WMS",
+
+      OrdenVentaId: 3,
+
+      Detalles: [
+
+        {
+          ItemId: 2,
+          ItemNombre: "Producto Prueba",
+          ItemCantidad: 1
+        },
+
+        {
+          ItemId: 4,
+          ItemNombre: "11088F 3/4 95H",
+          ItemCantidad: 1
+        }
+
+      ]
+
+    };
+
+    console.log("🟨 PAYLOAD ERP:");
+    console.log(JSON.stringify(payloadERP, null, 2));
+
+    /* =====================================
+       CREATE CONDUCE
+    ===================================== */
+
+    const responseERP = await createConduce(payloadERP);
+
+    console.log("🟩 ERP RESPONSE:");
+    console.log(responseERP);
+
+    /* =====================================
+       SUCCESS
+    ===================================== */
+
+    return res.status(200).json({
+
+      success: true,
+
+      payloadERP,
+
+      responseERP
+
+    });
+
+  } catch (error) {
+
+    console.error("🟥 TEST CREATE CONDUCE ERROR:");
+    console.error(error);
+
+    return res.status(500).json({
+
+      success: false,
+
+      message: error.message
+
+    });
+  }
+
+});
 
 
 

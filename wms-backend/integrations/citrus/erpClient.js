@@ -391,3 +391,184 @@ export async function callERPSales(xmlBody) {
     throw error;
   }
 }
+
+
+export async function callERPGeneral(
+  servicePath,
+  soapAction,
+  responseTag,
+  resultTag,
+  xmlBody
+) {
+
+  try {
+
+    let auth = await getERPAuth();
+
+    const url = `https://testapi.citrus.com.do/40/${servicePath}`;
+
+    /* ==================================
+       📡 REQUEST
+    ================================== */
+
+    const response = await axios({
+
+      method: "post",
+
+      url,
+
+      data: xmlBody,
+
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: soapAction,
+        Authorization: auth.token.trim(),
+        UsuarioTicketId: String(auth.ticket).trim(),
+      },
+
+      timeout: 20000,
+
+      transformRequest: [(data) => data],
+    });
+
+    /* ==================================
+       🔥 XML → JSON
+    ================================== */
+
+    const parsed = await parseStringPromise(response.data, {
+      explicitArray: false,
+      ignoreAttrs: true,
+    });
+
+    const envelopeKey = Object.keys(parsed)[0];
+    const bodyKey = Object.keys(parsed[envelopeKey])[0];
+
+    const body = parsed[envelopeKey][bodyKey];
+
+    /* ==================================
+       🔥 RESPONSE NODE
+    ================================== */
+
+    const responseNode = body[responseTag];
+
+    if (!responseNode) {
+
+      console.log(`❌ No existe ${responseTag}`);
+
+      console.log(JSON.stringify(body, null, 2));
+
+      return null;
+    }
+
+    /* ==================================
+       🔥 RESULT NODE
+    ================================== */
+
+    const raw = responseNode[resultTag];
+
+    if (!raw) {
+
+      console.log(`❌ No existe ${resultTag}`);
+
+      return null;
+    }
+
+    /* ==================================
+       🔥 STRING → JSON
+    ================================== */
+
+    let data;
+
+    if (
+      typeof raw === "string" &&
+      raw.trim().startsWith("{")
+    ) {
+
+      data = JSON.parse(raw);
+
+    } else {
+
+      data = raw;
+    }
+
+    /* ==================================
+       🔄 RELOGIN AUTO
+    ================================== */
+
+    if (
+      data?.SesionExpirada === 1 ||
+      data?.TicketInvalido === 1
+    ) {
+
+      console.log("🔄 ERP session expired → re-login");
+
+      auth = await refreshERPToken();
+
+      const retry = await axios.post(url, xmlBody, {
+
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          SOAPAction: soapAction,
+          Authorization: auth.token.trim(),
+          UsuarioTicketId: String(auth.ticket).trim(),
+        },
+
+      });
+
+      const parsedRetry = await parseStringPromise(
+        retry.data,
+        {
+          explicitArray: false,
+          ignoreAttrs: true,
+        }
+      );
+
+      const envelopeRetry = Object.keys(parsedRetry)[0];
+
+      const bodyRetryKey =
+        Object.keys(parsedRetry[envelopeRetry])[0];
+
+      const bodyRetry =
+        parsedRetry[envelopeRetry][bodyRetryKey];
+
+      const responseRetry =
+        bodyRetry[responseTag];
+
+      const rawRetry =
+        responseRetry[resultTag];
+
+      if (
+        typeof rawRetry === "string" &&
+        rawRetry.trim().startsWith("{")
+      ) {
+
+        return JSON.parse(rawRetry);
+      }
+
+      return rawRetry;
+    }
+
+    /* ==================================
+       ✅ RESULT
+    ================================== */
+
+    return data;
+
+  } catch (error) {
+
+    console.log("🔴 ERP ERROR:");
+
+    if (error.response) {
+
+      console.log("STATUS:", error.response.status);
+
+      console.log("BODY:", error.response.data);
+
+    } else {
+
+      console.log(error.message);
+    }
+
+    throw error;
+  }
+}

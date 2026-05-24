@@ -2,9 +2,9 @@
   background-color: #ffffff;
   border-radius: 18px;
   padding: 20px;
-  min-height: 130px;
+  min-height: 160px;
   max-width: 160px;
-  min-width: 120px;
+  min-width: 160px;
 
   display: flex;
   flex-direction: column;
@@ -35,21 +35,37 @@
   background-color: #f5f7fa;
 }
 
+/* 🔥 NUEVO: tarjeta interna del icono */
+.menu-button__icon-card {
+  background-color: #f2f3f5;
+  border-radius: 12px;
+  padding: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 70px;
+  height: 70px;
+}
+
+/* Icono */
 .menu-button__icon {
-  color: #1e88e5;
+  color: #7b4a6a; /* 👈 morado elegante como la imagen */
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .menu-button__icon svg {
-  width: 90px;
-  height: 90px;
+  width: 40px;
+  height: 40px;
 }
 
+/* Texto */
 .menu-button__title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #222;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
   text-align: center;
 }

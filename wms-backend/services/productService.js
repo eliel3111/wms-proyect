@@ -28,13 +28,17 @@ export async function getActiveProductById(client, productId) {
 /*Usando el sku de un producto te da el codigo de barra primario de ese producto*/
 
 export async function getPrimaryBarcodeBySku(client, sku) {
+
   return client.query(`
-    SELECT barcode
+    SELECT
+      id,
+      barcode,
+      is_primary
     FROM product_barcodes
     WHERE product_sku = $1
     ORDER BY is_primary DESC, id ASC
-    LIMIT 1
   `, [sku]);
+
 }
 
 // Utilizando un sku el me devuelve la informacion basica de un producto

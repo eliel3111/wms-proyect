@@ -43,12 +43,14 @@ export default function PickingRoute() {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
     const { openModal } = useModal();
+    const { closeModal } = useModal();
     const [pickings, setPickings] = useState<StockMoveLine[]>([]);
     const [pickingId, setPickingId] = useState<number | null>(null);
     const pickingIdRef = useRef<number | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const isModalOpenRef = useRef(false);
-const [goNext, setGoNext] = useState(false);
+    const [goNext, setGoNext] = useState(false);
+    const [canEdit, setCanEdit] = useState(false);
 
     const [fromLocation, setFromLocation] = useState<Location | null>(null);
     const fromLocationRef = useRef<Location | null>(null);
@@ -85,18 +87,17 @@ const [goNext, setGoNext] = useState(false);
         selectedProductRef.current = selectedProduct;
     }, [selectedProduct]);
     useEffect(() => {
-  if (goNext && pickings.length > 0) {
-    selectNextLine();
-    setGoNext(false);
-  }
-}, [pickings]);
+        if (goNext && pickings.length > 0) {
+            selectNextLine();
+            setGoNext(false);
+        }
+    }, [pickings]);
 
 
     /* 1️⃣ Obtener ID desde la URL */
     const { id } = useParams<{ id: string }>();
     useEffect(() => {
         if (!id) return;
-
         const poId = Number(id);
         if (isNaN(poId)) return;
 
@@ -110,26 +111,56 @@ const [goNext, setGoNext] = useState(false);
         if (!pickingId) return;
 
         fetchData();
-        
+
 
     }, [pickingId]);
 
+
+
     const fetchData = async () => {
-            try {
-                // 🔹 2. Hacer request
-                const response = await apiClient.get(
-                    `/picking/${pickingId}/products-locations`
-                );
+        try {
+            // 🔹 2. Hacer request
+            const response = await apiClient.get(
+                `/picking/${pickingId}/products-locations`
+            );
 
-                // 🔹 3. Log del resultado
-                console.log("📦 Products Locations:", response.data.finalResult);
-                setPickings(response.data.finalResult);
-                setLoading(false);   
+            // 🔹 3. Log del resultado
+            console.log("📦 Products Locations:", response.data);
 
-            } catch (error) {
-                console.error("❌ Error fetching products locations:", error);
+            if (!response.data.success) {
+                setPickings([]);
+                openModal({
+                    title: "NO SE PUDO INICIAR RECOGIDA",
+                    message: response.data.message
+                });
+                return;
             }
-        };
+
+            setPickings(
+                Array.isArray(response.data.data)
+                    ? response.data.data
+                    : []
+            );
+            setLoading(false);
+
+        } catch (error) {
+            console.error("❌ Error fetching products locations:", error);
+        }
+    };
+
+    const alreadyCheckedRef = useRef(false);
+
+    useEffect(() => {
+        if (alreadyCheckedRef.current) return;
+        if (pickings.length === 0) return;
+
+        alreadyCheckedRef.current = true;
+
+        console.log("✅ PICKINGS CARGADOS POR PRIMERA VEZ:", pickings);
+
+        selectNextLine();
+
+    }, [pickings]);
 
 
     /* =======================
@@ -138,7 +169,7 @@ const [goNext, setGoNext] = useState(false);
     useEffect(() => {
         async function handleKeyDown(e: KeyboardEvent) {
             const isEndKey = e.key === "Enter" || e.key === "Tab";
-
+            closeModal();
             if (!isModalOpenRef.current) {
                 openModal({
                     title: "INICIE LA RECOGIDA",
@@ -167,7 +198,7 @@ const [goNext, setGoNext] = useState(false);
 
                     const data = res.data;
 
-                    console.log(data);
+                    console.log("LLEGO DEL BACKKEND: ", data);
 
                     // 🟢 ES UBICACIÓN
                     if (data.success && data.type === "location") {
@@ -308,8 +339,68 @@ const [goNext, setGoNext] = useState(false);
 
 
 
-   
 
+    function handleEditLine(lineId: number) {
+
+        console.log("✏️ EDITANDO LINE:", lineId);
+
+        // 🔍 buscar línea completa real
+        const pickingLine = pickings.find(p => p.id === lineId);
+
+        if (!pickingLine) {
+            console.log("❌ Línea no encontrada");
+            return;
+        }
+
+        console.log("📦 PICKING LINE:", pickingLine);
+
+        // =========================
+        // CURRENT LINE
+        // =========================
+        setCurrentLine(pickingLine);
+        currentLineRef.current = pickingLine;
+
+        // =========================
+        // LOCATION
+        // =========================
+        const location = {
+            id: pickingLine.location_id,
+            code: pickingLine.code,
+        };
+
+        setFromLocation(location);
+        fromLocationRef.current = location;
+
+        // =========================
+        // PRODUCT
+        // =========================
+        const product = {
+            id: pickingLine.product_id,
+            sku: pickingLine.sku,
+            description: pickingLine.description,
+        };
+
+        setSelectedProduct(product);
+
+        // =========================
+        // QTY
+        // =========================
+        setQty(
+            String(
+                Number(pickingLine.qty_done || 0)
+            )
+        );
+
+        console.log("📍 LOCATION:", location);
+        console.log("📦 PRODUCT:", product);
+        console.log("🔢 QTY:", qty);
+
+        // =========================
+        // OPEN MODAL
+        // =========================
+        setIsModalOpen(true);
+        isModalOpenRef.current = true;
+    }
 
 
 
@@ -359,14 +450,14 @@ const [goNext, setGoNext] = useState(false);
             }
 
             // ✅ TODO BIEN → LIMPIAR UI
-          
+
             await fetchData();
-setGoNext(true);
+            setGoNext(true);
             setFromLocation(null);
             setSelectedProduct(null);
             setQty("");
 
-            
+
             setStartedPicking(false);
 
 
@@ -380,7 +471,7 @@ setGoNext(true);
         }
     }
 
-    function closeModal() {
+    function closeModals() {
         // ✅ TODO BIEN → LIMPIAR UI
         setFromLocation(null);
         setSelectedProduct(null);
@@ -392,6 +483,11 @@ setGoNext(true);
     }
 
     function handleOpenModal() {
+        // 🚫 SI YA SE PUEDE EDITAR → NO ABRIR MODAL
+        if (canEdit) {
+            console.log("✏️ EDIT MODE ENABLED → modal no se abre");
+            return null;
+        }
         selectNextLine();
         setIsModalOpen(true);
         isModalOpenRef.current = true;
@@ -399,87 +495,102 @@ setGoNext(true);
     };
 
     const SkeletonLine = () => (
-  <div className="skeleton-line">
-    <div className="skeleton-code"></div>
-    <div className="skeleton-text"></div>
-    <div className="skeleton-qty"></div>
-  </div>
-);
-
-
-
-
-   function selectNextLine() {
-
-  // 🔥 1. BUSCAR PRIMERO LAS QUE ESTÁN EN 0
-  const zeroLine = pickings.find(line => {
-    const done = Number(line.qty_done || 0);
-    return done === 0;
-  });
-
-  if (zeroLine) {
-    console.log("🎯 ZERO LINE", zeroLine);
-    setCurrentLine(zeroLine);
-    return zeroLine;
-  }
-
-  // 🔥 2. SI NO HAY EN 0 → BUSCAR PARCIALES
-  const partialLine = pickings.find(line => {
-    const done = Number(line.qty_done || 0);
-    const required = Number(line.product_uom_qty || 0);
-
-    return done < required;
-  });
-
-  if (partialLine) {
-    console.log("🟡 PARTIAL LINE", partialLine);
-    setCurrentLine(partialLine);
-    return partialLine;
-  }
-
-  // 🔴 3. NO HAY MÁS
-  console.log("✅ TODAS COMPLETAS");
-  return null;
-}
-
-const handleFinish = async () => {
-  if (!pickingIdRef.current) return;
-
-  try {
-    const response = await apiClient.get(
-      `/picking/${pickingIdRef.current}/differences`
+        <div className="skeleton-line">
+            <div className="skeleton-code"></div>
+            <div className="skeleton-text"></div>
+            <div className="skeleton-qty"></div>
+        </div>
     );
 
-    const result = response.data;
 
-    if (!result.success) {
-      openModal({
-        title: "Error",
-        message: "No se pudo validar el picking"
-      });
-      return;
+
+
+    function selectNextLine() {
+
+        console.log("🟥🟥 LINEAS", pickings);
+
+        // 🚫 SI YA ESTÁ EN MODO EDICIÓN
+        if (canEdit) {
+            setIsModalOpen(false);
+            console.log("✏️ EDIT MODE ENABLED → modal no se abre");
+
+
+
+            return null;
+        }
+
+        // 🔍 BUSCAR LÍNEAS EN 0
+        const zeroLine = pickings.find(line => {
+
+            const done = Number(line.qty_done || 0);
+
+            return done === 0;
+        });
+
+        // ✅ ENCONTRÓ UNA EN 0
+        if (zeroLine) {
+
+            console.log("🎯 ZERO LINE", zeroLine);
+
+            setCurrentLine(zeroLine);
+
+            return zeroLine;
+        }
+        // 🔒 CERRAR MODAL
+        setIsModalOpen(false);
+        // ❌ YA NO HAY LÍNEAS EN 0
+        console.log("✅ TODAS LAS LÍNEAS AUTOMÁTICAS COMPLETAS");
+
+
+
+        // ✏️ ACTIVAR EDICIÓN MANUAL
+        setCanEdit(true);
+
+        console.log("✏️ canEdit = true");
+        console.log("🚫 El modal ya no volverá a abrir");
+        console.log("🧾 El usuario ahora puede editar manualmente");
+
+        return null;
     }
 
-    const lines = result.data.lines;
+    const handleFinish = async () => {
+        if (!pickingIdRef.current) return;
 
-    // 🔴 SI HAY DIFERENCIAS → IR A VALIDACIÓN
-    if (lines.length > 0) {
-      navigate(`/picking/validation/${pickingIdRef.current}`);
-      return;
-    }
+        try {
+            const response = await apiClient.get(
+                `/picking/${pickingIdRef.current}/differences`
+            );
 
-    // ✅ SI NO HAY DIFERENCIAS → FINALIZAR DIRECTO
-    navigate(`/picking/final/${pickingIdRef.current}`);
+            const result = response.data;
 
-  } catch (error) {
-    console.error(error);
+            if (!result.success) {
+                openModal({
+                    title: "Error",
+                    message: "No se pudo validar el picking"
+                });
+                return;
+            }
 
-    openModal({
-      title: "Error",
-      message: "Error al validar el picking"
-    });
-  }
-};
+            const lines = result.data.lines;
+
+            // 🔴 SI HAY DIFERENCIAS → IR A VALIDACIÓN
+            if (lines.length > 0) {
+                navigate(`/picking/validation/${pickingIdRef.current}`);
+                return;
+            }
+
+            // ✅ SI NO HAY DIFERENCIAS → FINALIZAR DIRECTO
+            navigate(`/picking/final/${pickingIdRef.current}`);
+
+        } catch (error) {
+            console.error(error);
+
+            openModal({
+                title: "Error",
+                message: "Error al validar el picking"
+            });
+        }
+    };
 
 
 
@@ -504,54 +615,59 @@ const handleFinish = async () => {
 
 
                     {/* ✅ FINALIZAR */}
-                <button className="picking-user-finish" onClick={handleFinish}>
-  <span className="icon">
-    <svg viewBox="0 0 24 24">
-      <path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z" />
-    </svg>
-  </span>
-  <span className="label">Finalizar</span>
-</button>
+                    <button className="picking-user-finish" onClick={handleFinish}>
+                        <span className="icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z" />
+                            </svg>
+                        </span>
+                        <span className="label">Finalizar</span>
+                    </button>
                 </div>
             </div>
 
             <div className="order-container-table">
                 <div className="order-lines-header">
-                    <div>Código</div>
+                    <div>SKU</div>
                     <div>Descripción</div>
-                    <div>Recogida</div>
+                    <div>Cantidad</div>
                     <div>Diferencia</div>
+                    <div className="editar">Editar</div>
                 </div>
 
                 <div className="lines-list">
 
-  {loading ? (
-    <>
-      <SkeletonLine />
-      <SkeletonLine />
-      <SkeletonLine />
-      <SkeletonLine />
-    </>
-  ) : pickings.length === 0 ? (
-    <div>No hay líneas</div>
-  ) : (
-    pickings.map((line) => (
-      <OrderLineCard
-        key={line.id}
-        line={{
-          id: line.product_id,
-          sku: line.sku,
-          description: line.description,
-          ordered_qty: Math.trunc(Number(line.product_uom_qty)),
-          received_qty: Math.trunc(Number(line.qty_done)),
-          product_exists: true,
-          barcodes: [],
-        }}
-      />
-    ))
-  )}
+                    {loading ? (
+                        <>
+                            <SkeletonLine />
+                            <SkeletonLine />
+                            <SkeletonLine />
+                            <SkeletonLine />
+                        </>
+                    ) : pickings.length === 0 ? (
+                        <div>No hay líneas</div>
+                    ) : (
+                        pickings.map((line) => (
+                            <OrderLineCard
+                                key={line.id}
+                                editable={canEdit}
 
-</div>
+                                onEdit={() => handleEditLine(line.id)}
+
+                                line={{
+                                    id: line.product_id,
+                                    sku: line.sku,
+                                    description: line.description,
+                                    ordered_qty: Math.trunc(Number(line.product_uom_qty)),
+                                    received_qty: Math.trunc(Number(line.qty_done)),
+                                    product_exists: true,
+                                    barcodes: [],
+                                }}
+                            />
+                        ))
+                    )}
+
+                </div>
             </div>
 
 
@@ -566,7 +682,7 @@ const handleFinish = async () => {
 
             <ScanModal
                 open={isModalOpen}
-                onClose={closeModal}
+                onClose={closeModals}
             >
                 <div className="transfer-page">
                     <div className="transfer-card">
@@ -654,7 +770,7 @@ const handleFinish = async () => {
 
                         {/* BOTONES */}
                         <section className="block-actions">
-                            <button className="btn btn-exit" onClick={closeModal}>
+                            <button className="btn btn-exit" onClick={closeModals}>
                                 Salir
                             </button>
 

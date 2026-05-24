@@ -11,13 +11,16 @@ export async function buildWarehouseEntry(client, lines, purchaseOrderId) {
     `, [purchaseOrderId]);
 
     if (poRes.rowCount === 0) {
+      console.log("🟥 ERROR NO ENCONTRO ID DE LA ORDEN DE COMPRA DE CITRUS")
       throw new Error("Purchase Order no encontrada");
     }
 
     const erpOrderId = poRes.rows[0].erp_order_id;
+      console.log("✅ ID DE LA ORDEN DE COMPRA DE CITRUS: ", erpOrderId);
 
     // 🔹 2. Validaciones básicas
     if (!erpOrderId) {
+      console.log("🟥 ERROR NO ENCONTRO ID DE LA ORDEN DE COMPRA DE CITRUS")
       throw new Error("ERP Order ID es requerido");
     }
 
@@ -67,6 +70,7 @@ if (receiptRes.rowCount >= 2) {
       }
 
       const erpItemId = productRes.rows[0].erp_id;
+      console.log("✅ ID DEL PRODUCTO EN CITRUS: ", erpItemId);
 
       if (restante <= 0) {
   console.log(`⚠️ Cantidad inválida (${restante}) para SKU: ${line.sku}`);
@@ -86,7 +90,7 @@ payload.Detalles.push({
 }
 
     // 🔹 5. Log final
-    console.log("📦 Payload Entrada Almacén:", JSON.stringify(payload, null, 2));
+    console.log("✅📦 Payload Entrada Almacén:", JSON.stringify(payload, null, 2));
 
     return payload;
 

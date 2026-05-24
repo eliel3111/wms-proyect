@@ -2,6 +2,11 @@ import { db } from "../../db.js";
 import { fetchAllItems, fetchPurchaseOrdersTest } from "./citrus.items.js";
 import { insertProductFromERP } from "./citrus.product.service.js";
 import { callERP } from "./erpClient.js";
+import {
+    normalizeERPDate,
+    getLocalERPDate,
+    isERPDateGreater
+} from "../../services/time.service.js";
 
 
 //🚨🚨🚨🚨🚨Me quede en actualizar esto para ordenes de compra, la ordenes de compra llegan juntas con las lineas, tengo que buscar por fecha, pero primero chequiar si hay de actualizacion si no hay entonces usar de creacion. Solo he tocado syncAllPurchaseOrders tengo que moficar fetchAllItems(maxWriteDate); y luego adentro de fetch modificar callERP( si es necesario, quizas no🚨🚨🚨🚨🚨*/
@@ -14,7 +19,7 @@ export async function syncAllPurchaseOrders() {
 
     try {
 
-        console.log("🚀 Sync PURCHASE ORDERS iniciado");
+        console.log("🚀🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥 Sync PURCHASE ORDERS iniciado");
 
         lock = await lockSyncControl(model);
 
@@ -36,7 +41,7 @@ export async function syncAllPurchaseOrders() {
         const orders = pucharseOrders?.Data?.OrdenCompras || [];
         //console.log("VER ORDENES DE COMPRAS: ", orders);
         orders.forEach((order) => {
-            console.log("LINEAS:", order.OrdenCompraDetalles);
+            //console.log("LINEAS:", order.OrdenCompraDetalles);
         });
 
         if (orders.length === 0) {
@@ -64,21 +69,43 @@ export async function syncAllPurchaseOrders() {
 
         for (const order of orders) {
 
+            const orderDate =
+                order.FechaActualizacion ||
+                order.FechaCreacion;
 
-            const erpDateObj = new Date(order.FechaActualizacion || order.FechaCreacion);
+            if (!orderDate) continue;
+console.log("🟩 HORA ACTUAL", getLocalERPDate())
+            console.log("🟨HORA DE LA ORDEN", orderDate);
 
-            if (!erpDateObj) continue;
+            console.log(
+                "🟥 HORA DE BASE DE DATO: ",
+                normalizeERPDate(newMaxWriteDate)
+            );
 
+            console.log(
+                "ORDERDATE > MAXWRITEDATE",
+                isERPDateGreater(
+                    orderDate,
+                    normalizeERPDate(newMaxWriteDate)
+                )
+            );
 
-            console.log("new date", erpDateObj);
-            console.log("new MAX  date",newMaxWriteDate);
-            if (!newMaxWriteDate || erpDateObj > new Date(newMaxWriteDate)) {
-                console.log("PRUEBA 1");
-                newMaxWriteDate = erpDateObj.toISOString();
+            if (
+                isERPDateGreater(
+                    orderDate,
+                    normalizeERPDate(newMaxWriteDate)
+                )
+            ) {
+
+                newMaxWriteDate = orderDate;
+
+            } else {
+
+                newMaxWriteDate = getLocalERPDate();
             }
         }
 
-        //console.log("🆕 NEW MAX DATE:", newMaxWriteDate);
+        console.log("🆕 NEW MAX DATE:", newMaxWriteDate);
 
         /* ===============================
            3️⃣ GUARDAR
@@ -94,7 +121,7 @@ export async function syncAllPurchaseOrders() {
       WHERE model = $2
     `, [newMaxWriteDate, model]);
 
-        console.log("✅ Sync Purchase Orders terminado");
+        console.log("✅🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪 Sync Purchase Orders terminado");
 
     } catch (error) {
 
@@ -132,10 +159,12 @@ export async function syncAllItems() {
 
     try {
 
-        console.log("🚀 Sync items iniciado");
+        console.log("🚀🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 Sync items iniciado");
 
         // 🔒 obtener lock
         lock = await lockSyncControl(model);
+
+        console.log("LOCK: ", lock)
 
         if (!lock) {
             console.log(`[SYNC] ${model} ya está corriendo`);
@@ -183,13 +212,23 @@ export async function syncAllItems() {
             for (const item of items) {
 
                 await insertProductFromERP(client, item);
+                const itemDate =
+                    item.FechaActualizacion ||
+                    item.FechaCreacion;
+                console.log("itemdate", itemDate);
+                console.log("MAX WRITE DATE:", normalizeERPDate(maxWriteDate));
+                console.log("ITEMDATE > MAXWRITEDATE", isERPDateGreater(itemDate, normalizeERPDate(maxWriteDate)));
 
-                // actualizar maxWriteDate
-                if (item.FechaActualizacion &&
-                    new Date(item.FechaActualizacion) > new Date(maxWriteDate)) {
-
-                    maxWriteDate = item.FechaActualizacion;
+                if (isERPDateGreater(itemDate, normalizeERPDate(maxWriteDate))) {
+                    maxWriteDate = itemDate;
+                } else {
+                    maxWriteDate = getLocalERPDate();
                 }
+
+                //console.log("local time", getLocalERPDate())
+                //maxWriteDate = getLocalERPDate()
+
+
             }
 
             await client.query("COMMIT");
@@ -206,7 +245,7 @@ export async function syncAllItems() {
         /* ===============================
            ✅ MARCAR SUCCESS
         =============================== */
-
+        console.log("🟪 NEW LASTWRITE: ", maxWriteDate);
         await db.query(`
       UPDATE sync_control
       SET
@@ -217,7 +256,7 @@ export async function syncAllItems() {
       WHERE model = $2
     `, [maxWriteDate, model]);
 
-        console.log("✅ Sync items terminado");
+        console.log("🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨 Sync items terminado");
 
     } catch (error) {
 
@@ -286,9 +325,11 @@ AND (
 
             await client.query("COMMIT");
 
+            console.log("LOCK LAST WRITE DATE:", normalizeERPDate(row.last_write_date));
+
             return {
                 id: row.id,
-                lastWriteDate: row.last_write_date
+                lastWriteDate: normalizeERPDate(row.last_write_date)
             };
         }
 
@@ -539,3 +580,6 @@ LIMIT 1
         }
     }
 }*/
+
+
+

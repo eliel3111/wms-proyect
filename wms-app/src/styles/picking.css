@@ -117,7 +117,7 @@ position: relative;
 
   font-size: 17px;
   font-weight: 500;
-  color: black;
+  color: #1f2937; /* 🔥 mejor color */
 
   border-radius: 10px;
   cursor: pointer;
@@ -128,6 +128,10 @@ position: relative;
 .sidebar-button:hover {
   background-color: #909195;
   transform: translateX(3px);
+}
+
+.sidebar-button svg {
+  stroke: #1e88e5; /* 🔥 fuerza icono visible */
 }
 
 
@@ -919,14 +923,17 @@ color: #000; /* negro */
   margin-bottom: 16px;
 }
 
-/* CARD */
 .modal-pick-card-select {
   background: #f3f3f3;
   border-radius: 16px;
   padding: 10px;
+
   display: flex;
   flex-direction: column;
   gap: 10px;
+
+  max-height: 420px;
+  overflow-y: auto;
 }
 
 /* ROW */

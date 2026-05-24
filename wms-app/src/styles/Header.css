@@ -4,19 +4,33 @@
 .app-header {
   position: fixed;
   top: 0;
-  left: 0;               /* 🔥 AGREGA ESTO */
+  left: 0;
   width: 100%;
-  background: #1E88E5;
-  height: 56px;
-  border-bottom: none;
+
+  height: 56px; /* 👈 NO se toca */
+
+  /* 🔥 Fondo moderno (igual altura, más elegante) */
+  background: linear-gradient(
+    90deg,
+    #1e88e5 0%,
+    #1976d2 50%,
+    #1565c0 100%
+  );
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
-  padding-right: 12px;       /* 🔥 QUITAMOS PADDING DUPLICADO */
-  box-sizing: border-box; /* 🔥 IMPORTANTE */
+  padding: 0 12px;
+  box-sizing: border-box;
+
   z-index: 1000;
+
+  /* ✨ sombra suave profesional */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+
+  /* 🔥 transición suave */
+  transition: transform 0.3s ease, box-shadow 0.2s ease;
 }
 
 .app-header.hidden {
@@ -69,7 +83,7 @@
 .header-username {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #F5F5F5;
 }
 
 .menu-btn {
@@ -82,11 +96,12 @@
 
 .logout-btn {
   background: #007aff;
-  color: white;
-  border: none;
+  color: #F5F5F5;
+
   padding: 6px 12px;
   font-size: 14px;
   border-radius: 8px;
+  border: 1px solid #F5F5F5;
   cursor: pointer;
 }
 

@@ -8,8 +8,9 @@ export async function insertProductFromERP(client, item) {
 
     const erpId = item.Id ?? null;
 
-    // SKU
-    let sku = item.SKU;
+    // SKU 
+     let erp_sku = item.SKU;
+     let sku = "";
 
     if (!sku || sku.trim() === "") {
 
@@ -33,11 +34,10 @@ export async function insertProductFromERP(client, item) {
     }
 
     const name =
-        item.Nombre ||
-        item.Descripcion ||
-        "SIN DESCRIPCIÓN";
+        item.Nombre;
 
     const description =
+        item.Descripcion ||
         item.Referencia ||
         "SIN DESCRIPCIÓN";    
 
@@ -61,17 +61,19 @@ export async function insertProductFromERP(client, item) {
     UPDATE products
     SET
         erp_name = $2,
-        description = $3,
-        uom = $4,
-        uom_id = $5,
-        status = $6,
-        deleted_erp = $7,
+        erp_sku = $3,
+        description = $4,
+        uom = $5,
+        uom_id = $6,
+        status = $7,
+        deleted_erp = $8,
         updated_at = now()
     WHERE erp_id = $1
     RETURNING *;
 `, [
     erpId,
     name,
+    erp_sku,
     description,
     uom,
     uom_id,
@@ -96,6 +98,7 @@ export async function insertProductFromERP(client, item) {
     (
         erp_id,
         erp_name,
+        erp_sku,
         sku,
         description,
         uom,
@@ -108,11 +111,12 @@ export async function insertProductFromERP(client, item) {
         updated_at
     )
     VALUES
-    ($1,$2,$3,$4,$5,$6,false,false,false,$7,$8,now())
+    ($1,$2,$3,$4,$5,$6,$7,false,false,false,$8,$9,now())
     RETURNING *;
 `, [
     erpId,
     name,
+    erp_sku,
     sku,
     description,
     uom,

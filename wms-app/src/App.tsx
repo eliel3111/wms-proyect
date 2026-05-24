@@ -25,7 +25,8 @@ import GetAssignedPickings from "./pages/Picking_pending_assigned.tsx";
 import PickingRoute from "./pages/Picking_user_working.tsx"
 import PickingValidation from "./pages/picking_user_validation.tsx";
 import PickingFinal from "./pages/picking_user_final.tsx"
-import BarcodePage from "./pages/Barcode-main.tsx"
+import BarcodePage from "./pages/Barcode-main.tsx";
+import MonitorInventory from "./pages/Inventory_monitor.tsx"
 
 
 
@@ -84,6 +85,9 @@ function App() {
 
           {/*BARCODE */}
           <Route path="/barcode-scanner" element={<BarcodePage />} />
+
+          {/*INVENTORY */}
+          <Route path="/inventory-monitor" element={<MonitorInventory />} />
 
         </Route>
 

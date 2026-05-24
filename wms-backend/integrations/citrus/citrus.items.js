@@ -1,5 +1,6 @@
 import { callERP, callERPPurchase } from "./erpClient.js";
 import { db } from "../../db.js";
+import { insertProductFromERP } from  "./citrus.product.service.js"
 
 //ESTO ES PARA PODER BUSCAR POR PAGUINA Y CANTIDAD LOS PRODUCTOS
 /*
@@ -12,29 +13,25 @@ export async function fetchAllItems(lastWriteDate) {
 
 
 
-const fechaInicioFormatted = new Date(lastWriteDate)
-  .toISOString()
-  .slice(0, 19);
-const fechaFinFormatted = new Date()
-  .toISOString()
-  .slice(0, 19);
+    const fechaInicioFormatted = formatLocalDate(new Date(lastWriteDate));
+    const fechaFinFormatted = formatLocalDate(new Date());
 
-console.log("FECHA DE INICIO: ",fechaInicioFormatted);
-console.log("FECHA DE FINAL: ",fechaFinFormatted);
+    console.log("FECHA DE INICIO: ", fechaInicioFormatted);
+    console.log("FECHA DE FINAL: ", fechaFinFormatted);
 
 
-//Filtro para quitar y poner la fecha.
-const useDateFilter = true;
-const dateFilter = useDateFilter
-  ? `
+    //Filtro para quitar y poner la fecha.
+    const useDateFilter = true;
+    const dateFilter = useDateFilter
+      ? `
     <tem:FechaInicioActualizacion>${fechaInicioFormatted}</tem:FechaInicioActualizacion>
         <tem:FechaFinActualizacion>${fechaFinFormatted}</tem:FechaFinActualizacion>
   `
-  : "";
+      : "";
 
 
 
-const xml = `
+    const xml = `
 <soap:Envelope
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -59,7 +56,7 @@ const xml = `
       xml
     );
 
-    
+
 
     if (!data || data.Success === 0) {
       console.log("🔴 ERP respondió error:", data?.Mensaje);
@@ -74,32 +71,175 @@ const xml = `
   }
 }
 
+export async function fetchAllItemsAndSync() {
+
+  const client = await db.connect();
+
+  try {
+
+    let currentPage = 0;
+
+    let totalProcessed = 0;
+
+    while (true) {
+
+      console.log("📄 PAGINA ACTUAL:", currentPage);
+
+      const xml = `
+<soap:Envelope 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:tem="http://tempuri.org/"
+  xmlns:bas="BaseModel.Where">
+
+  <soap:Body>
+    <tem:BuscarItems>
+      <tem:itemWhere>
+
+        <tem:Estatus>A</tem:Estatus>
+
+        <bas:Pagina>${currentPage}</bas:Pagina>
+
+        <bas:CantidadPorPagina>100</bas:CantidadPorPagina>
+
+      </tem:itemWhere>
+    </tem:BuscarItems>
+  </soap:Body>
+
+</soap:Envelope>
+`;
+
+      console.log("📡 CONSULTANDO ERP...");
+
+      const data = await callERP(
+        "Inventario/ItemService.asmx",
+        "http://tempuri.org/BuscarItems",
+        xml
+      );
+
+      // 🔴 VALIDAR RESPUESTA
+      if (!data || data.Success === 0) {
+
+        console.log(
+          "🔴 ERP respondió error:",
+          data?.Mensaje
+        );
+
+        break;
+      }
+
+      const items =
+        data?.Data?.Items || [];
+
+      console.log(
+        `📦 ITEMS RECIBIDOS PAGINA ${currentPage}:`,
+        items.length
+      );
+
+      // 🔴 SI NO HAY MÁS ITEMS
+      if (items.length === 0) {
+
+        console.log("✅ NO HAY MÁS ITEMS");
+
+        break;
+      }
+
+      // 🔥 TRANSACCIÓN POR PÁGINA
+      await client.query("BEGIN");
+
+      try {
+
+        for (const item of items) {
+
+          console.log(
+            "📦 PROCESANDO:",
+            item.Nombre
+          );
+
+          await insertProductFromERP(
+            client,
+            item
+          );
+
+          totalProcessed++;
+        }
+
+        await client.query("COMMIT");
+
+        console.log(
+          `✅ PAGINA ${currentPage} PROCESADA`
+        );
+
+      } catch (error) {
+
+        await client.query("ROLLBACK");
+
+        console.error(
+          `🔥 ERROR PAGINA ${currentPage}:`,
+          error.message
+        );
+
+        throw error;
+      }
+
+      // ➡️ SIGUIENTE PAGINA
+      currentPage++;
+    }
+
+    console.log(
+      "✅ TOTAL PRODUCTOS PROCESADOS:",
+      totalProcessed
+    );
+
+    return {
+      success: true,
+      totalProcessed
+    };
+
+  } catch (error) {
+
+    console.error(
+      "🔥 fetchAllItemsAndSync error:",
+      error
+    );
+
+    return {
+      success: false,
+      error: error.message
+    };
+
+  } finally {
+
+    client.release();
+  }
+}
+
 export async function fetchPurchaseOrdersTest(lastWriteDate) {
   try {
 
     //console.log("🚨CPO CHECK 4-FETCH PURCHASE ");
 
 
-    const fechaInicioFormatted = new Date(lastWriteDate)
-  .toISOString()
-  .slice(0, 19);
-const fechaFinFormatted = new Date()
-  .toISOString()
-  .slice(0, 19);
-
-console.log("FECHA DE INICIO: ",fechaInicioFormatted);
-console.log("FECHA DE FINAL: ",fechaFinFormatted);
+    const fechaInicioFormatted = formatLocalDate(new Date(lastWriteDate));
+    const fechaFinFormatted = formatLocalDate(new Date());
 
 
-//Filtro para quitar y poner la fecha.
-const useDateFilter = true;
-const dateFilter = useDateFilter
-  ? `
+
+
+    console.log("PURCHASE FECHA DE INICIO: ", fechaInicioFormatted);
+    console.log("FECHA DE FINAL: ", fechaFinFormatted);
+
+
+    //Filtro para quitar y poner la fecha.
+    const useDateFilter = false;
+    const dateFilter = useDateFilter
+      ? `
     <tem:EsFecha>true</tem:EsFecha>
     <tem:FechaInicio>${fechaInicioFormatted}</tem:FechaInicio>
     <tem:FechaFin>${fechaFinFormatted}</tem:FechaFin>
   `
-  : "";
+      : "";
 
     const xml = `
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -119,35 +259,36 @@ const dateFilter = useDateFilter
 `;
 
 
-const data = await callERPPurchase(
-  "CxP/OrdenCompraService.asmx",
-  "http://tempuri.org/BuscarOrdenesCompras",
-  xml
-);
+    const data = await callERPPurchase(
+      "CxP/OrdenCompraService.asmx",
+      "http://tempuri.org/BuscarOrdenesCompras",
+      xml
+    );
 
-//console.log("🚨CPO CHECK 5 - CALL ERP RESULT: ", data);
-const orders = data?.Data?.OrdenCompras || [];
-//console.log("🚨CPO CHECK 6 - ORDERS RESULT: ", orders);
-for (const order of orders) {
+    //console.log("🚨CPO CHECK 5 - CALL ERP RESULT: ", data);
+    const orders = data?.Data?.OrdenCompras || [];
+    //console.log("🚨CPO CHECK 6 - ORDERS RESULT: ", orders);
+    for (const order of orders) {
 
-  console.log("📦 ERP Orden:", order.Id);
+      console.log("📦 ERP Orden:", order.Id);
+      console.log("📦 ERP Orden:", order);
 
-  // 🔥 guarda/actualiza PO
-  const wmsId = await syncPurchaseOrder(order);
+      // 🔥 guarda/actualiza PO
+      const wmsId = await syncPurchaseOrder(order);
 
-  console.log("🆔 WMS PO ID:", wmsId);
+      console.log("🆔 WMS PO ID:", wmsId);
 
-  // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
-  await syncPurchaseOrderLines(order, wmsId);
+      // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
+      await syncPurchaseOrderLines(order, wmsId);
 
-  // 🔎 logs (opcional)
-  for (const line of order.OrdenCompraDetalles || []) {
-    console.log("  Producto:", line.Item?.Nombre);
-    console.log("  SKU:", line.Item?.SKU);
-    console.log("  Cantidad:", line.ItemCantidad);
-  }
-}
- 
+      // 🔎 logs (opcional)
+      for (const line of order.OrdenCompraDetalles || []) {
+        console.log("  Producto:", line.Item?.Nombre);
+        console.log("  SKU:", line.Item?.SKU);
+        console.log("  Cantidad:", line.ItemCantidad);
+      }
+    }
+
     return data;
 
   } catch (error) {
@@ -156,7 +297,11 @@ for (const order of orders) {
   }
 }
 
+function formatLocalDate(date) {
+  const pad = (n) => String(n).padStart(2, "0");
 
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
 
 
 async function syncPurchaseOrder(order) {

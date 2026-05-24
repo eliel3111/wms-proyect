@@ -15,6 +15,7 @@ export interface Product {
     sku: string;
     description: string;
     erp_sku: string | null;
+    erp_id: string | null;
     erp_name: string | null;
     supplier_barcode: string | null;
 }
@@ -104,9 +105,13 @@ export default function BarcodePage() {
                 title: "",
                 message: res.data.message
             });
-            // 🔥 opcional: limpiar o feedback
-            // setSupplierCode("");
-            // alert("Guardado correctamente");
+
+
+            setSelectedProduct(null);
+            setActiveTab("manual");
+            setPrintType("internal");
+            setQuantity("");
+            setSupplierCode("");
 
         } catch (error: any) {
             console.error("❌ Error guardando:", error);
@@ -199,29 +204,54 @@ export default function BarcodePage() {
     async function printLabel(
         description: string,
         sku: string,
+        erp_name?: string,
         qty: number = 1
     ) {
         try {
-            const printer = await getPrinter();
 
+
+
+
+            const printer = await getPrinter();
+            console.log("CAMBIO DE PAPI");
             const d = cleanAndFormat(description);
+            const i = cleanAndFormat(erp_name || "");
             const s = clean(sku);
             const x = getBarcodeX(s);
 
+
+            function limitLabelText(
+                i: string,
+                d: string,
+                maxChars: number = 48
+            ): string {
+
+                const text = `${i} / ${d}`.trim();
+
+                if (text.length <= maxChars) {
+                    return text;
+                }
+
+                return text.substring(0, maxChars - 3).trim() + "...";
+            }
+
+            const labelText = limitLabelText(i, d);
+
             const zpl = `
 ^XA
+
 ^PW400
-^LL200
+^LL203
 ^LH0,0
 
-^CF0,28
+^CF0,26
 
-^FO0,30
+^FO0,10
 ^FB400,2,0,C,0
-^FD${d}^FS
+^FD${labelText}^FS
 
 ^BY2,2,50
-^FO${x},100
+^FO${x},75
 ^BCN,50,Y,N,N
 ^FD${s}^FS
 
@@ -253,6 +283,7 @@ export default function BarcodePage() {
         printLabel(
             selectedProduct.description,
             code,
+            selectedProduct.erp_name || "",
             Number(quantity)
         );
     }
@@ -338,11 +369,14 @@ export default function BarcodePage() {
                         >
 
                             <div className="barcode-description">
-                                {p.description}
+                                {p.erp_name}<br />
+                                {p.description}<br />
+                                {p.erp_sku}<br />
+                                {p.erp_id}
                             </div>
 
                             <div className="barcode-details">
-                                <div>Codigo de ERP: {p.sku ?? "-"}</div>
+                                <div>Codigo Interno: {p.sku ?? "-"}</div>
 
                                 {p.supplier_barcode && (
                                     <div>Codigo de Proveedor: {p.supplier_barcode}</div>
@@ -489,7 +523,7 @@ export default function BarcodePage() {
                                                 className="barcode-quantity-input"
                                                 type="text"
                                                 value={supplierCode}
-                                                onChange={(e) => setSupplierCode(e.target.value.trim())}
+                                                onChange={(e) => setSupplierCode(e.target.value)}
                                                 onKeyDown={(e) => {
                                                     if (e.key === "Enter") {
                                                         console.log("Barcode:", supplierCode);

@@ -2,7 +2,7 @@ import { db } from "../../db.js";
 import { fetchAllItems, fetchPurchaseOrdersTest } from "./citrus.items.js";
 import { insertProductFromERP } from "./citrus.product.service.js";
 
-import { callERPSales } from "./erpClient.js";
+import { callERPSales, callERPGeneral } from "./erpClient.js";
 
 
 
@@ -70,10 +70,36 @@ export async function getActiveSaleOrders() {
         // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
         await syncSalesOrderLines(clientDb, so, picking.id);
 
-        const writeDate = so.FechaActualizacion || so.Fecha;
+        const writeDate = so.FechaActualizacion || so.FechaCreacion;
 
-        if (writeDate && new Date(writeDate) > new Date(maxWriteDate)) {
-          maxWriteDate = writeDate;
+
+
+        const writeDateDate =
+          new Date(writeDate);
+
+        const maxWriteDateDate =
+          new Date(maxWriteDate);
+
+        console.log(
+          "writeDateDate:",
+          writeDateDate.toISOString()
+        );
+
+        console.log(
+          "maxWriteDateDate:",
+          maxWriteDateDate.toISOString()
+        );
+
+        if (
+          writeDate &&
+          writeDateDate.getTime() >
+          maxWriteDateDate.getTime()
+        ) {
+
+          maxWriteDate = new Date(
+            writeDateDate.getTime() + 1000
+          );
+
         }
       }
 
@@ -91,7 +117,7 @@ export async function getActiveSaleOrders() {
       /* ==========================
          ✅ SUCCESS
       ========================== */
-
+      console.log("LAST WRITE DATE: ", maxWriteDate);
       await clientDb.query(
         `
         UPDATE sync_control
@@ -213,24 +239,57 @@ AND (
   }
 }
 
+function formatERPDate(date) {
+
+  const d = new Date(date);
+
+  const yyyy = d.getFullYear();
+
+  const mm = String(
+    d.getMonth() + 1
+  ).padStart(2, "0");
+
+  const dd = String(
+    d.getDate()
+  ).padStart(2, "0");
+
+  const hh = String(
+    d.getHours()
+  ).padStart(2, "0");
+
+  const mi = String(
+    d.getMinutes()
+  ).padStart(2, "0");
+
+  const ss = String(
+    d.getSeconds()
+  ).padStart(2, "0");
+
+  const ms = String(
+    d.getMilliseconds()
+  ).padStart(3, "0");
+
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}.${ms}`;
+}
+
 
 export async function fetchSalesOrdersTest(lastWriteDate) {
   try {
-    const fechaInicio = new Date(lastWriteDate)
-    .toLocaleString("sv-SE", {
-      timeZone: "America/New_York"
-    })
-    .replace(" ", "T");
+    const fechaInicio =
+      formatERPDate(lastWriteDate);
 
-  const fechaFin = new Date()
-    .toLocaleString("sv-SE", {
-      timeZone: "America/New_York"
-    })
-    .replace(" ", "T");
+    const fechaFin =
+      formatERPDate(new Date());
 
-  console.log("FECHA INICIO:", fechaInicio);
+    console.log(
+      "FECHA INICIO:",
+      fechaInicio
+    );
 
-  console.log("FECHA FIN:", fechaFin);
+    console.log(
+      "FECHA FIN:",
+      fechaFin
+    );
 
     // 🔥 Toggle filtros
     const useCreatedDate = false;
@@ -307,8 +366,13 @@ async function syncSalesOrder(clientDb, order) {
     const locationId = null;
     const locationDestId = null;
 
+    const erp_tienda_id = order.TiendaId ?? null;
+    const erp_vendedor_id = order.VendedorId ?? null;
+
     // 🔹 Cliente
     const supplierName = order.NombreCliente ?? null;
+    const erp_cliente_id = order.ClienteId ?? null;
+    const erp_direccion_cliente = order.DireccionCliente ?? null;
 
     // 🔹 Estado
     const statusMap = {
@@ -318,28 +382,38 @@ async function syncSalesOrder(clientDb, order) {
 
     const state = statusMap[order.Estatus] || "draft";
 
+    console.log("🟥🟨 ESTATUS FINAL: ", state);
+
     /* =========================
        1️⃣ UPDATE
     ========================= */
 
     const updateResult = await clientDb.query(`
-      UPDATE stock_picking
-      SET
-        sale_id = $1,
-        state = $2,
-        erp_location_id = $3,
-        erp_location_dest_id = $4,
-        order_name = $5,
-        erp_cliente = $6
-      WHERE erp_id = $7
-      RETURNING id, order_name
-    `, [
+  UPDATE stock_picking
+  SET
+    sale_id = $1,
+    state = $2,
+    erp_location_id = $3,
+    erp_location_dest_id = $4,
+    order_name = $5,
+    erp_cliente = $6,
+    erp_cliente_id = $7,
+    erp_direccion_cliente = $8,
+    erp_tienda_id = $9,
+    erp_vendedor_id = $10
+  WHERE erp_id = $11
+  RETURNING id, order_name
+`, [
       saleId,
       state,
       locationId,
       locationDestId,
       saleName,
       supplierName,
+      erp_cliente_id,
+      erp_direccion_cliente,
+      erp_tienda_id,
+      erp_vendedor_id,
       erpId
     ]);
 
@@ -359,19 +433,23 @@ async function syncSalesOrder(clientDb, order) {
     console.log("➕ INSERTANDO PICKING NUEVO");
 
     const insertResult = await clientDb.query(`
-      INSERT INTO stock_picking (
-        erp_id,
-        sale_id,
-        state,
-        picking_type,
-        erp_location_id,
-        erp_location_dest_id,
-        order_name,
-        erp_cliente
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      RETURNING id, order_name
-    `, [
+  INSERT INTO stock_picking (
+    erp_id,
+    sale_id,
+    state,
+    picking_type,
+    erp_location_id,
+    erp_location_dest_id,
+    order_name,
+    erp_cliente,
+    erp_cliente_id,
+    erp_direccion_cliente,
+    erp_tienda_id,
+    erp_vendedor_id
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+  RETURNING id, order_name
+`, [
       erpId,
       saleId,
       state,
@@ -379,7 +457,11 @@ async function syncSalesOrder(clientDb, order) {
       locationId,
       locationDestId,
       saleName,
-      supplierName
+      supplierName,
+      erp_cliente_id,
+      erp_direccion_cliente,
+      erp_tienda_id,
+      erp_vendedor_id
     ]);
 
     return {
@@ -420,7 +502,46 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
         `🚀 syncSalesOrderLines intento ${attempt + 1}`
       );
 
-  
+      const currentERPProducts = lines.map(
+        line => line.Item?.Id
+      );
+
+      console.log(
+        "🟩3️⃣ PRODUCTOS ERP ACTUALES:",
+        currentERPProducts
+      );
+
+      const deleteResult = await clientDb.query(
+        `
+  DELETE FROM stock_move
+  WHERE picking_id = $1
+  AND erp_product_id IS NOT NULL
+  AND erp_product_id != ALL($2::bigint[])
+  RETURNING id, erp_product_id, product_id
+  `,
+        [
+          pickingId,
+          currentERPProducts
+        ]
+      );
+
+      if (deleteResult.rows.length > 0) {
+
+        console.log(
+          "🗑️ MOVES ELIMINADOS:"
+        );
+
+        console.table(deleteResult.rows);
+
+      } else {
+
+        console.log(
+          "✅ NO HABÍA MOVES PARA ELIMINAR"
+        );
+
+      }
+
+
 
       /* =====================================
          1️⃣ RECORRER LÍNEAS
@@ -459,113 +580,22 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
            2️⃣ QUERY ÚNICO
         ===================================== */
 
-       /* =====================================
-   1️⃣ BUSCAR PICKING
-===================================== */
+        /* =====================================
+    1️⃣ BUSCAR PICKING
+ ===================================== */
 
-const pickingResult = await clientDb.query(
-  `
+        const pickingResult = await clientDb.query(
+          `
   SELECT
     id,
     name
   FROM stock_picking
   WHERE id = $1
   `,
-  [pickingIdInt]
-);
+          [pickingIdInt]
+        );
 
-if (!pickingResult.rows.length) {
-
-  console.log(
-    "⚠️ Picking no encontrado:",
-    pickingIdInt
-  );
-
-  continue;
-
-}
- console.log("BUSCAR PICKING", pickingResult.rows[0]);
-const picking = pickingResult.rows[0];
-
-const reference = picking.name;
-
-/* =====================================
-   2️⃣ BUSCAR PRODUCTO
-===================================== */
-
-const productResult = await clientDb.query(
-  `
-  SELECT
-    id,
-    uom_id
-  FROM products
-  WHERE erp_id = $1
-  LIMIT 1
-  `,
-  [erp_product_id]
-);
-
-if (!productResult.rows.length) {
-
-  console.log(
-    "❌ Producto no encontrado:",
-    erp_product_id
-  );
-
-  continue;
-
-}
-
- console.log("BUSCAR PRODUCTO", productResult.rows[0]);
-
-const product = productResult.rows[0];
-
-const product_id =
-  product.id;
-
-const product_uom_id =
-  product.uom_id;
-
-/* =====================================
-   3️⃣ VALIDAR SI MOVE EXISTE
-===================================== */
-
-const moveResult = await clientDb.query(
-  `
-  SELECT EXISTS (
-    SELECT 1
-    FROM stock_move
-    WHERE erp_product_id = $1
-    AND picking_id = $2
-  ) AS move_exists
-  `,
-  [
-    erp_product_id,
-    pickingIdInt
-  ]
-);
-
-const moveExists =
-  moveResult.rows[0].move_exists;
-
-  console.log("VALIDAR SI MOVE EXISTE", moveExists);
-
-console.log("RESULTADOS:", {
-  reference,
-  product_id,
-  product_uom_id,
-  moveExists
-});
-
-        console.log("🟥 PICKING:", pickingResult.rows);
-
-console.log("🟥 PRODUCT:", productResult.rows);
-
-console.log("🟥 MOVE:", moveResult.rows);
-
-
-
-       /* if (!result.rows.length) {
+        if (!pickingResult.rows.length) {
 
           console.log(
             "⚠️ Picking no encontrado:",
@@ -575,37 +605,128 @@ console.log("🟥 MOVE:", moveResult.rows);
           continue;
 
         }
+        console.log("BUSCAR PICKING", pickingResult.rows[0]);
+        const picking = pickingResult.rows[0];
 
-        const row = result.rows[0];
+        const reference = picking.name;
 
-        const reference =
-          row.reference;
+        /* =====================================
+           2️⃣ BUSCAR PRODUCTO
+        ===================================== */
+
+        const productResult = await clientDb.query(
+          `
+  SELECT
+    id,
+    uom_id
+  FROM products
+  WHERE erp_id = $1
+  LIMIT 1
+  `,
+          [erp_product_id]
+        );
+
+        if (!productResult.rows.length) {
+
+          console.log(
+            "❌ Producto no encontrado:",
+            erp_product_id
+          );
+
+          continue;
+
+        }
+
+        console.log("BUSCAR PRODUCTO", productResult.rows[0]);
+
+        const product = productResult.rows[0];
 
         const product_id =
-          row.product_id;
+          product.id;
 
         const product_uom_id =
-          row.product_uom_id;
+          product.uom_id;
+
+        /* =====================================
+           3️⃣ VALIDAR SI MOVE EXISTE
+        ===================================== */
+
+        const moveResult = await clientDb.query(
+          `
+  SELECT EXISTS (
+    SELECT 1
+    FROM stock_move
+    WHERE erp_product_id = $1
+    AND picking_id = $2
+  ) AS move_exists
+  `,
+          [
+            erp_product_id,
+            pickingIdInt
+          ]
+        );
 
         const moveExists =
-          row.move_exists;*/
+          moveResult.rows[0].move_exists;
 
-          /* =====================================
-   VALIDAR PRODUCTO
+        console.log("VALIDAR SI MOVE EXISTE", moveExists);
+
+        console.log("RESULTADOS:", {
+          reference,
+          product_id,
+          product_uom_id,
+          moveExists
+        });
+
+        console.log("🟥 PICKING:", pickingResult.rows);
+
+        console.log("🟥 PRODUCT:", productResult.rows);
+
+        console.log("🟥 MOVE:", moveResult.rows);
+
+
+
+        /* if (!result.rows.length) {
+ 
+           console.log(
+             "⚠️ Picking no encontrado:",
+             pickingIdInt
+           );
+ 
+           continue;
+ 
+         }
+ 
+         const row = result.rows[0];
+ 
+         const reference =
+           row.reference;
+ 
+         const product_id =
+           row.product_id;
+ 
+         const product_uom_id =
+           row.product_uom_id;
+ 
+         const moveExists =
+           row.move_exists;*/
+
+        /* =====================================
+ VALIDAR PRODUCTO
 ===================================== */
 
-if (!product_id) {
+        if (!product_id) {
 
-  console.log(
-    "❌ Producto no encontrado:",
-    erp_product_id
-  );
+          console.log(
+            "❌ Producto no encontrado:",
+            erp_product_id
+          );
 
-  continue;
+          continue;
 
-}
+        }
 
-        
+
 
         /* =====================================
            3️⃣ UPDATE
@@ -641,7 +762,7 @@ if (!product_id) {
           }
 
           params.push(
-            erp_move_id,
+            erp_product_id,
             pickingIdInt
           );
 
@@ -657,7 +778,7 @@ if (!product_id) {
             SET
               ${updateFields.join(", ")}
 
-            WHERE erp_move_id = $${whereIndex1}
+            WHERE erp_product_id = $${whereIndex1}
             AND picking_id = $${whereIndex2}
             `,
             params
@@ -742,7 +863,7 @@ if (!product_id) {
          5️⃣ COMMIT
       ===================================== */
 
-     
+
 
 
 
@@ -784,4 +905,106 @@ if (!product_id) {
 
   }
 
+}
+
+
+
+export async function createConduce(payloadERP) {
+  try {
+
+    // 🔹 1. Formatear fecha
+    const fecha = new Date(payloadERP.Fecha)
+      .toISOString()
+      .slice(0, 19);
+
+    // 🔹 2. Construir detalles dinámicamente
+    const detallesXML = payloadERP.Detalles.map(det => `
+      <ConduceDetalle>
+
+        <ItemId>${det.ItemId}</ItemId>
+
+        <ItemNombre>${det.ItemNombre ?? ''}</ItemNombre>
+
+        <ItemCantidad>${det.ItemCantidad}</ItemCantidad>
+
+      </ConduceDetalle>
+    `).join("");
+
+    // 🔹 3. Construir XML SOAP
+    const xml = `
+<?xml version="1.0" encoding="utf-8"?>
+
+<soap:Envelope
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+ xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+
+  <soap:Body>
+
+    <CrearConduce xmlns="http://tempuri.org/">
+
+      <conduce>
+
+        <ClienteId>${payloadERP.ClienteId}</ClienteId>
+
+        <ClienteNombre>${payloadERP.ClienteNombre}</ClienteNombre>
+
+        <ClienteDireccion>${payloadERP.ClienteDireccion ?? ''}</ClienteDireccion>
+
+        <Fecha>${fecha}</Fecha>
+
+        <Estatus>${payloadERP.Estatus}</Estatus>
+
+        <TiendaId>${payloadERP.TiendaId}</TiendaId>
+
+        <VendedorId>${payloadERP.VendedorId}</VendedorId>
+
+        <Nota>${payloadERP.Nota ?? ''}</Nota>
+
+        <OrdenVentaId>${payloadERP.OrdenVentaId}</OrdenVentaId>
+
+        <ConduceDetalles>
+
+          ${detallesXML}
+
+        </ConduceDetalles>
+
+      </conduce>
+
+    </CrearConduce>
+
+  </soap:Body>
+
+</soap:Envelope>
+`;
+
+    console.log("🟨 XML CONDUCE:", xml);
+
+    // 🔹 4. Llamar ERP SOAP
+    const data = await callERP(
+      "Facturacion/ConduceService.asmx",
+      "http://tempuri.org/CrearConduce",
+      "CrearConduceResponse",
+      "CrearConduceResult",
+      xml
+    );
+
+    // 🔹 5. Validar respuesta
+    if (!data || data.Success === 0) {
+
+      console.log("🟥 ERP ERROR:", data?.Mensaje);
+
+      return null;
+    }
+
+    console.log("🟩 CONDUCE CREADO:", data);
+
+    return data;
+
+  } catch (error) {
+
+    console.error("🟥 createConduce error:", error.message);
+
+    return null;
+  }
 }

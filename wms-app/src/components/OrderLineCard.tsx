@@ -14,18 +14,30 @@ type Product = {
 type Props = {
   line: Product;
   validation?: boolean; // 👈 opcional
+  editable?: boolean; // 👈 NUEVO
+  onEdit?: () => void;
 };
 
-export default function OrderLineCard({ line, validation }: Props) {
+export default function OrderLineCard({
+  line,
+  validation,
+  editable,
+  onEdit,
+}: Props) {
+
   const differenceQty = line.received_qty - line.ordered_qty;
 
   const statusClass = validation
     ? "line-default"
-    : line.product_exists === false
-      ? "line-error"
-      : line.received_qty > 0
-        ? "line-ok"
+    : line.received_qty > 0
+      ? "line-ok"
+      : line.product_exists === false
+        ? "line-error"
         : "line-default";
+
+
+
+
 
 
   return (
@@ -44,6 +56,15 @@ export default function OrderLineCard({ line, validation }: Props) {
         {differenceQty}
       </div>
 
+      {/* 👇 BOTÓN SOLO SI editable = true */}
+      {editable && (
+        <button
+          className="line-edit-btn"
+          onClick={onEdit}
+        >
+          Editar
+        </button>
+      )}
     </div>
   );
 }

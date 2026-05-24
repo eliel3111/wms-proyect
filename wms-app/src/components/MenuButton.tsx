@@ -27,19 +27,22 @@ export default function MenuButton({
   };
 
   return (
-    <div
-      className="menu-button"
-      onClick={handleClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          handleClick();
-        }
-      }}
-    >
+  <div
+    className="menu-button"
+    onClick={handleClick}
+    role="button"
+    tabIndex={0}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        handleClick();
+      }
+    }}
+  >
+    <div className="menu-button__icon-card">
       <div className="menu-button__icon">{icon}</div>
-      <div className="menu-button__title">{title}</div>
     </div>
-  );
+
+    <div className="menu-button__title">{title}</div>
+  </div>
+);
 }

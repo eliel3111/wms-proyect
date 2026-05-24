@@ -227,7 +227,7 @@ WHERE r.id = $1;
       company_slug: header.company_slug,
     };
 
-   // console.log("📄 HEADER PDF:", headerPDF);
+    // console.log("📄 HEADER PDF:", headerPDF);
     //console.log("📄 HEADER PDF:", headerPDF);
 
     //-------------------------------------------------
@@ -266,15 +266,56 @@ WHERE r.id = $1;
         ]
       );
     }
+    
+    //------------------------------------------------------
+    // CALCULAR CANTIDAD REAL QUE DEBE ENTRAR
 
+    const stockLinesAdjusted = [];
+
+for (const line of stockLines) {
+
+  const receiptRes = await client.query(`
+    SELECT received_qty
+    FROM receipt_lines
+    WHERE purchase_order_line_id = $1
+    ORDER BY id DESC
+    LIMIT 2
+  `, [line.id]);
+
+  let restante = 0;
+
+  if (receiptRes.rowCount >= 2) {
+
+    const ultima = Number(receiptRes.rows[0].received_qty);
+    const penultima = Number(receiptRes.rows[1].received_qty);
+
+    restante = ultima - penultima;
+
+  } else if (receiptRes.rowCount === 1) {
+
+    restante = Number(receiptRes.rows[0].received_qty);
+
+  }
+
+  if (restante <= 0) {
+    console.log(`⚠️ Cantidad inválida (${restante}) para SKU: ${line.sku}`);
+    continue;
+  }
+
+  stockLinesAdjusted.push({
+    ...line,
+    restante
+  });
+}
     //----------------------------------------------------
     //PONER LA CANTIDAD POR UBICACION POR CADA PRODUCTO
-    if (stockLines.length > 0) {
+    console.log("🔴🔴🔴 STOCKLINES: ", stockLinesAdjusted);
+    if (stockLinesAdjusted.length > 0) {
 
       const values = [];
       const params = [];
 
-      stockLines.forEach((line, i) => {
+      stockLinesAdjusted.forEach((line, i) => {
         const base = i * 4; // 👈 ahora son 4 columnas
 
         values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
@@ -283,7 +324,7 @@ WHERE r.id = $1;
           warehouseId,          // ✅ warehouse_id
           locationId,           // ✅ location_id
           line.sku,             // product_sku
-          line.received_qty     // qty
+          line.restante     // qty
         );
       });
 
@@ -305,12 +346,12 @@ WHERE r.id = $1;
     //------------------------------------------------
     // REGISTRAR MOVIMIENTOS DE INVENTARIO (HISTORIAL)
 
-    if (stockLines.length > 0) {
+    if (stockLinesAdjusted.length > 0) {
 
       const moveValues = [];
       const moveParams = [];
 
-      stockLines.forEach((line, i) => {
+      stockLinesAdjusted.forEach((line, i) => {
         const base = i * 7;
 
         moveValues.push(`
@@ -322,7 +363,7 @@ WHERE r.id = $1;
           line.sku,              // ✅ product_sku
           null,                  // from_location_id (entra al almacén)
           locationId,            // to_location_id
-          line.received_qty,     // qty
+          line.restante,     // qty
           "RECEIPT",             // movement_type
           "RECEPTION",           // reference_type
           receiptId.toString()   // reference_id
@@ -349,18 +390,18 @@ WHERE r.id = $1;
 
 
     //INTEGRACION 🟨🟨🟨🟨🟨🟨🟨
-const payloadERP = await buildWarehouseEntry(
+    const payloadERP = await buildWarehouseEntry(
       client,
       stockLines,
       purchaseOrderId
     );
 
-      if (payloadERP) {
-        const response = await createWarehouseEntry(payloadERP);
+    if (payloadERP) {
+      const response = await createWarehouseEntry(payloadERP);
 
-console.log("🟨🟨",response);
+      console.log("🟨🟨", response);
 
-}
+    }
 
 
 
@@ -876,7 +917,7 @@ export async function getReceivingByPoId(req, res) {
       [purchaseOrder.id]
     );
 
-    console.log("PUCHASE ORDER LINES: ",linesResult.rows);
+    console.log("PUCHASE ORDER LINES: ", linesResult.rows);
 
     /* 3️⃣ Obtener TODOS los SKUs */
     const skus = linesResult.rows.map(line => line.sku);
@@ -908,12 +949,12 @@ export async function getReceivingByPoId(req, res) {
     const enrichedLines = linesResult.rows.map(line => {
 
       const dbQty = line.received_qty ?? 0;
-const receiptQty = maxReceivedMap.get(line.id) ?? 0;
+      const receiptQty = maxReceivedMap.get(line.id) ?? 0;
 
       return {
         ...line,
         received_qty: dbQty,
-  min_received_qty: receiptQty,
+        min_received_qty: receiptQty,
         barcodes: barcodeMap.get(line.sku) || [],
         product_exists: (barcodeMap.get(line.sku) || []).length > 0
       };
@@ -1106,28 +1147,7 @@ export async function confirmingIdOrder(req, res) {
 export async function gettingOpenOrders(req, res) {
   try {
 
-    // 1️⃣ Ejecutar sync
-     console.time("⏱ Tiempo total sync");
-
-    // 🔹 Sync Items
-    try {
-      console.log("🔄 Sync Items...");
-      await syncAllItems();
-    } catch (err) {
-      console.error("❌ Error en syncAllItems:", err.message);
-    }
-
-    // 🔹 Sync Purchase Orders
-    try {
-      console.log("🔄 Sync Purchase Orders...");
-      await syncAllPurchaseOrders();
-    } catch (err) {
-      console.error("❌ Error en syncAllPurchaseOrders:", err.message);
-    }
-
-    console.timeEnd("⏱ Tiempo total sync");
-
-    // 2️⃣ Traer órdenes actualizadas
+    // 1️⃣ Traer órdenes actualizadas
     const result = await db.query(`
       SELECT id, purchase_order_number
       FROM purchase_orders
@@ -1135,11 +1155,35 @@ export async function gettingOpenOrders(req, res) {
       ORDER BY created_at ASC
     `);
 
-    // 3️⃣ UNA SOLA RESPUESTA
-    return res.status(200).json({
+    // 2️⃣ RESPONDER AL FRONTEND
+    res.status(200).json({
       success: true,
-      message: "Full sync ejecutado",
+      message: "Orders fetched successfully",
       data: result.rows,
+    });
+
+    // 3️⃣ Ejecutar sync EN BACKGROUND
+    setImmediate(async () => {
+
+      console.time("⏱ Tiempo total sync");
+
+    // 🔹 Sync Items
+      try {
+        console.log("🔄 Sync Items...");
+        await syncAllItems();
+      } catch (err) {
+        console.error("❌ Error en syncAllItems:", err.message);
+      }
+
+    // 🔹 Sync Purchase Orders
+      try {
+        console.log("🔄 Sync Purchase Orders...");
+        await syncAllPurchaseOrders();
+      } catch (err) {
+        console.error("❌ Error en syncAllPurchaseOrders:", err.message);
+      }
+
+      console.timeEnd("⏱ Tiempo total sync");
     });
 
   } catch (error) {

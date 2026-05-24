@@ -27,7 +27,7 @@ export async function assignmentService() {
     FROM stock_move sm
     JOIN products p ON p.id = sm.product_id
     WHERE sm.picking_id = $1
-    AND sm.state IN ('confirmed', 'partially_available')
+    AND sm.state IN ('confirmed', 'partially_available', 'draft')
 `, [picking.id]);
 
             console.log("NUMERO DE PRODUCTOS EN UN PEDIDO", moves.rowCount);
@@ -82,19 +82,19 @@ export async function assignmentService() {
 
 
 
-/* ==============================
-   5️⃣ CREAR ASIGNACIÓN
-============================== */
+            /* ==============================
+               5️⃣ CREAR ASIGNACIÓN
+            ============================== */
 
-const existing = await client.query(`
+            const existing = await client.query(`
   SELECT 1
   FROM picking_assignments
   WHERE stock_picking_id = $1
 `, [picking.id]);
 
-if (existing.rowCount === 0) {
+            if (existing.rowCount === 0) {
 
-  await client.query(`
+                await client.query(`
     INSERT INTO picking_assignments (
       stock_picking_id,
       picker_id,
@@ -105,13 +105,13 @@ if (existing.rowCount === 0) {
     VALUES ($1, $2, NOW(), CURRENT_DATE, $3)
   `, [picking.id, elElegido, moves.rowCount]);
 
-  console.log("✅ Picking asignado correctamente");
+                console.log("✅ Picking asignado correctamente");
 
-  /* ==============================
-     4️⃣ ACTUALIZAR PICKING (SOLO SI INSERTÓ)
-  ============================== */
+                /* ==============================
+                   4️⃣ ACTUALIZAR PICKING (SOLO SI INSERTÓ)
+                ============================== */
 
-  await client.query(`
+                await client.query(`
     UPDATE stock_picking sp
     SET 
         state = 'assigned',
@@ -121,7 +121,7 @@ if (existing.rowCount === 0) {
     AND p.id = $2
   `, [picking.id, elElegido]);
 
-}
+            }
 
         }
 
@@ -317,21 +317,19 @@ async function service1(client) {
 
 
 
-//Buscar pickings o pedidos activos
 async function getActivePickings(client) {
 
     const result = await client.query(`
     SELECT id
-FROM stock_picking
-WHERE picking_type = 'outgoing'
-AND state != 'assigned'
-FOR UPDATE SKIP LOCKED
-  `);
+    FROM stock_picking
+    WHERE picking_type = 'outgoing'
+    AND state NOT IN ('assigned', 'cancel', 'done')
+    FOR UPDATE SKIP LOCKED
+    `);
 
     return result.rows;
 
 }
-
 //LOCK PICKING FOR UPDATE
 async function lockPicking(client, pickingId) {
 

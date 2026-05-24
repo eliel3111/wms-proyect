@@ -181,7 +181,7 @@
   display: flex;
   justify-content: flex-start; /* izquierda */
   align-items: center;
-
+  width: 100%;
   font-size: 14px;
   font-weight: 600;
   color: #333;
@@ -205,7 +205,7 @@
 .pick-user-location-empty {
   background: #FFD54F;
   border: 2px dashed #212121;
-  padding: 24px;
+  padding: 18PX 24px;
   gap: 15px;
   display: flex;
   flex-direction: column;
@@ -214,10 +214,12 @@
 .pick-user-product-empty {
   background: #FFD54F;
   border: 2px dashed #212121;
-  padding: 24px;
+  padding: 8px 24px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .section-qty{

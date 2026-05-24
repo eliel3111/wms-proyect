@@ -100,7 +100,7 @@ export default function PutawayPickPage() {
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
       if (e.key === "Enter") {
-        const scannedValue = scanBuffer.current.trim().toUpperCase();
+        const scannedValue = scanBuffer.current.trim();
 
         if (scannedValue) {
 

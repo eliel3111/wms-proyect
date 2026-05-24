@@ -47,6 +47,7 @@ type PendingPutawayLine = {
 export default function PutawayPickPage() {
   const navigate = useNavigate();
   const { openModal } = useModal();
+  const { closeModal } = useModal();
 
   const [loading, setLoading] = useState(true);
   const [pendingLines, setPendingLines] = useState<PendingPutawayLine[]>([]);
@@ -60,7 +61,7 @@ export default function PutawayPickPage() {
 
 
 
-  
+
   const qtyInputRef = useRef<HTMLInputElement | null>(null);
   const scanBuffer = useRef<string>("");
   const currentLineRef = useRef<PendingPutawayLine | null>(null);
@@ -117,9 +118,26 @@ export default function PutawayPickPage() {
 
         try {
           // 1️⃣ ¿Es producto pendiente?
+          const cleanScan = scannedValue.trim().toUpperCase();
+
           const foundLine = pendingLinesRef.current.find(
-            (line) => line.barcode?.trim().toUpperCase() === scannedValue
+            (line) =>
+              line.barcode?.trim().toUpperCase() === cleanScan ||
+              line.sku?.trim().toUpperCase() === cleanScan
           );
+
+          if (putLocationRef.current === null && !foundLine) {
+            openModal({
+              title: "Producto no válido",
+              message: "Este producto no está en el putaway."
+            });
+
+            scanBuffer.current = "";
+            return;
+          }
+
+          //console.log("🟥 foundline: ", foundLine);
+          //console.log("🟨 ubicasion actual:: ", putLocationRef.current);
 
           if (foundLine) {
             console.log("✅ PRODUCTO EN SESSION:", foundLine);
@@ -151,6 +169,7 @@ export default function PutawayPickPage() {
           setPutLocation(result.location);
           setCurrentLine(null);     // 🔥 limpiar producto
           setQty("");               // 🔥 limpiar cantidad (si existe)
+          closeModal();
 
         } catch (err) {
           console.error("❌ Error procesando scan:", err);

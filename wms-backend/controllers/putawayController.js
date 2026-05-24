@@ -474,7 +474,7 @@ export async function getPendingPutaway(req, res) {
 
     for (const line of linesResult.rows) {
       const barcodeResult = await getPrimaryBarcodeBySku(db, line.sku);
-
+ console.log("🟩🟩 BARCODES: ", barcodeResult.rows);
       enrichedLines.push({
         ...line,
         barcode: barcodeResult.rowCount > 0 ? barcodeResult.rows[0].barcode : null
@@ -831,3 +831,87 @@ export async function dropPutaway(req, res) {
 
 };
 
+
+
+// GET ALL PENDING PUTAWAY LINES FOR A USER
+export async function getPendingPutawayDrop(req, res) {
+  try {
+    console.log("🔥 GET /putaway/pending funcionando");
+
+    // 👉 si usas authMiddleware, normalmente viene de req.user
+    const userId = req.user?.id || req.query.userId;
+    console.log("🔥", userId);
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        code: "USER_REQUIRED",
+        message: "User id requerido"
+      });
+    }
+
+    // 1️⃣ Buscar sesión activa de putaway del usuario
+    const sessionResult = await db.query(`
+      SELECT id
+      FROM putaway_sessions
+      WHERE user_id = $1
+        AND status IN ('picking','putting')
+      ORDER BY started_at DESC
+      LIMIT 1
+    `, [userId]);
+
+    if (sessionResult.rowCount === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        session: null
+      });
+    }
+
+    const putawaySessionId = sessionResult.rows[0].id;
+
+    // 2️⃣ Buscar líneas pendientes (NO completed)
+    const linesResult = await db.query(`
+      SELECT
+        pl.id,
+        p.sku,
+        p.description,
+        p.uom,
+        pl.picked_qty,
+        pl.remaining_qty AS pending_qty
+      FROM putaway_lines pl
+      JOIN products p ON p.id = pl.product_id
+      WHERE pl.putaway_session_id = $1
+        AND pl.status IN ('picked','partial')
+      ORDER BY p.sku;
+    `, [putawaySessionId]);
+
+    const enrichedLines = [];
+
+    for (const line of linesResult.rows) {
+      const barcodeResult = await getPrimaryBarcodeBySku(db, line.sku);
+ console.log("🟩🟩 BARCODES: ", barcodeResult.rows);
+      enrichedLines.push({
+        ...line,
+        barcode: barcodeResult.rowCount > 0 ? barcodeResult.rows[0].barcode : null
+      });
+    }
+
+    // 3️⃣ Responder al frontend
+    return res.json({
+      success: true,
+      sessionId: putawaySessionId,
+      totalLines: enrichedLines.length,
+      data: enrichedLines
+    });
+
+
+  } catch (error) {
+    console.error("❌ Error en getPendingPutaway:", error);
+
+    return res.status(500).json({
+      success: false,
+      code: "INTERNAL_ERROR",
+      message: "Error buscando putaway pendientes"
+    });
+  }
+}

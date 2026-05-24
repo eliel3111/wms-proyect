@@ -298,10 +298,17 @@ export async function getBestShippingLocation(req, res) {
 
 
 export async function getPickingDifferences(req, res) {
+
   const { pickingId } = req.params;
+
+  console.log("🚀 getPickingDifferences iniciado");
+  console.log("📦 PARAMS:", req.params);
 
   // 🔴 VALIDAR ID
   if (!pickingId) {
+
+    console.log("❌ PICKING_ID_REQUIRED");
+
     return res.status(400).json({
       success: false,
       message: "PICKING_ID_REQUIRED",
@@ -310,7 +317,12 @@ export async function getPickingDifferences(req, res) {
 
   const id = Number(pickingId);
 
+  console.log("🔢 PICKING ID:", id);
+
   if (isNaN(id)) {
+
+    console.log("❌ INVALID_PICKING_ID");
+
     return res.status(400).json({
       success: false,
       message: "INVALID_PICKING_ID",
@@ -318,6 +330,9 @@ export async function getPickingDifferences(req, res) {
   }
 
   try {
+
+    console.log("🔍 BUSCANDO PICKING...");
+
     // 1️⃣ VALIDAR PICKING
     const pickingResult = await db.query(
       `
@@ -329,7 +344,15 @@ export async function getPickingDifferences(req, res) {
       [id]
     );
 
+    console.log(
+      "📦 PICKING RESULT:",
+      pickingResult.rows
+    );
+
     if (pickingResult.rowCount === 0) {
+
+      console.log("❌ PICKING_NOT_FOUND");
+
       return res.status(404).json({
         success: false,
         message: "PICKING_NOT_FOUND",
@@ -338,13 +361,25 @@ export async function getPickingDifferences(req, res) {
 
     const picking = pickingResult.rows[0];
 
+    console.log("✅ PICKING ENCONTRADO:", picking);
+
     // 2️⃣ VALIDAR STATE
+    console.log("📌 PICKING STATE:", picking.state);
+
     if (picking.state !== "assigned") {
+
+      console.log("❌ PICKING_NOT_ASSIGNED");
+
       return res.status(409).json({
         success: false,
         message: "PICKING_NOT_ASSIGNED",
+        data: {
+          current_state: picking.state
+        }
       });
     }
+
+    console.log("🔍 BUSCANDO DIFERENCIAS...");
 
     // 3️⃣ BUSCAR LÍNEAS CON DIFERENCIA
     const linesResult = await db.query(
@@ -365,7 +400,19 @@ export async function getPickingDifferences(req, res) {
       [id]
     );
 
+    console.log(
+      "📋 LÍNEAS CON DIFERENCIA:",
+      linesResult.rows
+    );
+
+    console.log(
+      "📊 TOTAL DIFERENCIAS:",
+      linesResult.rowCount
+    );
+
     // 4️⃣ RESPONSE
+    console.log("✅ RESPUESTA EXITOSA");
+
     return res.status(200).json({
       success: true,
       data: {
@@ -377,7 +424,14 @@ export async function getPickingDifferences(req, res) {
     });
 
   } catch (error) {
-    console.error("🔥 ERROR getPickingDifferences:", error);
+
+    console.error("🔥 ERROR getPickingDifferences:");
+
+    console.error("MESSAGE:", error.message);
+
+    console.error("STACK:", error.stack);
+
+    console.error("FULL ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -385,7 +439,6 @@ export async function getPickingDifferences(req, res) {
     });
   }
 }
-
 
 
 
@@ -1139,12 +1192,13 @@ export async function reassignPicking(req, res) {
     await client.query(
       `
   UPDATE stock_picking 
-  SET user_id = $1 
+  SET 
+      user_id = $1,
+      state = 'assigned'
   WHERE id = $2
   `,
       [userIdObtenido, pickingId]
     );
-
     // 🔹 6. Upsert eficiente en picking_assignments
     console.log("🔄 Upsert picking_assignments");
 

@@ -3,12 +3,18 @@
     grid-template-columns:
         140px
         /* Código */
+
         1fr
         /* Descripción */
+
         120px
-        /* Cantidad recibida */
-        120px;
-    /* Diferencia */
+        /* Cantidad */
+
+        120px
+        /* Diferencia */
+
+        100px;
+        /* Editar 👈 NUEVO */
 
     gap: 12px;
     padding: 10px 14px;
@@ -52,15 +58,21 @@
 .order-line {
 
     display: grid;
-    grid-template-columns:
+     grid-template-columns:
         140px
         /* SKU */
+
         1fr
         /* descripción */
+
         120px
         /* qty */
-        120px;
-    /* diferencia */
+
+        120px
+        /* diferencia */
+
+        100px;
+        /* editar 👈 NUEVO */
     align-items: center;
     /* 👈 alineación vertical */
     justify-content: flex-start;
@@ -109,7 +121,7 @@
 }
 
 .line-desc {
-    margin-top: 6px;
+    
     font-size: 14px;
     opacity: 0.9;
 
@@ -134,6 +146,24 @@
     margin-bottom: 12px;
 }
 
+.line-edit-btn {
+    border: none;
+    background: #2563eb;
+    color: white;
+
+    padding: 7px 12px;
+    border-radius: 6px;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.line-edit-btn:hover {
+    opacity: 0.9;
+}
+
 
 
 @media (max-width: 768px) {
@@ -156,10 +186,27 @@
             /* SKU */
             1fr
             /* descripción */
-            70px
+            60px
             /* qty */
-            60px;
+            45px;
         /* diferencia */
         gap: 7px;
     }
+
+    .editar {
+        display: none;
+    }
+
+    .line-sku {
+    font-weight: 700;
+    text-align: left;
+
+    width: 65px;
+    max-width: 65px;
+
+    word-break: break-word;
+    overflow-wrap: break-word;
+
+    white-space: normal;
+}
 }
