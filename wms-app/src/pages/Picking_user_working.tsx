@@ -27,6 +27,7 @@ export default function PickingRoute() {
         code: string;
         sku: string;
         description: string;
+        erp_name?: string | null;
     };
 
     type Location = {
@@ -54,7 +55,7 @@ export default function PickingRoute() {
 
     const [fromLocation, setFromLocation] = useState<Location | null>(null);
     const fromLocationRef = useRef<Location | null>(null);
-
+    const qtyInputRef = useRef<HTMLInputElement | null>(null);
 
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const selectedProductRef = useRef<Product | null>(null);
@@ -302,7 +303,12 @@ export default function PickingRoute() {
 
 
         setFromLocation(location);   // ✅ guardar ubicación
+        setSelectedProduct({
+            id: -1,
+            sku: ""
+        } as any);
         setQty("");                        // 🔥 limpiar cantidad
+
     }
 
     // FUNCTION: Handle scanned product
@@ -320,19 +326,27 @@ export default function PickingRoute() {
             });
             return;
         }
-        console.log(product)
+        //console.log(product)
 
 
-        console.log("📍 UBICACIÓN ACTUAL:", fromLocationRef.current);
-        console.log("📍 LIINEA ACTUAL:", currentLineRef.current);
+        //console.log("📍 UBICACIÓN ACTUAL:", fromLocationRef.current);
+        //console.log("📍 LIINEA ACTUAL:", currentLineRef.current);
 
         setSelectedProduct({
             id: Number(product.id),
             sku: product.sku,
         });
         setQty("");
+        console.log("SKU ESCANEADO:", JSON.stringify(product.sku));
+        console.log("SKU LINEA:", JSON.stringify(currentLineRef.current?.sku));
+        console.log("CURRENT LINE:", currentLineRef.current);
 
-
+        if (product.sku === currentLineRef.current?.sku) {
+            console.log("✅ Es el mismo código");
+            focusQtyInput();
+        } else {
+            console.log("❌ No es el mismo código");
+        }
 
     }
 
@@ -469,6 +483,10 @@ export default function PickingRoute() {
                 message: "No se pudo guardar la información"
             });
         }
+    }
+
+    function focusQtyInput() {
+        qtyInputRef.current?.focus();
     }
 
     function closeModals() {
@@ -651,15 +669,16 @@ export default function PickingRoute() {
                             <OrderLineCard
                                 key={line.id}
                                 editable={canEdit}
-
                                 onEdit={() => handleEditLine(line.id)}
-
                                 line={{
-                                    id: line.product_id,
+                                    id: Number(line.product_id),
                                     sku: line.sku,
                                     description: line.description,
                                     ordered_qty: Math.trunc(Number(line.product_uom_qty)),
                                     received_qty: Math.trunc(Number(line.qty_done)),
+                                    min_received_qty: 0,
+                                    erp_name: line.erp_name,
+
                                     product_exists: true,
                                     barcodes: [],
                                 }}
@@ -738,6 +757,7 @@ export default function PickingRoute() {
                             <div className="pick-user-qty-div-a">
                                 <div className="block-title">Cantidad:</div>
                                 <input
+                                    ref={qtyInputRef}
                                     className="qty-input"
                                     type="number"
                                     value={qty}

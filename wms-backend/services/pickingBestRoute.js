@@ -82,6 +82,21 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
     });
   }
   //console.log("QUE ES ESTO? ", inventoryMap);
+
+  const warehouseResult = await client.query(`
+  SELECT id, erp_warehouse_id
+  FROM warehouses
+  WHERE is_default = true
+    AND status = 'ACTIVE'
+  LIMIT 1
+`);
+
+if (warehouseResult.rowCount === 0) {
+  throw new Error("No existe warehouse por defecto");
+}
+
+const warehouseId = warehouseResult.rows[0].id;
+
   // ==============================
   // 6️⃣ CONFIG + FALLBACK
   // ==============================
@@ -90,7 +105,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   let defaultLocation = null;
 
   if (config.allow_picking_without_locations) {
-    const warehouseId = inventoryResult.rows[0]?.warehouse_id || 1;
+    
     defaultLocation = await getOrCreateDefaultLocation(client, warehouseId);
   }
 
@@ -542,7 +557,9 @@ export async function getMoveLinesOrderedByLocation(client, pickingId) {
         l.code,
 
         p.sku,
-        p.description
+        p.description,
+        p.erp_name,
+        p.erp_sku
 
       FROM stock_move_line sml
 

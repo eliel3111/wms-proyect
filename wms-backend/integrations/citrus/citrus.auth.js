@@ -1,11 +1,11 @@
 import axios from "axios";
 import { parseStringPromise } from "xml2js";
 
-const ERP_URL = "https://testapi.citrus.com.do/40/Seguridad/SeguridadService.asmx";
+const ERP_URL = "https://api.citrus.com.do/40/Seguridad/SeguridadService.asmx";
 
 // 🔐 credenciales ERP
 const ERP_USER = "api";
-const ERP_PASS = "2yMFKI3c2g";
+const ERP_PASS = "8jZ0u5puIBlC9nMu";
 const ERP_COMPANY = "garlascontrol";
 
 // 🧠 memoria interna

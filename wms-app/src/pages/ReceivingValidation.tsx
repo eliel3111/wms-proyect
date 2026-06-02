@@ -14,6 +14,9 @@ type Diferencia = {
     received_qty: number;
     product_exists: boolean;
     barcodes: string[];
+    erp_name: string | null;
+    erp_sku: string | null;
+    erp_id: number;
 };
 
 

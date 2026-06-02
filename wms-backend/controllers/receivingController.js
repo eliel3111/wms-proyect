@@ -97,15 +97,26 @@ export async function CloseReception(req, res) {
     // BUSCAR LA DESCRIPCION DE LOS PRODUCTOS DE LA ORDEN
     const productsResult = await client.query(
       `
-      SELECT sku, description
-      FROM products
-      WHERE sku = ANY($1)
-      `,
+  SELECT
+    sku,
+    description,
+    erp_name,
+    erp_sku,
+    erp_id
+  FROM products
+  WHERE sku = ANY($1)
+  `,
       [skus]
     );
     const productMap = {};
+
     for (const p of productsResult.rows) {
-      productMap[p.sku] = p.description;
+      productMap[p.sku] = {
+        description: p.description,
+        erp_name: p.erp_name,
+        erp_sku: p.erp_sku,
+        erp_id: p.erp_id,
+      };
     }
 
     //------------------------------------------------
@@ -188,12 +199,23 @@ WHERE r.id = $1;
     // AGREGAR TODAS LAS DESCRIPCIONES PARA LAS LINES PDF
     const enrichedLines = lines.map((line, index) => {
       const difference_qty = line.received_qty - line.ordered_qty;
+      const productInfo = productMap[line.sku] || {};
 
       return {
         line_no: index + 1,
         id: line.id,                // 🔢 1,2,3...
         sku: line.sku,
         description: productMap[line.sku] || "SIN DESCRIPCIÓN",
+        erp_name:
+          productInfo.erp_name || null,
+
+        erp_sku:
+          productInfo.erp_sku || null,
+
+        erp_id:
+          productInfo.erp_id || null,
+
+        ordered_qty: line.ordered_qty,
         ordered_qty: line.ordered_qty,
         received_qty: line.received_qty,
         difference_qty,                    // ➖ calculado
@@ -266,15 +288,15 @@ WHERE r.id = $1;
         ]
       );
     }
-    
+
     //------------------------------------------------------
     // CALCULAR CANTIDAD REAL QUE DEBE ENTRAR
 
     const stockLinesAdjusted = [];
 
-for (const line of stockLines) {
+    for (const line of stockLines) {
 
-  const receiptRes = await client.query(`
+      const receiptRes = await client.query(`
     SELECT received_qty
     FROM receipt_lines
     WHERE purchase_order_line_id = $1
@@ -282,40 +304,56 @@ for (const line of stockLines) {
     LIMIT 2
   `, [line.id]);
 
-  let restante = 0;
+      let restante = 0;
 
-  if (receiptRes.rowCount >= 2) {
+      if (receiptRes.rowCount >= 2) {
 
-    const ultima = Number(receiptRes.rows[0].received_qty);
-    const penultima = Number(receiptRes.rows[1].received_qty);
+        const ultima = Number(receiptRes.rows[0].received_qty);
+        const penultima = Number(receiptRes.rows[1].received_qty);
 
-    restante = ultima - penultima;
+        restante = ultima - penultima;
 
-  } else if (receiptRes.rowCount === 1) {
+      } else if (receiptRes.rowCount === 1) {
 
-    restante = Number(receiptRes.rows[0].received_qty);
+        restante = Number(receiptRes.rows[0].received_qty);
 
-  }
+      }
 
-  if (restante <= 0) {
-    console.log(`⚠️ Cantidad inválida (${restante}) para SKU: ${line.sku}`);
-    continue;
-  }
+      if (restante <= 0) {
+        console.log(`⚠️ Cantidad inválida (${restante}) para SKU: ${line.sku}`);
+        continue;
+      }
 
-  stockLinesAdjusted.push({
-    ...line,
-    restante
-  });
-}
+      stockLinesAdjusted.push({
+        ...line,
+        restante
+      });
+    }
     //----------------------------------------------------
     //PONER LA CANTIDAD POR UBICACION POR CADA PRODUCTO
-    console.log("🔴🔴🔴 STOCKLINES: ", stockLinesAdjusted);
+    console.log("====================================");
+    console.log("📦 INVENTORY UPSERT");
+    console.log("====================================");
+
+    console.log("🏬 WAREHOUSE ID:", warehouseId);
+    console.log("📍 LOCATION ID:", locationId);
+    console.log("📦 STOCK LINES:", JSON.stringify(stockLinesAdjusted, null, 2));
     if (stockLinesAdjusted.length > 0) {
 
       const values = [];
       const params = [];
 
       stockLinesAdjusted.forEach((line, i) => {
+
+        console.log(`📦 LINEA ${i + 1}`);
+        console.log({
+          sku: line.sku,
+          qty: line.restante,
+          warehouseId,
+          locationId
+        });
+
+
         const base = i * 4; // 👈 ahora son 4 columnas
 
         values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
@@ -327,6 +365,14 @@ for (const line of stockLines) {
           line.restante     // qty
         );
       });
+
+      console.log("📋 VALUES SQL:");
+      console.log(values);
+
+      console.log("📋 PARAMS SQL:");
+      console.log(params);
+
+
 
       const upsertInventorySQL = `
     INSERT INTO inventory_by_location
@@ -341,6 +387,10 @@ for (const line of stockLines) {
 
       await client.query(upsertInventorySQL, params);
     }
+
+    console.log("✅ UPSERT COMPLETADO");
+    console.log("📦 INVENTARIO AFECTADO:");
+
 
 
     //------------------------------------------------
@@ -389,7 +439,7 @@ for (const line of stockLines) {
     }
 
 
-    //INTEGRACION 🟨🟨🟨🟨🟨🟨🟨
+    /*//INTEGRACION 🟨🟨🟨🟨🟨🟨🟨
     const payloadERP = await buildWarehouseEntry(
       client,
       stockLines,
@@ -401,7 +451,7 @@ for (const line of stockLines) {
 
       console.log("🟨🟨", response);
 
-    }
+    }*/
 
 
 
@@ -458,12 +508,17 @@ for (const line of stockLines) {
     //MANDAR PDF POR CORREO
 
     // después de generar el PDF
-    await sendReceiptEmail({
-      to: header.company_receipt_email,
-      pdfBuffer: pdf,
-      receiptCode: header.receipt_code,
-      companyName: header.company_slug,
-    });
+await sendReceiptEmail({
+  to: [
+    "Cmerino@garlascontrol.com",
+    "Jdaniel@garlascontrol.com",
+    "Bdeaza@garlascontrol.com",
+    "eliel3111@gmail.com"
+  ],
+  pdfBuffer: pdf,
+  receiptCode: header.receipt_code,
+  companyName: header.company_slug,
+});
 
 
     return res.status(200).json({
@@ -587,19 +642,29 @@ export async function getReceivingDifferences(req, res) {
     /* 3️⃣ Buscar líneas con diferencias */
     const linesResult = await db.query(
       `
-            SELECT
-                id,
-                sku,
-                description,
-                ordered_qty,
-                received_qty,
-                difference_qty,
-                product_exists
-            FROM purchase_order_lines
-            WHERE purchase_order_id = $1
-              AND ordered_qty <> received_qty
-            ORDER BY id ASC
-            `,
+  SELECT
+      pol.id,
+      pol.sku,
+      pol.description,
+      pol.ordered_qty,
+      pol.received_qty,
+      pol.difference_qty,
+      pol.product_exists,
+
+      p.erp_name,
+      p.erp_sku,
+      p.erp_id
+
+  FROM purchase_order_lines pol
+
+  LEFT JOIN products p
+      ON p.sku = pol.sku
+
+  WHERE pol.purchase_order_id = $1
+    AND pol.ordered_qty <> pol.received_qty
+
+  ORDER BY pol.id ASC
+  `,
       [purchaseOrderId]
     );
 
@@ -608,6 +673,8 @@ export async function getReceivingDifferences(req, res) {
       ...line,
       barcodes: "NO-NEEDED"
     }));
+
+    console.log(enrichedLines);
 
     /* 4️⃣ Respuesta */
     return res.status(200).json({
@@ -924,7 +991,33 @@ export async function getReceivingByPoId(req, res) {
     console.log("ESTOS SON LOS SKUS", skus);
     /* 4️⃣ Buscar barcodes */
     let barcodeMap = new Map();
+    let erpNameMap = new Map();
+    let erpSkuMap = new Map();
+    let erpIdMap = new Map();
 
+    if (skus.length > 0) {
+
+      const productResult = await db.query(
+        `
+  SELECT
+    sku,
+    erp_name,
+    erp_sku,
+    erp_id
+  FROM products
+  WHERE sku = ANY($1)
+  `,
+        [skus]
+      );
+
+      productResult.rows.forEach(row => {
+
+        erpNameMap.set(row.sku, row.erp_name);
+        erpSkuMap.set(row.sku, row.erp_sku);
+        erpIdMap.set(row.sku, row.erp_id);
+
+      });
+    }
     if (skus.length > 0) {
       const barcodeResult = await db.query(
         `
@@ -956,7 +1049,10 @@ export async function getReceivingByPoId(req, res) {
         received_qty: dbQty,
         min_received_qty: receiptQty,
         barcodes: barcodeMap.get(line.sku) || [],
-        product_exists: (barcodeMap.get(line.sku) || []).length > 0
+        product_exists: (barcodeMap.get(line.sku) || []).length > 0,
+        erp_name: erpNameMap.get(line.sku) || null,
+        erp_sku: erpSkuMap.get(line.sku) || null,
+        erp_id: erpIdMap.get(line.sku) || null
       };
     });
 
@@ -1162,7 +1258,7 @@ export async function gettingOpenOrders(req, res) {
       data: result.rows,
     });
 
-    // 3️⃣ Ejecutar sync EN BACKGROUND
+    /*// 3️⃣ Ejecutar sync EN BACKGROUND
     setImmediate(async () => {
 
       console.time("⏱ Tiempo total sync");
@@ -1184,7 +1280,7 @@ export async function gettingOpenOrders(req, res) {
       }
 
       console.timeEnd("⏱ Tiempo total sync");
-    });
+    });*/
 
   } catch (error) {
 

@@ -39,13 +39,13 @@ const app = express();
 app.get("/alegra", async (req, res) => {
   try {
 
-/*ALMACEN
+
 const warehouses = await alegraWarehousesService.getWarehouses({status: 'active'});
-await upsertWarehouses(warehouses);*/
+await upsertWarehouses(warehouses);
 
 
 
-  /*  
+   
 //PRODUCTOS
 let allProducts = [];
   let start = 0;
@@ -74,9 +74,9 @@ let allProducts = [];
   } while (allProducts.length < total);
 
 
- //console.log("TOTAL DE PRODUCTOS", allProducts);*/
+ //console.log("TOTAL DE PRODUCTOS", allProducts);
 
- //PRUEBA DE 30
+ /*PRUEBA DE 30
  let allProducts = [];
 
 const response = await alegraItemsService.getItems({
@@ -88,7 +88,7 @@ const response = await alegraItemsService.getItems({
 
 allProducts = response.data;
 
-//console.log(allProducts);
+//console.log(allProducts);*/
 
 const BATCH_SIZE = 100;
 const CONCURRENCY = 1;

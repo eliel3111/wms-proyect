@@ -6,10 +6,21 @@ import { moveInventoryBetweenLocations, createInventoryMovement } from "../servi
 // CREATE A PUTAWAY LINE
 export async function createPutawayLine(req, res) {
 
-  console.log("ESTA ENTRANDO AL END POINT");
-  console.log(req.body);
+  console.log("========================================");
+  console.log("🚀 CREATE PUTAWAY LINE");
+  console.log("========================================");
+
+  console.log("📥 BODY:", req.body);
+  console.log("👤 USER:", req.user);
   const { productId, fromLocationId, qty } = req.body;
   const userId = req.user.id;
+  const numericQty = Number(qty);
+
+  console.log("📦 PRODUCT ID:", productId);
+  console.log("📍 FROM LOCATION:", fromLocationId);
+  console.log("🔢 QTY ORIGINAL:", qty);
+  console.log("🔢 QTY NUMBER:", numericQty);
+  console.log("🔢 QTY TYPE:", typeof qty);
 
   const client = await db.connect();
 
@@ -38,12 +49,15 @@ export async function createPutawayLine(req, res) {
       FOR UPDATE
     `, [userId]);
 
+    console.log("📄 SESSION RESULT:", sessionResult.rows);
+
     if (sessionResult.rowCount === 0) {
+      console.log("❌ NO ACTIVE SESSION");
       throw { code: "NO_ACTIVE_SESSION" };
     }
 
     const sessionId = sessionResult.rows[0].id;
-    console.log(sessionId);
+    console.log("✅ SESSION ID:", sessionId);
 
     // 2️⃣ Validar que from_location es RECEIVING
     const locResult = await client.query(`
@@ -53,10 +67,11 @@ export async function createPutawayLine(req, res) {
     `, [fromLocationId]);
 
     if (locResult.rowCount === 0 || locResult.rows[0].location_type !== "RECEIVING") {
+      console.log("❌ INVALID RECEIVING LOCATION");
       throw { code: "INVALID_RECEIVING_LOCATION" };
     }
 
-    console.log("UBICACION", locResult.rows);
+    console.log("📍 LOCATION RESULT:", locResult.rows);
 
     // 3️⃣ Validar stock disponible (usando qty_available)
     const stockResult = await client.query(`
@@ -66,25 +81,34 @@ export async function createPutawayLine(req, res) {
   FOR UPDATE
 `, [product.sku, fromLocationId]);
 
+console.log("📦 STOCK RESULT:", stockResult.rows);
+
     if (stockResult.rowCount === 0 || Number(stockResult.rows[0].qty_available) < Number(qty)) {
       throw { code: "QTY_EXCEEDS_RECEIVING" };
     }
 
     const inventoryRow = stockResult.rows[0];
 
+    console.log("📦 INVENTARIO ENCONTRADO");
 
-    console.log("CANTIDAD DISPONIBLES", stockResult.rows[0].qty_on_hand);
+    console.log("📦 QTY ON HAND:", stockResult.rows[0].qty_on_hand);
+    console.log("📦 QTY RESERVED:", stockResult.rows[0].qty_reserved);
+    console.log("📦 QTY AVAILABLE:", stockResult.rows[0].qty_available);
+
+
+
 
 
     const userLocation = await getUserActiveLocation(client, req.user.id);
-
+console.log("📍 USER LOCATION:", userLocation);
     if (!userLocation) {
+      console.log("❌ USER LOCATION NOT FOUND");
       return res.status(404).json({
         success: false,
         error: "USER_LOCATION_NOT_FOUND"
       });
     }
-    console.log("SE BUSCO LA UBICACION DEL USUARIO: ", userLocation);
+    console.log("✅ USER LOCATION VALIDADA");
 
     // 4️⃣ Buscar si ya existe linea
     const existingLineResult = await client.query(`
@@ -97,13 +121,16 @@ export async function createPutawayLine(req, res) {
       FOR UPDATE
     `, [sessionId, productId, fromLocationId]);
 
-    console.log("CEHQUIAR SI LA LINEA EXISTE", existingLineResult);
+    console.log("📄 EXISTING LINE RESULT:", existingLineResult.rows);
     // Si existe entonces sumarle
     if (existingLineResult.rowCount > 0) {
+      console.log("🟡 EXISTE LINEA, ACTUALIZANDO");
       const line = existingLineResult.rows[0];
 
-      const newPickedQty = Number(line.picked_qty) + Number(qty);
 
+console.log("📄 LINE:", line);
+      const newPickedQty = Number(line.picked_qty) + Number(qty);
+console.log("🔢 NEW PICKED QTY:", newPickedQty);
       const updateResult = await client.query(`
         UPDATE putaway_lines
         SET picked_qty = $1,
@@ -115,18 +142,52 @@ export async function createPutawayLine(req, res) {
       `, [newPickedQty, userLocation.id, line.id]);
 
 
-      console.log("SE actualizo la linea: ", userLocation);
+
+      console.log("✅ LINEA ACTUALIZADA", userLocation);
+      console.log("📄 UPDATE RESULT:", updateResult.rows);
 
       //Aqui luego se puede buscar la informacion del almacen del usuario
       const warehouseId = 1;
 
-      await moveInventoryBetweenLocations(client, {
-        warehouseId: warehouseId,
+      console.log("========================================");
+      console.log("🚚 INICIANDO MOVIMIENTO INVENTARIO");
+      console.log("========================================");
+
+      console.log({
+        warehouseId,
         productSku: product.sku,
-        fromLocationId: fromLocationId,
+        fromLocationId,
         toLocationId: userLocation.id,
-        qty: qty
+        qty: numericQty
       });
+
+      try {
+
+        const movementResult =
+          await moveInventoryBetweenLocations(client, {
+            warehouseId,
+            productSku: product.sku,
+            fromLocationId,
+            toLocationId: userLocation.id,
+            qty: numericQty
+          });
+
+        console.log("✅ MOVIMIENTO EXITOSO");
+        console.log("📦 MOVEMENT RESULT:", movementResult);
+
+      } catch (movementError) {
+
+        console.log("========================================");
+        console.log("🔥 ERROR EN MOVIMIENTO INVENTARIO");
+        console.log("========================================");
+
+        console.log("❌ ERROR:", movementError);
+        console.log("❌ ERROR MESSAGE:", movementError.message);
+        console.log("❌ ERROR CODE:", movementError.code);
+        console.log("❌ ERROR STACK:", movementError.stack);
+
+        throw movementError;
+      }
 
 
       await client.query("COMMIT");
@@ -201,18 +262,41 @@ export async function scanPutawayProduct(req, res) {
       });
     }
 
+    // ==============================
     // 1️⃣ Buscar producto por barcode
-    const productResult = await db.query(
+    // ==============================
+    let productResult = await db.query(
       `
-      SELECT p.id, p.sku, p.description, p.uom
-      FROM product_barcodes pb
-      JOIN products p ON p.sku = pb.product_sku
-      WHERE pb.barcode = $1
-      LIMIT 1
-      `,
+  SELECT p.id, p.sku, p.description, p.uom
+  FROM product_barcodes pb
+  JOIN products p ON p.sku = pb.product_sku
+  WHERE UPPER(pb.barcode) = UPPER($1)
+  LIMIT 1
+  `,
       [barcode]
     );
 
+    // ==============================
+    // 2️⃣ Si no existe barcode → buscar SKU
+    // ==============================
+    if (productResult.rowCount === 0) {
+
+      console.log("⚠️ Barcode no encontrado, buscando SKU...");
+
+      productResult = await db.query(
+        `
+    SELECT id, sku, description, uom
+    FROM products
+    WHERE UPPER(sku) = UPPER($1)
+    LIMIT 1
+    `,
+        [barcode]
+      );
+    }
+
+    // ==============================
+    // 3️⃣ Producto no existe
+    // ==============================
     if (productResult.rowCount === 0) {
       return res.json({
         success: false,
@@ -474,7 +558,7 @@ export async function getPendingPutaway(req, res) {
 
     for (const line of linesResult.rows) {
       const barcodeResult = await getPrimaryBarcodeBySku(db, line.sku);
- console.log("🟩🟩 BARCODES: ", barcodeResult.rows);
+      console.log("🟩🟩 BARCODES: ", barcodeResult.rows);
       enrichedLines.push({
         ...line,
         barcode: barcodeResult.rowCount > 0 ? barcodeResult.rows[0].barcode : null
@@ -889,7 +973,7 @@ export async function getPendingPutawayDrop(req, res) {
 
     for (const line of linesResult.rows) {
       const barcodeResult = await getPrimaryBarcodeBySku(db, line.sku);
- console.log("🟩🟩 BARCODES: ", barcodeResult.rows);
+      console.log("🟩🟩 BARCODES: ", barcodeResult.rows);
       enrichedLines.push({
         ...line,
         barcode: barcodeResult.rowCount > 0 ? barcodeResult.rows[0].barcode : null

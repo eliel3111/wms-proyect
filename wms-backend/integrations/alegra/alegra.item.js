@@ -63,7 +63,7 @@ function generateHash(p) {
     p.description,
     p.name,
     p.status,
-    p.category?.id,
+    p.itemCategory?.id,
     p.inventory?.unitCost
   ].join("|");
 
@@ -85,7 +85,7 @@ export async function processBatch(chunk, batchIndex) {
       erp_id: String(p.id),
       uom: "EA",
       status: p.status === "active" ? "ACTIVE" : "INACTIVE",
-      category_id: p.category?.id || null,
+      category_id: p.itemCategory?.id || null,
       reference: p.reference?.reference || null,
       unit_cost: p.inventory?.unitCost || 0
     }));

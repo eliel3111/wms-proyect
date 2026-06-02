@@ -7,7 +7,7 @@ export async function moveInventory(req, res) {
     fromLocation,
     toLocation,
     qty,
-    qty_promised 
+    qty_promised
   } = req.body;
 
   // 🔴 Validación básica
@@ -26,7 +26,7 @@ export async function moveInventory(req, res) {
       fromLocation,
       toLocation,
       qty,
-      qty_promised 
+      qty_promised
     });
 
     return res.status(200).json({
@@ -59,7 +59,7 @@ export async function moveInventoryBetweenLocationsV2(
     fromLocation,
     toLocation,
     qty,
-    qty_promised 
+    qty_promised
   }
 ) {
 
@@ -68,7 +68,7 @@ export async function moveInventoryBetweenLocationsV2(
     fromLocation,
     toLocation,
     qty,
-    qty_promised 
+    qty_promised
   });
 
   // 🔴 VALIDACIONES
@@ -205,6 +205,136 @@ export async function moveInventoryBetweenLocationsV2(
 
 
 
+/*export async function moveInventoryBetweenLocations(
+  client,
+  {
+    warehouseId,
+    productSku,
+    fromLocationId,
+    toLocationId,
+    qty
+  }
+) {
+
+  console.log("==================================");
+  console.log("🚚 MOVE INVENTORY");
+  console.log("==================================");
+
+  console.log("VALORES:", {
+    warehouseId,
+    productSku,
+    fromLocationId,
+    toLocationId,
+    qty
+  });
+
+  // 1️⃣ Buscar inventario origen
+  const fromResult = await client.query(`
+    SELECT id, qty_on_hand, qty_reserved, qty_available
+    FROM inventory_by_location
+    WHERE warehouse_id = $1
+      AND product_sku = $2
+      AND location_id = $3
+    FOR UPDATE
+  `, [warehouseId, productSku, fromLocationId]);
+
+  console.log("✅ QUERY INVENTARIO ORIGEN COMPLETADO");
+  console.log("📦 RESULT:", fromResult.rows);
+
+
+  if (fromResult.rowCount === 0) {
+    throw {
+      code: "ORIGIN_NOT_FOUND",
+      message: "No existe inventario en la ubicación de origen"
+    };
+  }
+
+  const fromInv = fromResult.rows[0];
+
+  console.log("📦 INVENTARIO ORIGEN:", fromInv);
+
+  console.log("🔍 VALIDANDO CANTIDAD");
+  console.log("REQUESTED:", qty);
+  console.log("AVAILABLE:", fromInv.qty_available);
+
+  // 2️⃣ Validar cantidad disponible
+  if (qty > Number(fromInv.qty_available)) {
+    throw {
+      code: "QTY_EXCEEDS_AVAILABLE",
+      message: "Cantidad mayor a la disponible en la ubicación de origen"
+    };
+  }
+
+  const updateOrigin = await client.query(`
+        UPDATE inventory_by_location
+        SET qty_on_hand = qty_on_hand - $1,
+            updated_at = now()
+        WHERE id = $2
+        RETURNING *
+    `, [qty, fromInv.id]);
+
+  console.log("✅ UPDATE ORIGEN COMPLETADO");
+  console.log(updateOrigin.rows[0]);
+
+
+
+  // 4️⃣ Buscar inventario destino
+  console.log(warehouseId);
+  console.log(productSku);
+  console.log(toLocationId);
+  const toResult = await client.query(`
+    SELECT id
+    FROM inventory_by_location
+    WHERE warehouse_id = $1
+      AND product_sku = $2
+      AND location_id = $3
+    FOR UPDATE
+  `, [warehouseId, productSku, Number(toLocationId)]);
+  console.log("✅ BUSQUEDA DESTINO COMPLETADA");
+  console.log(toResult.rows);
+  let toInvId;
+
+  try {
+    if (toResult.rowCount === 0) {
+      const insertResult = await client.query(`
+      INSERT INTO inventory_by_location
+        (warehouse_id, product_sku, location_id, qty_on_hand, qty_reserved)
+      VALUES
+        ($1, $2, $3, 0, 0)
+      RETURNING id
+    `, [warehouseId, productSku, Number(toLocationId)]);
+
+      toInvId = insertResult.rows[0].id;
+      console.log("✅ INVENTARIO DESTINO CREADO");
+      console.log(insertResult.rows[0]);
+      console.log("📦 INVENTARIO DESTINO CREADO:", toInvId);
+    } else {
+      console.log("✅ INVENTARIO DESTINO EXISTE");
+      toInvId = toResult.rows[0].id;
+
+    }
+  } catch (err) {
+    console.error("🔥 ERROR CREANDO INVENTARIO DESTINO:", err);
+    throw err;
+  }
+
+  console.log("CANTIDAD", qty)
+  console.log("ID", toInvId)
+  // 5️⃣ Sumar en destino
+  await client.query(`
+    UPDATE inventory_by_location
+    SET qty_on_hand = qty_on_hand + $1,
+        updated_at = now()
+    WHERE id = $2
+    `, [qty, toInvId]);
+
+  console.log("SE PONE LA CANTIDAD A LA UBICACION DE DESTINO");
+  return {
+    success: true
+  };
+}*/
+
+
 export async function moveInventoryBetweenLocations(
     client,
     {
@@ -216,96 +346,212 @@ export async function moveInventoryBetweenLocations(
     }
 ) {
 
-    console.log("VALORES: ", warehouseId, productSku, fromLocationId, toLocationId, qty);
-    console.log("SE INICIA EL MOVIMIENTO DE INVENTARIO");
-    // 1️⃣ Buscar inventario origen
-    const fromResult = await client.query(`
-    SELECT id, qty_on_hand, qty_reserved, qty_available
-    FROM inventory_by_location
-    WHERE warehouse_id = $1
-      AND product_sku = $2
-      AND location_id = $3
-    FOR UPDATE
-  `, [warehouseId, productSku, fromLocationId]);
+    console.log("====================================");
+    console.log("🚚 MOVE INVENTORY BETWEEN LOCATIONS");
+    console.log("====================================");
 
-    if (fromResult.rowCount === 0) {
-        throw {
-            code: "ORIGIN_NOT_FOUND",
-            message: "No existe inventario en la ubicación de origen"
+    console.log("📥 PARAMETROS:");
+    console.log({
+        warehouseId,
+        productSku,
+        fromLocationId,
+        toLocationId,
+        qty
+    });
+
+    try {
+
+        // =====================================================
+        // 1️⃣ BUSCAR INVENTARIO ORIGEN
+        // =====================================================
+
+        console.log("🔍 PASO 1 - BUSCANDO INVENTARIO ORIGEN");
+
+        const fromResult = await client.query(`
+            SELECT
+                id,
+                qty_on_hand,
+                qty_reserved,
+                qty_available
+            FROM inventory_by_location
+            WHERE warehouse_id = $1
+              AND product_sku = $2
+              AND location_id = $3
+            FOR UPDATE
+        `, [warehouseId, productSku, fromLocationId]);
+
+        console.log("✅ PASO 1 COMPLETADO");
+
+        console.log("📦 INVENTARIO ORIGEN ENCONTRADO:");
+        console.log(fromResult.rows);
+
+        if (fromResult.rowCount === 0) {
+            throw {
+                code: "ORIGIN_NOT_FOUND",
+                message: "No existe inventario en la ubicación de origen"
+            };
+        }
+
+        const fromInv = fromResult.rows[0];
+
+        console.log("📦 FROM INVENTORY:");
+        console.log(fromInv);
+
+        // =====================================================
+        // 2️⃣ VALIDAR DISPONIBLE
+        // =====================================================
+
+        console.log("🔍 PASO 2 - VALIDANDO DISPONIBLE");
+
+        console.log("REQUESTED:", qty);
+        console.log("AVAILABLE:", fromInv.qty_available);
+
+        if (Number(qty) > Number(fromInv.qty_available)) {
+            throw {
+                code: "QTY_EXCEEDS_AVAILABLE",
+                message: "Cantidad mayor a la disponible en la ubicación de origen"
+            };
+        }
+
+        console.log("✅ PASO 2 COMPLETADO");
+
+        // =====================================================
+        // 3️⃣ RESTAR ORIGEN
+        // =====================================================
+
+        console.log("🔍 PASO 3 - UPDATE ORIGEN");
+
+        const updateOriginResult = await client.query(`
+            UPDATE inventory_by_location
+            SET qty_on_hand = qty_on_hand - $1,
+                updated_at = now()
+            WHERE id = $2
+            RETURNING *
+        `, [qty, fromInv.id]);
+
+        console.log("✅ PASO 3 COMPLETADO");
+
+        console.log("📦 INVENTARIO ORIGEN ACTUALIZADO:");
+        console.log(updateOriginResult.rows[0]);
+
+        // =====================================================
+        // 4️⃣ BUSCAR DESTINO
+        // =====================================================
+
+        console.log("🔍 PASO 4 - BUSCANDO DESTINO");
+
+        const toResult = await client.query(`
+            SELECT id
+            FROM inventory_by_location
+            WHERE warehouse_id = $1
+              AND product_sku = $2
+              AND location_id = $3
+            FOR UPDATE
+        `, [warehouseId, productSku, Number(toLocationId)]);
+
+        console.log("✅ PASO 4 COMPLETADO");
+
+        console.log("📦 DESTINO:");
+        console.log(toResult.rows);
+
+        let toInvId;
+
+        // =====================================================
+        // 5️⃣ CREAR DESTINO SI NO EXISTE
+        // =====================================================
+
+        if (toResult.rowCount === 0) {
+
+            console.log("🔍 PASO 5 - CREANDO DESTINO");
+
+            const insertResult = await client.query(`
+                INSERT INTO inventory_by_location
+                (
+                    warehouse_id,
+                    product_sku,
+                    location_id,
+                    qty_on_hand,
+                    qty_reserved
+                )
+                VALUES
+                (
+                    $1,
+                    $2,
+                    $3,
+                    0,
+                    0
+                )
+                RETURNING *
+            `, [warehouseId, productSku, Number(toLocationId)]);
+
+            console.log("✅ PASO 5 COMPLETADO");
+
+            console.log("📦 DESTINO CREADO:");
+            console.log(insertResult.rows[0]);
+
+            toInvId = insertResult.rows[0].id;
+
+        } else {
+
+            console.log("✅ DESTINO YA EXISTE");
+
+            toInvId = toResult.rows[0].id;
+        }
+
+        console.log("📦 DESTINATION ID:", toInvId);
+
+        // =====================================================
+        // 6️⃣ SUMAR DESTINO
+        // =====================================================
+
+        console.log("🔍 PASO 6 - UPDATE DESTINO");
+
+        const updateDestinationResult = await client.query(`
+            UPDATE inventory_by_location
+            SET qty_on_hand = qty_on_hand + $1,
+                updated_at = now()
+            WHERE id = $2
+            RETURNING *
+        `, [qty, toInvId]);
+
+        console.log("✅ PASO 6 COMPLETADO");
+
+        console.log("📦 DESTINO ACTUALIZADO:");
+        console.log(updateDestinationResult.rows[0]);
+
+        console.log("🎉 MOVIMIENTO COMPLETADO");
+
+        return {
+            success: true
         };
+
+    } catch (err) {
+
+        console.log("====================================");
+        console.log("🔥 ERROR MOVE INVENTORY");
+        console.log("====================================");
+
+        console.log("ERROR:");
+        console.log(err);
+
+        console.log("MESSAGE:");
+        console.log(err.message);
+
+        console.log("CODE:");
+        console.log(err.code);
+
+        console.log("DETAIL:");
+        console.log(err.detail);
+
+        console.log("HINT:");
+        console.log(err.hint);
+
+        console.log("STACK:");
+        console.log(err.stack);
+
+        throw err;
     }
-    console.log("INVENTARIO ORIGEN: ", fromResult.rows[0]);
-    const fromInv = fromResult.rows[0];
-
-    // 2️⃣ Validar cantidad disponible
-    if (qty > Number(fromInv.qty_available)) {
-        throw {
-            code: "QTY_EXCEEDS_AVAILABLE",
-            message: "Cantidad mayor a la disponible en la ubicación de origen"
-        };
-    }
- 
-    // 3️⃣ Restar de origen
-    await client.query(`
-    UPDATE inventory_by_location
-    SET qty_on_hand = qty_on_hand - $1,
-        updated_at = now()
-    WHERE id = $2
-  `, [qty, fromInv.id]);
-
-
-    console.log("SE RESTA LA CANTIDAD DEL ORIGEN");
-    // 4️⃣ Buscar inventario destino
-    console.log(warehouseId);
-    console.log(productSku);
-    console.log(toLocationId);
-    const toResult = await client.query(`
-    SELECT id
-    FROM inventory_by_location
-    WHERE warehouse_id = $1
-      AND product_sku = $2
-      AND location_id = $3
-    FOR UPDATE
-  `, [warehouseId, productSku, Number(toLocationId)]);
-    console.log("SE BUSCA LA UBICACION DE DESTINO", toResult);
-    let toInvId;
-
-   try {
-  if (toResult.rowCount === 0) {
-    const insertResult = await client.query(`
-      INSERT INTO inventory_by_location
-        (warehouse_id, product_sku, location_id, qty_on_hand, qty_reserved)
-      VALUES
-        ($1, $2, $3, 0, 0)
-      RETURNING id
-    `, [warehouseId, productSku, Number(toLocationId)]);
-
-    toInvId = insertResult.rows[0].id;
-    console.log("📦 INVENTARIO DESTINO CREADO:", toInvId);
-  } else {
-    toInvId = toResult.rows[0].id;
-  }
-} catch (err) {
-  console.error("🔥 ERROR CREANDO INVENTARIO DESTINO:", err);
-  throw err;
 }
-
-    console.log("CANTIDAD", qty)
-    console.log("ID", toInvId)
-    // 5️⃣ Sumar en destino
-    await client.query(`
-    UPDATE inventory_by_location
-    SET qty_on_hand = qty_on_hand + $1,
-        updated_at = now()
-    WHERE id = $2
-    `, [qty, toInvId]);
-
-    console.log("SE PONE LA CANTIDAD A LA UBICACION DE DESTINO");
-    return {
-        success: true
-    };
-}
-
 
 
 // SERVICIO: Crea un movimiendo, no afecta inventario, solo dice el movimiento, de donde a donde, y porque
@@ -465,7 +711,7 @@ export async function updateInventoryByCount(client, {
 
     // 6) Actualizar línea
     await client.query(
-  `
+      `
   UPDATE inventory_by_location
   SET
     old_qty_on_hand = qty_on_hand,
@@ -476,16 +722,16 @@ export async function updateInventoryByCount(client, {
     updated_at = NOW()
   WHERE id = $3
   `,
-  [countedQty, userId, inventoryRowId]
-);
+      [countedQty, userId, inventoryRowId]
+    );
   } else {
     // 7) No existe línea: crearla
     difference = countedQty;
     oldQtyOnHand = 0;
     action = countedQty > 0 ? "GAIN" : "SKIP";
 
-   const insertResult = await client.query(
-  `
+    const insertResult = await client.query(
+      `
   INSERT INTO inventory_by_location (
     warehouse_id,
     location_id,
@@ -501,34 +747,34 @@ export async function updateInventoryByCount(client, {
   VALUES ($1, $2, $3, $4, $4, 0, 0, $5, NOW(), NOW())
   RETURNING id
   `,
-  [warehouseId, locationId, productSku, countedQty, userId]
-);
+      [warehouseId, locationId, productSku, countedQty, userId]
+    );
 
     inventoryRowId = insertResult.rows[0].id;
   }
 
   // 8) Si no hubo diferencia, no crear movimiento
   if (action === "SKIP") {
-  return {
-    success: true,
-    title: "Conteo guardado",
-    message: "No hubo diferencia de inventario.",
-    data: {
-      action,
-      difference,
-      productId,
-      productSku,
-      locationId,
-      warehouseId,
-      inventoryRowId,
-      oldQtyOnHand,
-      newQtyOnHand: countedQty
-    }
-  };
-}
+    return {
+      success: true,
+      title: "Conteo guardado",
+      message: "No hubo diferencia de inventario.",
+      data: {
+        action,
+        difference,
+        productId,
+        productSku,
+        locationId,
+        warehouseId,
+        inventoryRowId,
+        oldQtyOnHand,
+        newQtyOnHand: countedQty
+      }
+    };
+  }
 
   // 9) Crear / obtener ubicación virtual
-  
+
 
   if (action === "LOSS") {
     const lossResult = await client.query(

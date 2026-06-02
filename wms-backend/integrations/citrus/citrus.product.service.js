@@ -9,8 +9,8 @@ export async function insertProductFromERP(client, item) {
     const erpId = item.Id ?? null;
 
     // SKU 
-     let erp_sku = item.SKU;
-     let sku = "";
+    let erp_sku = item.SKU;
+    let sku = "";
 
     if (!sku || sku.trim() === "") {
 
@@ -39,7 +39,7 @@ export async function insertProductFromERP(client, item) {
     const description =
         item.Descripcion ||
         item.Referencia ||
-        "SIN DESCRIPCIÓN";    
+        "SIN DESCRIPCIÓN";
 
     const uom = "UNITS";
 
@@ -57,7 +57,7 @@ export async function insertProductFromERP(client, item) {
     // 1️⃣ INTENTAR UPDATE PRIMERO
     // --------------------------------
 
- const updateResult = await client.query(`
+    const updateResult = await client.query(`
     UPDATE products
     SET
         erp_name = $2,
@@ -71,15 +71,15 @@ export async function insertProductFromERP(client, item) {
     WHERE erp_id = $1
     RETURNING *;
 `, [
-    erpId,
-    name,
-    erp_sku,
-    description,
-    uom,
-    uom_id,
-    status,
-    deleted_erp
-]);
+        erpId,
+        name,
+        erp_sku,
+        description,
+        uom,
+        uom_id,
+        status,
+        deleted_erp
+    ]);
 
     let product;
 
@@ -114,16 +114,16 @@ export async function insertProductFromERP(client, item) {
     ($1,$2,$3,$4,$5,$6,$7,false,false,false,$8,$9,now())
     RETURNING *;
 `, [
-    erpId,
-    name,
-    erp_sku,
-    sku,
-    description,
-    uom,
-    uom_id,
-    status,
-    deleted_erp
-]);
+            erpId,
+            name,
+            erp_sku,
+            sku,
+            description,
+            uom,
+            uom_id,
+            status,
+            deleted_erp
+        ]);
 
         product = insertResult.rows[0];
     }
@@ -153,10 +153,157 @@ SELECT
     now()
 ON CONFLICT (barcode) DO NOTHING;
 `, [
-    productSku,
-    barcode
-]);
+            productSku,
+            barcode
+        ]);
     }
 
     return product;
 }
+
+
+
+//solo sincroniza productos nuevos
+export async function insertNewProductFromERP(client, item) {
+
+
+    if (!item) {
+        throw new Error("Item inválido recibido");
+    }
+
+    const erpId = item.Id ?? null;
+
+    // SKU ERP
+    const erp_sku = item.SKU;
+
+    let sku = "";
+
+    
+
+    const name = item.Nombre;
+
+    const description =
+        item.Descripcion ||
+        item.Referencia ||
+        "SIN DESCRIPCIÓN";
+
+    const uom = "UNITS";
+
+    const uom_id =
+        item.ItemUnidadIdSec
+            ? Number(item.ItemUnidadIdSec)
+            : 1;
+
+    const isActive = item.Estatus === "A";
+
+    const status = isActive ? "ACTIVE" : "INACTIVE";
+    const deleted_erp = isActive ? false : true;
+
+    // --------------------------------
+    // 1️⃣ VERIFICAR SI YA EXISTE
+    // --------------------------------
+
+    const existingResult = await client.query(`
+        SELECT *
+        FROM products
+        WHERE erp_id = $1
+        LIMIT 1
+    `, [erpId]);
+
+    let product;
+
+    if (existingResult.rowCount > 0) {
+
+    product = existingResult.rows[0];
+
+} else {
+
+    // --------------------------------
+    // 2️⃣ GENERAR SKU CON SEQUENCE
+    // --------------------------------
+
+    const skuResult = await client.query(`
+        SELECT
+            'SKU-' || LPAD(nextval('sku_seq')::text, 5, '0') AS sku
+    `);
+
+    const sku = skuResult.rows[0].sku;
+
+    console.log("🟨 NUEVO SKU:", sku);
+
+    // --------------------------------
+    // 3️⃣ INSERT
+    // --------------------------------
+
+    const insertResult = await client.query(`
+        INSERT INTO products
+        (
+            erp_id,
+            erp_name,
+            erp_sku,
+            sku,
+            description,
+            uom,
+            uom_id,
+            is_lot_tracked,
+            is_expirable,
+            is_serialized,
+            status,
+            deleted_erp,
+            updated_at
+        )
+        VALUES
+        ($1,$2,$3,$4,$5,$6,$7,false,false,false,$8,$9,now())
+        RETURNING *;
+    `, [
+        erpId,
+        name,
+        erp_sku,
+        sku,
+        description,
+        uom,
+        uom_id,
+        status,
+        deleted_erp
+    ]);
+
+    product = insertResult.rows[0];
+}
+
+    const productSku = product.sku;
+
+    // --------------------------------
+    // 3️⃣ BARCODE LOGIC
+    // --------------------------------
+
+    const barcode = item.CodigoBarra?.trim();
+
+    if (barcode) {
+
+        await client.query(`
+            INSERT INTO product_barcodes
+            (
+                product_sku,
+                barcode,
+                is_primary,
+                created_at
+            )
+            SELECT
+                $1::text,
+                $2::text,
+                NOT EXISTS (
+                    SELECT 1
+                    FROM product_barcodes
+                    WHERE product_sku = $1::text
+                      AND is_primary = true
+                ),
+                now()
+            ON CONFLICT (barcode) DO NOTHING;
+        `, [
+            productSku,
+            barcode
+        ]);
+    }
+
+    return product;
+};

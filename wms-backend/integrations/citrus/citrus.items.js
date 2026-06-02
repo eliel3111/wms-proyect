@@ -1,6 +1,6 @@
 import { callERP, callERPPurchase } from "./erpClient.js";
 import { db } from "../../db.js";
-import { insertProductFromERP } from  "./citrus.product.service.js"
+import { insertNewProductFromERP } from  "./citrus.product.service.js"
 
 //ESTO ES PARA PODER BUSCAR POR PAGUINA Y CANTIDAD LOS PRODUCTOS
 /*
@@ -157,7 +157,7 @@ export async function fetchAllItemsAndSync() {
             item.Nombre
           );
 
-          await insertProductFromERP(
+          await insertNewProductFromERP(
             client,
             item
           );

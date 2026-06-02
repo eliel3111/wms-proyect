@@ -15,14 +15,17 @@ import { useModal } from "../context/ModalContext";
 
 /* Tipos base */
 type Product = {
-  id: number;
-  sku: string;
-  description: string;
-  ordered_qty: number;
-  received_qty: number;
-  min_received_qty: number; // 👈 AGREGA ESTO
-  product_exists: boolean;
-  barcodes: string[];
+    id: number;
+    sku: string;
+    description: string;
+    ordered_qty: number;
+    received_qty: number;
+    min_received_qty: number;
+    product_exists: boolean;
+    barcodes: string[];
+    erp_name: string | null;
+    erp_sku: string | null;
+    erp_id: number;
 };
 
 type Filter = "all" | "read" | "unread";
@@ -98,11 +101,11 @@ export default function OrdenCompra() {
 
 
     useEffect(() => {
-        
+
         if (!purchaseOrderId) return;
         const loadData = async () => {
             setLoading(true);
-            
+
             try {
                 // 1️⃣ IndexedDB
                 const local = await getReceptionByPOId(purchaseOrderId);
@@ -173,9 +176,9 @@ export default function OrdenCompra() {
             return {
                 ...p,
                 received_qty:
-    typeof localQty === "number"
-        ? Math.max(localQty, p.received_qty)
-        : p.received_qty,
+                    typeof localQty === "number"
+                        ? Math.max(localQty, p.received_qty)
+                        : p.received_qty,
             };
         });
 
@@ -312,15 +315,15 @@ export default function OrdenCompra() {
         );
 
         // 🔥 fallback a SKU
-if (!foundProduct) {
-  foundProduct = productsRef.current.find(
-    (product) => product.sku === barcode
-  );
+        if (!foundProduct) {
+            foundProduct = productsRef.current.find(
+                (product) => product.sku === barcode
+            );
 
-  index = productsRef.current.findIndex(
-    (product) => product.sku === barcode
-  );
-}
+            index = productsRef.current.findIndex(
+                (product) => product.sku === barcode
+            );
+        }
         console.log(productsRef.current);
         console.log("Producto encontrado:", foundProduct);
         if (index === -1) {
@@ -388,30 +391,30 @@ if (!foundProduct) {
     }
 
     function handleReceivedQtyBlur() {
-    if (selectedIndex === null) return;
+        if (selectedIndex === null) return;
 
-    setProducts(prev => {
-        const updated = [...prev];
-        const current = updated[selectedIndex];
+        setProducts(prev => {
+            const updated = [...prev];
+            const current = updated[selectedIndex];
 
-        let finalQty = Number(current.received_qty) || 0;
+            let finalQty = Number(current.received_qty) || 0;
 
-        if (finalQty < current.min_received_qty) {
-            finalQty = current.min_received_qty;
-        }
+            if (finalQty < current.min_received_qty) {
+                finalQty = current.min_received_qty;
+            }
 
-        if (finalQty > current.ordered_qty) {
-            finalQty = current.ordered_qty;
-        }
+            if (finalQty > current.ordered_qty) {
+                finalQty = current.ordered_qty;
+            }
 
-        updated[selectedIndex] = {
-            ...current,
-            received_qty: finalQty
-        };
+            updated[selectedIndex] = {
+                ...current,
+                received_qty: finalQty
+            };
 
-        return updated;
-    });
-}
+            return updated;
+        });
+    }
 
 
     // FUNCTION TO ADD +1 TO THE PRODUCT USING SCANNER
@@ -609,9 +612,9 @@ if (!foundProduct) {
                         <div className={`modal-sku ${selectedProduct.received_qty === selectedProduct.ordered_qty
                             ? "confirmed"
                             : ""
-                            }`}>{selectedProduct.sku}</div>
+                            }`}>{selectedProduct.erp_name}</div>
 
-                        <div className="modal-description">{selectedProduct.description}</div>
+                        <div className="modal-description">{selectedProduct.description} / PN: {selectedProduct.erp_sku} / ID: {selectedProduct.erp_id} / {selectedProduct.sku}</div>
 
                         <div className="qty-row">
                             <input

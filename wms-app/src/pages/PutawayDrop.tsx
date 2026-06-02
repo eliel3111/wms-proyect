@@ -126,7 +126,7 @@ export default function PutawayPickPage() {
               line.sku?.trim().toUpperCase() === cleanScan
           );
 
-          if (putLocationRef.current === null && !foundLine) {
+          if (putLocationRef.current !== null && !foundLine) {
             openModal({
               title: "Producto no válido",
               message: "Este producto no está en el putaway."
@@ -200,6 +200,7 @@ export default function PutawayPickPage() {
 
   /*FUNCTION: To confirm a location*/
   async function verifyPutawayLocation(scannedValue: string) {
+    console.log("Buscando location...");
     const response = await apiClient.post("/putaway/scan-putaway-location", {
       code: scannedValue
     });

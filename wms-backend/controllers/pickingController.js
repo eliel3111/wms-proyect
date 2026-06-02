@@ -4,6 +4,7 @@ import { reserveInventoryForMove } from "../services/pickingBestRoute.js"
 import { getPickingProductsWithLocationsService, getPickingConfig } from "../services/pickingBestRoute.js";
 import { selectBestLocation, getMoveLinesOrderedByLocation } from "../services/pickingBestRoute.js";
 import { createInventoryMovement, moveInventoryBetweenLocationsV2 } from "../services/inventoryService.js"
+import { getOrCreateDefaultLocation } from "../services/pickingBestRoute.js"
 
 
 export async function closePicking(req, res) {
@@ -533,7 +534,17 @@ export async function confirmPickingLine(req, res) {
 export async function scanPickingCode(req, res) {
   console.log("🟦 [START] scanPickingCode");
 
+
   const client = await db.connect();
+
+  const dbInfo = await client.query(`
+  SELECT current_database()
+`);
+
+  console.log(
+    "🗄️ DATABASE:",
+    dbInfo.rows[0].current_database
+  );
 
   try {
     const { code, pickingId } = req.body;
@@ -552,7 +563,7 @@ export async function scanPickingCode(req, res) {
 
     const normalized = code.trim().toUpperCase();
 
-    console.log("🔎 Código normalizado:", normalized);
+    console.log("🔎 Código normalizado:", JSON.stringify(normalized));
 
     let detectedType = null;
     let detectedData = null;
@@ -564,6 +575,8 @@ export async function scanPickingCode(req, res) {
       client,
       normalized
     );
+
+    console.log("🟥 location response  db", locationResult.rows[0]);
 
     if (locationResult.rowCount > 0) {
       detectedType = "location";
@@ -578,17 +591,37 @@ export async function scanPickingCode(req, res) {
     let productId = null;
 
     if (!detectedType) {
-      const productResult = await client.query(
+      // ==============================
+      // 🔎 BUSCAR PRODUCTO POR BARCODE
+      // ==============================
+      let productResult = await client.query(
         `
-        SELECT p.id, p.sku
-        FROM product_barcodes pb
-        JOIN products p ON p.sku = pb.product_sku
-        WHERE UPPER(pb.barcode) = $1
-        LIMIT 1
-      `,
+  SELECT p.id, p.sku
+  FROM product_barcodes pb
+  JOIN products p ON p.sku = pb.product_sku
+  WHERE UPPER(pb.barcode) = $1
+  LIMIT 1
+`,
         [normalized]
       );
 
+      // ==============================
+      // 🔎 SI NO EXISTE → BUSCAR SKU
+      // ==============================
+      if (productResult.rowCount === 0) {
+
+        console.log("⚠️ Barcode no encontrado, buscando SKU...");
+
+        productResult = await client.query(
+          `
+    SELECT id, sku
+    FROM products
+    WHERE UPPER(sku) = $1
+    LIMIT 1
+  `,
+          [normalized]
+        );
+      }
       if (productResult.rowCount === 0) {
         console.log("❌ Código inválido");
 
@@ -605,6 +638,52 @@ export async function scanPickingCode(req, res) {
 
       console.log("📦 PRODUCTO DETECTADO:", detectedData);
     }
+
+    // 🔹 Obtener configuración
+    const pickingConfig = await getPickingConfig(client);
+
+    console.log("⚙️ PICKING CONFIG:", pickingConfig);
+
+    // ==============================
+    // 🔥 IGNORAR VALIDACIÓN LOCATION
+    // ==============================
+    if (
+      detectedType === "location" &&
+      pickingConfig.allow_picking_without_locations === true
+    ) {
+      const warehouseResult = await client.query(`
+  SELECT id
+  FROM warehouses
+  WHERE is_default = true
+    AND status = 'ACTIVE'
+  LIMIT 1
+`);
+
+      if (warehouseResult.rowCount === 0) {
+        throw new Error("No existe warehouse por defecto");
+      }
+
+      const warehouseId = warehouseResult.rows[0].id;
+
+      let defaultLocation =
+        await getOrCreateDefaultLocation(
+          client,
+          warehouseId
+        );
+      console.log("✅ Location permitida sin validar picking", defaultLocation);
+
+      return res.json({
+        success: true,
+        type: "location",
+        data: {
+          id: defaultLocation.id,
+          code: defaultLocation.code
+        },
+        skipPickingValidation: true
+      });
+    }
+
+
 
     // ==============================
     // 4️⃣ VALIDAR QUE PERTENECE AL PICKING

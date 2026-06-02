@@ -3,6 +3,7 @@ import { login, registerUser, refreshToken, logoutUser } from "../controllers/au
 import bcrypt from "bcryptjs";
 import { db } from "../db.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { syncAllItems, syncAllPurchaseOrders } from "../integrations/citrus/citrus.sync.js";
 
 const router = express.Router();
 
@@ -44,10 +45,35 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     const user = result.rows[0];
 
-    return res.json({
+    res.status(200).json({
       message: "User profile",
       user,
     });
+
+    // 3️⃣ Ejecutar sync EN BACKGROUND
+        setImmediate(async () => {
+    
+          console.time("⏱ Tiempo total sync");
+    
+        // 🔹 Sync Items
+          try {
+            console.log("🔄 Sync Items...");
+            await syncAllItems();
+          } catch (err) {
+            console.error("❌ Error en syncAllItems:", err.message);
+          }
+    
+        // 🔹 Sync Purchase Orders
+          try {
+            console.log("🔄 Sync Purchase Orders...");
+            await syncAllPurchaseOrders();
+          } catch (err) {
+            console.error("❌ Error en syncAllPurchaseOrders:", err.message);
+          }
+    
+          console.timeEnd("⏱ Tiempo total sync");
+        });
+    
 
   } catch (error) {
     console.error("PROFILE ERROR:", error);

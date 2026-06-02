@@ -2,7 +2,7 @@ import { db } from "../../db.js";
 import { fetchAllItems, fetchPurchaseOrdersTest } from "./citrus.items.js";
 import { insertProductFromERP } from "./citrus.product.service.js";
 
-import { callERPSales, callERPGeneral } from "./erpClient.js";
+import { callERPSales, callERPCreateConduce } from "./erpClient.js";
 
 
 
@@ -917,77 +917,52 @@ export async function createConduce(payloadERP) {
       .toISOString()
       .slice(0, 19);
 
+      console.log("🟨 PAYLOAD ERP:");
+console.log(JSON.stringify(payloadERP, null, 2));
+
     // 🔹 2. Construir detalles dinámicamente
-    const detallesXML = payloadERP.Detalles.map(det => `
-      <ConduceDetalle>
+    const detallesXML = payloadERP.Detalles.map(det => {
 
-        <ItemId>${det.ItemId}</ItemId>
+  console.log("🟦 DETALLE:");
+  console.log(det);
 
-        <ItemNombre>${det.ItemNombre ?? ''}</ItemNombre>
-
-        <ItemCantidad>${det.ItemCantidad}</ItemCantidad>
-
-      </ConduceDetalle>
-    `).join("");
+  return  `<ConduceDetalle>
+<ItemId>${det.ItemId}</ItemId>
+<ItemNombre>${det.ItemNombre ?? ''}</ItemNombre>
+<ItemCantidad>${det.ItemCantidad}</ItemCantidad>
+</ConduceDetalle>`;
+}).join("");
 
     // 🔹 3. Construir XML SOAP
-    const xml = `
-<?xml version="1.0" encoding="utf-8"?>
-
-<soap:Envelope
- xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- xmlns:xsd="http://www.w3.org/2001/XMLSchema"
- xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-
-  <soap:Body>
-
-    <CrearConduce xmlns="http://tempuri.org/">
-
-      <conduce>
-
-        <ClienteId>${payloadERP.ClienteId}</ClienteId>
-
-        <ClienteNombre>${payloadERP.ClienteNombre}</ClienteNombre>
-
-        <ClienteDireccion>${payloadERP.ClienteDireccion ?? ''}</ClienteDireccion>
-
-        <Fecha>${fecha}</Fecha>
-
-        <Estatus>${payloadERP.Estatus}</Estatus>
-
-        <TiendaId>${payloadERP.TiendaId}</TiendaId>
-
-        <VendedorId>${payloadERP.VendedorId}</VendedorId>
-
-        <Nota>${payloadERP.Nota ?? ''}</Nota>
-
-        <OrdenVentaId>${payloadERP.OrdenVentaId}</OrdenVentaId>
-
-        <ConduceDetalles>
-
-          ${detallesXML}
-
-        </ConduceDetalles>
-
-      </conduce>
-
-    </CrearConduce>
-
-  </soap:Body>
-
-</soap:Envelope>
-`;
+    const xml =
+`<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<CrearConduce xmlns="http://tempuri.org/">
+<conduce>
+<ClienteId>${payloadERP.ClienteId}</ClienteId>
+<ClienteNombre>${payloadERP.ClienteNombre}</ClienteNombre>
+<ClienteDireccion>${payloadERP.ClienteDireccion ?? ''}</ClienteDireccion>
+<Fecha>${fecha}</Fecha>
+<Estatus>${payloadERP.Estatus}</Estatus>
+<TiendaId>${payloadERP.TiendaId}</TiendaId>
+<VendedorId>${payloadERP.VendedorId}</VendedorId>
+<Nota>${payloadERP.Nota ?? ''}</Nota>
+<OrdenVentaId>${payloadERP.OrdenVentaId}</OrdenVentaId>
+<ConduceDetalles>
+${detallesXML}
+</ConduceDetalles>
+</conduce>
+</CrearConduce>
+</soap:Body>
+</soap:Envelope>`;
 
     console.log("🟨 XML CONDUCE:", xml);
 
-    // 🔹 4. Llamar ERP SOAP
-    const data = await callERP(
-      "Facturacion/ConduceService.asmx",
-      "http://tempuri.org/CrearConduce",
-      "CrearConduceResponse",
-      "CrearConduceResult",
-      xml
-    );
+  // 🔹 4. Llamar ERP SOAP
+const data = await callERPCreateConduce(xml);
 
     // 🔹 5. Validar respuesta
     if (!data || data.Success === 0) {

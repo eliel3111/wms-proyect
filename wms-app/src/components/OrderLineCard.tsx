@@ -7,8 +7,12 @@ type Product = {
   description: string;
   ordered_qty: number;
   received_qty: number;
-  product_exists: boolean;
-  barcodes: string[];
+  min_received_qty?: number;
+  product_exists?: boolean;
+  barcodes?: string[];
+  erp_name?: string | null;
+  erp_sku?: string | null;
+  erp_id?: number;
 };
 
 type Props = {
@@ -42,8 +46,14 @@ export default function OrderLineCard({
 
   return (
     <div className={`order-line ${statusClass}`}>
-      <div className="line-sku">{line.sku}</div>
-      <div className="line-desc">{line.description}</div>
+      <div className="line-sku">{line.erp_name}</div>
+      <div className="line-desc">
+        {line.description}
+        <br />
+        <strong>PN:</strong> {line.erp_sku ?? "N/A"}
+        {" | "}
+        <strong>ID:</strong> {line.erp_id ?? "N/A"}
+      </div>
       <div className="line-qty">
         {Math.trunc(line.received_qty)} / {Math.trunc(line.ordered_qty)}
       </div>
