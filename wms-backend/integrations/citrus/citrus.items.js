@@ -271,7 +271,7 @@ export async function fetchPurchaseOrdersTest(lastWriteDate) {
     for (const order of orders) {
 
       console.log("📦 ERP Orden:", order.Id);
-      console.log("📦 ERP Orden:", order);
+      console.log("📦 ERP Orden:", order.OrdenCompraDetalles.Item);
 
       // 🔥 guarda/actualiza PO
       const wmsId = await syncPurchaseOrder(order);

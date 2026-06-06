@@ -20,7 +20,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   }
 
   const moves = movesResult.rows;
-  console.log("STOCK MOVE DEL PICKING: ", moves);
+  console.log("PRODUCTOS DEL PEDIDO: ", moves);
 
   // ==============================
   // 2️⃣ PRODUCT IDS
@@ -43,7 +43,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
     skuMap.set(p.id, p.sku);
     skuList.push(p.sku);
   }
-  //console.log("TODOS LOS SKUS: ", skuList);
+  console.log("TODOS LOS SKUS: ", skuList);
   // ==============================
   // 4️⃣ INVENTARIO + LOCATIONS
   // ==============================
@@ -61,8 +61,8 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
       AND l.location_type = 'STORAGE'
   `, [skuList]);
 
+console.log("📦 INVENTORY RESULT:", inventoryResult.rows);
 
-  //console.log("BUSQUEDA DE LOCATIONS POR STOCK MOVE: ", inventoryResult.rows);
   // ==============================
   // 5️⃣ MAP INVENTORY
   // ==============================
@@ -81,7 +81,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
       almacen: row.warehouse_id,
     });
   }
-  //console.log("QUE ES ESTO? ", inventoryMap);
+  console.log("QUE ES ESTO? ", inventoryMap);
 
   const warehouseResult = await client.query(`
   SELECT id, erp_warehouse_id

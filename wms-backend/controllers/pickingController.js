@@ -3,7 +3,7 @@ import { getActiveStorageLocationByCode } from "../services/locationService.js";
 import { reserveInventoryForMove } from "../services/pickingBestRoute.js"
 import { getPickingProductsWithLocationsService, getPickingConfig } from "../services/pickingBestRoute.js";
 import { selectBestLocation, getMoveLinesOrderedByLocation } from "../services/pickingBestRoute.js";
-import { createInventoryMovement, moveInventoryBetweenLocationsV2 } from "../services/inventoryService.js"
+import { createInventoryMovement, moveInventoryBetweenLocationsV2, moveInventoryGeneralLocation } from "../services/inventoryService.js"
 import { getOrCreateDefaultLocation } from "../services/pickingBestRoute.js"
 
 
@@ -23,6 +23,13 @@ export async function closePicking(req, res) {
 
   try {
     await client.query("BEGIN");
+
+const config = await getPickingConfig(client);
+
+    /*if (!config.allow_picking_without_locations && totalReserved === 0) {*/
+
+    console.log("🟨 configuracion: ", config);
+
 
     // 1️⃣ VALIDAR PICKING
     const pickingResult = await client.query(`
@@ -79,15 +86,35 @@ export async function closePicking(req, res) {
 
       if (qtyPlanned === 0) continue;
 
-      // 🔥 MOVER INVENTARIO
-      await moveInventoryBetweenLocationsV2(client, {
-        productSku: line.sku,
-        fromLocation: line.location_id,
-        toLocation: locationId,
-        qty: qtyDone,
-        qty_promised: qtyPlanned
-      });
+    if (!config.allow_picking_without_locations) {
 
+  // 🔥 MOVER INVENTARIO NORMAL
+  const resultMove = await moveInventoryBetweenLocationsV2(client, {
+    productSku: line.sku,
+    fromLocation: line.location_id,
+    toLocation: locationId,
+    qty: qtyDone,
+    qty_promised: qtyPlanned
+  });
+
+  console.log("✅ RESULTADO MOVE:", resultMove);
+
+} else {
+
+  console.log(
+    "🟥🚨🟨 allow_picking_without_locations=true → usando moveInventoryGeneralLocation"
+  );
+
+  const resultMove = await moveInventoryGeneralLocation(client, {
+    productSku: line.sku,
+    fromLocation: line.location_id,
+    toLocation: locationId,
+    qty: qtyDone,
+    qty_promised: qtyPlanned
+  });
+
+  console.log("✅ RESULTADO MOVE GENERAL:", resultMove);
+}
       console.log(lines);
 
       if (qtyDone === 0) continue;
@@ -106,7 +133,7 @@ export async function closePicking(req, res) {
       });
     }
 
-    // 4️⃣ ACTUALIZAR stock_move_line
+   /* // 4️⃣ ACTUALIZAR stock_move_line
     await client.query(`
       UPDATE stock_move_line
       SET state = 'done',
@@ -128,7 +155,7 @@ export async function closePicking(req, res) {
       UPDATE stock_picking
       SET state = 'done'
       WHERE id = $1
-    `, [pickingId]);
+    `, [pickingId]);*/
 
     await client.query("COMMIT");
 
@@ -162,7 +189,13 @@ export async function closePicking(req, res) {
 export async function getBestShippingLocation(req, res) {
   const { pickingId } = req.params;
 
+  console.log("=================================");
+  console.log("🚚 GET BEST SHIPPING LOCATION");
+  console.log("📦 Picking ID:", pickingId);
+  console.log("=================================");
+
   if (!pickingId) {
+    console.log("❌ No se recibió pickingId");
     return res.status(400).json({
       success: false,
       title: "Picking requerido",
@@ -178,13 +211,15 @@ export async function getBestShippingLocation(req, res) {
     );
 
     if (pickingResult.rowCount === 0) {
+      console.log("❌ Picking no existe:", pickingId);
+
       return res.status(404).json({
         success: false,
         title: "Picking no encontrado",
         message: "El picking no existe.",
       });
     }
-
+    console.log("📊 Picking encontrado:", pickingResult.rowCount);
     // 2️⃣ Obtener ubicaciones SHIPPING activas
     const locationsResult = await db.query(
       `
@@ -197,12 +232,18 @@ export async function getBestShippingLocation(req, res) {
     );
 
     if (locationsResult.rowCount === 0) {
+      console.log("❌ No existen ubicaciones SHIPPING");
       return res.status(404).json({
         success: false,
         title: "Sin ubicaciones de despacho",
         message: "No hay ubicaciones de despacho disponibles. Contacte al administrador.",
       });
     }
+
+    console.log(
+      "📍 Ubicaciones SHIPPING encontradas:",
+      locationsResult.rowCount
+    );
 
     const locations = locationsResult.rows;
     console.log("TODAS LAS UBICACIONES", locations);
@@ -220,8 +261,13 @@ export async function getBestShippingLocation(req, res) {
   GROUP BY location_id
   `
     );
+const assignmentsMap = new Map();
+    console.log(
+      "🗺️ Assignments Map:",
+      Object.fromEntries(assignmentsMap)
+    );
 
-    const assignmentsMap = new Map();
+    
 
     assignmentsResult.rows.forEach(row => {
       assignmentsMap.set(Number(row.location_id), Number(row.total_lines));
@@ -235,6 +281,10 @@ export async function getBestShippingLocation(req, res) {
 
     // 🔹 CASO 1: no hay ningún assignment hoy
     if (assignmentsResult.rowCount === 0) {
+      console.log(
+        "🟢 No hay asignaciones hoy. Seleccionando primera ubicación."
+      );
+
       bestLocation = locations[0];
     }
 
@@ -246,19 +296,36 @@ export async function getBestShippingLocation(req, res) {
         loc => !assignmentsMap.has(Number(loc.id))
       );
 
-      console.log("UBICACIONES SIN ASIGNACIONES", locationsWithoutAssignments);
+      console.log(
+        "🟡 Ubicaciones sin assignments:",
+        locationsWithoutAssignments.length
+      );
+
+      console.table(locationsWithoutAssignments);
 
       // 👉 PRIORIDAD: usar una libre
       if (locationsWithoutAssignments.length > 0) {
         bestLocation = locationsWithoutAssignments[0];
-      }
 
-      // 2. Si TODAS tienen assignments → elegir menor carga
-      else {
+        console.log(
+          "✅ Se seleccionó ubicación libre:",
+          bestLocation.code
+        );
+      } else {
+
+        console.log(
+          "🔄 Todas las ubicaciones tienen carga. Buscando menor carga..."
+        );
+
         let minLoad = Infinity;
 
         for (const loc of locations) {
           const load = assignmentsMap.get(Number(loc.id)) || 0;
+
+          console.log(
+            `📍 ${loc.code} | carga=${load}`
+          );
+
 
           if (load < minLoad) {
             minLoad = load;

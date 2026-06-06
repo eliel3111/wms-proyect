@@ -122,6 +122,20 @@ export async function getUserActiveLocation(client, userId) {
     };
   }
 
+  const warehouseResult = await client.query(`
+    SELECT id
+    FROM warehouses
+    WHERE id = $1
+`, [warehouseId]);
+
+if (warehouseResult.rowCount === 0) {
+  console.log(`❌Warehouse ${warehouseId} assigned to user ${userId} does not exist`);
+    throw {
+        code: "INVALID_USER_WAREHOUSE",
+        message: `Warehouse ${warehouseId} assigned to user ${userId} does not exist`
+    };
+}
+
   console.log("🏬 USER WAREHOUSE:", warehouseId);
 
   //--------------------------------------------------
@@ -153,36 +167,59 @@ export async function getUserActiveLocation(client, userId) {
 
   } else {
 
-    console.log("📍 CREANDO NUEVA UBICACION");
+    console.log("📍 CREANDO NUEVA UBICACION", userId);
 
-    const locationResult = await client.query(`
-      INSERT INTO locations
-      (
-        code,
-        warehouse_id,
-        location_type,
-        is_active
-      )
-      VALUES
-      (
-        $1,
-        $2,
-        'PICKING',
-        true
-      )
-      RETURNING
-        id,
-        code,
-        warehouse_id,
-        location_type
-    `, [
-      `USER-HAND-${userId}`,
-      warehouseId
-    ]);
+    console.log("📍 CREANDO NUEVA UBICACION", userId);
 
-    location = locationResult.rows[0];
+try {
 
-    console.log("✅ UBICACION CREADA:", location);
+  const locationResult = await client.query(`
+    INSERT INTO locations
+    (
+      code,
+      warehouse_id,
+      location_type,
+      is_active
+    )
+    VALUES
+    (
+      $1,
+      $2,
+      'PICKING',
+      true
+    )
+    RETURNING
+      id,
+      code,
+      warehouse_id,
+      location_type
+  `, [
+    `USER-HAND-${userId}`,
+    warehouseId
+  ]);
+
+  console.log("📍 CREANDO NUEVA UBICACION 2");
+
+  location = locationResult.rows[0];
+
+  console.log("✅ UBICACION CREADA:", location);
+
+} catch (err) {
+
+  console.log("================================");
+  console.log("🔥 ERROR INSERT LOCATION");
+  console.log("================================");
+
+  console.log(err);
+  console.log("MESSAGE:", err.message);
+  console.log("CODE:", err.code);
+  console.log("DETAIL:", err.detail);
+  console.log("CONSTRAINT:", err.constraint);
+  console.log("TABLE:", err.table);
+  console.log("COLUMN:", err.column);
+
+  throw err;
+}
   }
 
   //--------------------------------------------------

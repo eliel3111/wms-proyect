@@ -203,6 +203,217 @@ export async function moveInventoryBetweenLocationsV2(
 }
 
 
+export async function moveInventoryGeneralLocation(
+  client,
+  {
+    productSku,
+    fromLocation,
+    toLocation,
+    qty,
+    qty_promised
+  }
+) {
+
+  console.log("🚀 MOVE INVENTORY FROM GENERAL LOCATION:", {
+    productSku,
+    fromLocation,
+    toLocation,
+    qty,
+    qty_promised
+  });
+
+  // 🔴 VALIDACIONES
+  if (Number(fromLocation) === Number(toLocation)) {
+    throw {
+      code: "SAME_LOCATION",
+      message: "Origen y destino no pueden ser iguales"
+    };
+  }
+
+  if (qty < 0) {
+    throw {
+      code: "INVALID_QTY",
+      message: "Cantidad inválida"
+    };
+  }
+
+  if (qty_promised < 0) {
+    throw {
+      code: "INVALID_PROMISED_QTY",
+      message: "Cantidad comprometida inválida"
+    };
+  }
+
+  // 1️⃣ Obtener warehouses
+  const locationsResult = await client.query(`
+    SELECT id, warehouse_id
+    FROM locations
+    WHERE id = ANY($1)
+  `, [[Number(fromLocation), Number(toLocation)]]);
+
+  if (locationsResult.rowCount < 2) {
+    throw {
+      code: "LOCATION_NOT_FOUND",
+      message: "Una o ambas ubicaciones no existen"
+    };
+  }
+
+  const fromLoc = locationsResult.rows.find(
+    l => Number(l.id) === Number(fromLocation)
+  );
+
+  const toLoc = locationsResult.rows.find(
+    l => Number(l.id) === Number(toLocation)
+  );
+
+  const fromWarehouse = fromLoc.warehouse_id;
+  const toWarehouse = toLoc.warehouse_id;
+
+// 2️⃣ Inventario origen
+const fromResult = await client.query(`
+  SELECT
+    id,
+    qty_available,
+    qty_on_hand,
+    qty_reserved
+  FROM inventory_by_location
+  WHERE warehouse_id = $1
+    AND product_sku = $2
+    AND location_id = $3
+  FOR UPDATE
+`, [
+  fromWarehouse,
+  productSku,
+  Number(fromLocation)
+]);
+
+// 3️⃣ Descontar origen SOLO SI EXISTE Y TIENE STOCK
+if (fromResult.rowCount > 0) {
+
+  const fromInv = fromResult.rows[0];
+
+  const currentOnHand =
+    Number(fromInv.qty_on_hand || 0);
+
+  const currentReserved =
+    Number(fromInv.qty_reserved || 0);
+
+  if (currentOnHand > 0) {
+
+    const qtyToSubtract = Math.min(
+      Number(qty),
+      currentOnHand
+    );
+
+    const reservedToSubtract = Math.min(
+      Number(qty_promised),
+      currentReserved
+    );
+
+    await client.query(`
+      UPDATE inventory_by_location
+      SET
+        qty_on_hand = qty_on_hand - $1,
+        qty_reserved = qty_reserved - $2,
+        updated_at = now()
+      WHERE id = $3
+    `, [
+      qtyToSubtract,
+      reservedToSubtract,
+      fromInv.id
+    ]);
+
+    console.log("✅ INVENTARIO DESCONTADO DEL ORIGEN:", {
+      qtyToSubtract,
+      reservedToSubtract,
+      fromInvId: fromInv.id
+    });
+
+  } else {
+
+    console.log(
+      "⚠️ El origen existe pero no tiene stock. No se descuenta nada."
+    );
+  }
+
+} else {
+
+  console.log(
+    "⚠️ No existe inventario en origen. No se descuenta nada."
+  );
+}
+
+// 4️⃣ Buscar inventario destino
+const toResult = await client.query(`
+  SELECT id
+  FROM inventory_by_location
+  WHERE warehouse_id = $1
+    AND product_sku = $2
+    AND location_id = $3
+  FOR UPDATE
+`, [
+  toWarehouse,
+  productSku,
+  Number(toLocation)
+]);
+
+let toInvId;
+
+// 5️⃣ Crear destino si no existe
+if (toResult.rowCount === 0) {
+
+  console.log("➕ CREANDO INVENTARIO DESTINO");
+
+  const insertResult = await client.query(`
+    INSERT INTO inventory_by_location (
+      warehouse_id,
+      product_sku,
+      location_id,
+      qty_on_hand,
+      qty_reserved
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      0,
+      0
+    )
+    RETURNING id
+  `, [
+    toWarehouse,
+    productSku,
+    Number(toLocation)
+  ]);
+
+  toInvId = insertResult.rows[0].id;
+
+} else {
+
+  toInvId = toResult.rows[0].id;
+}
+
+// 6️⃣ Siempre sumar destino
+await client.query(`
+  UPDATE inventory_by_location
+  SET
+    qty_on_hand = qty_on_hand + $1,
+    updated_at = now()
+  WHERE id = $2
+`, [
+  qty,
+  toInvId
+]);
+
+console.log("✅ INVENTARIO SUMADO EN DESTINO:", {
+  qty,
+  toInvId
+});
+
+return {
+  success: true
+};
+}
 
 
 /*export async function moveInventoryBetweenLocations(

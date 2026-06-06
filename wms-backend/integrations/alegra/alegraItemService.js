@@ -67,3 +67,62 @@ export const alegraWarehousesService = {
   updateWarehouse: (id, body, params) =>
     put(`/warehouses/${id}`, body, params),
 };
+
+
+export const alegraPurchaseOrdersService = {
+  getPurchaseOrders: (params) =>
+    get("/purchase-orders", params),
+
+  getPurchaseOrderById: (id, params) =>
+    get(`/purchase-orders/${id}`, params),
+
+  getAllPurchaseOrders: async (params = {}) => {
+    const limit = 30;
+    let start = 0;
+    let allOrders = [];
+    let page = 1;
+
+    while (true) {
+      console.log(
+        `📄 Consultando página ${page} | start=${start} | limit=${limit}`
+      );
+
+      const orders = await get("/purchase-orders", {
+        ...params,
+        start,
+        limit,
+      });
+
+      console.log(
+        `✅ Página ${page} recibió ${orders?.length || 0} órdenes`
+      );
+
+      if (!orders || orders.length === 0) {
+        console.log("🏁 No hay más órdenes");
+        break;
+      }
+
+      allOrders.push(...orders);
+
+      console.log(
+        `📦 Total acumulado: ${allOrders.length} órdenes`
+      );
+
+      if (orders.length < limit) {
+        console.log(
+          `🏁 Última página encontrada (${orders.length} < ${limit})`
+        );
+        break;
+      }
+
+      start += limit;
+      page++;
+    }
+
+    console.log(
+      `🎉 Sincronización completada. Total órdenes: ${allOrders.length}`
+    );
+
+    return allOrders;
+  },
+};

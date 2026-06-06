@@ -14,20 +14,26 @@ import { setIO } from "./socket.js";
 //import { getActiveSaleOrders } from "./integrations/odoo/odoo.sale.service.js";
 //[ODOO] import { getActiveSaleMoves } from "./integrations/odoo/odoo.sale.lines.service.js";
 import { startCronJobs, productsCronJobs } from "./cron/cronJobs.js";
-import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 //import { startWarehouseCron } from "./cron/cronJobs.js";
 import { startMainCron, runFullSync } from "./cron/cronJobs.js";
 import { assignmentService } from "./services/saleAssignmentService.js";
-import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js"
 import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
+
+
+//CITRUS
 import { fetchPurchaseOrdersTest, fetchAllItemsAndSync } from "./integrations/citrus/citrus.items.js";
 import { createConduce } from "./integrations/citrus/citrus.saleOrder.js";
+import {getActiveSaleOrders} from "./integrations/citrus/citrus.saleOrder.js"
+import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js";
+import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 
 //ALEGRA
 import { alegraItemsService, alegraItemCategoriesService, alegraWarehousesService } from "./integrations/alegra/alegraItemService.js";
-import {getActiveSaleOrders} from "./integrations/citrus/citrus.saleOrder.js"
-import {upsertWarehouses} from "./integrations/alegra/alegra.wharehouse.js"
-import {chunkArray,  processInParallel} from "./integrations/alegra/alegra.item.js"
+import {
+  alegraPurchaseOrdersService,
+} from "./integrations/alegra/alegraItemService.js";
+import {upsertWarehouses} from "./integrations/alegra/alegra.wharehouse.js";
+import {chunkArray,  processInParallel} from "./integrations/alegra/alegra.item.js";
 
 
 
@@ -35,19 +41,21 @@ import {chunkArray,  processInParallel} from "./integrations/alegra/alegra.item.
 
 
 const app = express();
+
+//ALEGRA
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
 app.get("/alegra", async (req, res) => {
   try {
 
 
-const warehouses = await alegraWarehousesService.getWarehouses({status: 'active'});
-await upsertWarehouses(warehouses);
+/*const warehouses = await alegraWarehousesService.getWarehouses({status: 'active'});
+await upsertWarehouses(warehouses);*/
 
 
 
    
 //PRODUCTOS
-let allProducts = [];
+/*let allProducts = [];
   let start = 0;
   const limit = 30;
   let total = 0;
@@ -90,21 +98,24 @@ allProducts = response.data;
 
 //console.log(allProducts);*/
 
-const BATCH_SIZE = 100;
+//-------------------------------------------------
+/*const BATCH_SIZE = 100;
 const CONCURRENCY = 1;
-
-
 const chunks = chunkArray(allProducts, BATCH_SIZE);
-
 await processInParallel(chunks, CONCURRENCY);
+console.log("🎉 Todos los batches procesados");*/
+//-------------------------------------------------
 
-console.log("🎉 Todos los batches procesados");
+//Busca todas las ordenes de compra
+const orders =
+  await alegraPurchaseOrdersService.getAllPurchaseOrders();
 
-
+//console.log(orders);
 
     res.json({
       success: true,
-      data: allProducts,
+      data: orders,
+      //data: allProducts,
     });
   } catch (error) {
     console.error("❌ Error en /test:", error.message);
@@ -117,6 +128,14 @@ console.log("🎉 Todos los batches procesados");
   }
 });
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
+
+
+
+//CITRUS
+//🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
+
+//[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
+//startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {
@@ -184,11 +203,6 @@ app.get("/test-purchase-orders", async (req, res) => {
   });
 });
 app.use(express.json());
-
-
-
-//app.get("/ashley", emitInventorySummary);
-
 
 /* ==================================================
    TEST CREAR CONDUCE
@@ -277,11 +291,12 @@ app.post("/test-create-conduce", async (req, res) => {
   }
 
 });
+//🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 
-
-
-console.log("🔥 CRON NUEVO EJECUTANDO 🔥");
+//ODOO
+//🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
+console.log("🔥 ODOO CRON NUEVO EJECUTANDO 🔥");
 // 🔥 Cron automático
 //startMainCron();
 
@@ -314,19 +329,15 @@ app.get("/test-sale-orders", async (req, res) => {
   }
 
 });
-
-
-
 //startCronJobs();
 //productsCronJobs();
 //console.log("🔥 LLAMANDO CRON 🔥");
 //startWarehouseCron();
 
+//🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
 
 
 
-//[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-//startCitrusCron();
 
 
 
