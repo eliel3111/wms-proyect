@@ -81,7 +81,7 @@ export async function createPutawayLine(req, res) {
   FOR UPDATE
 `, [product.sku, fromLocationId]);
 
-console.log("📦 STOCK RESULT:", stockResult.rows);
+    console.log("📦 STOCK RESULT:", stockResult.rows);
 
     if (stockResult.rowCount === 0 || Number(stockResult.rows[0].qty_available) < Number(qty)) {
       throw { code: "QTY_EXCEEDS_RECEIVING" };
@@ -100,7 +100,7 @@ console.log("📦 STOCK RESULT:", stockResult.rows);
 
 
     const userLocation = await getUserActiveLocation(client, req.user.id);
-console.log("📍 USER LOCATION:", userLocation);
+    console.log("📍 USER LOCATION:", userLocation);
     if (!userLocation) {
       console.log("❌ USER LOCATION NOT FOUND");
       return res.status(404).json({
@@ -128,9 +128,9 @@ console.log("📍 USER LOCATION:", userLocation);
       const line = existingLineResult.rows[0];
 
 
-console.log("📄 LINE:", line);
+      console.log("📄 LINE:", line);
       const newPickedQty = Number(line.picked_qty) + Number(qty);
-console.log("🔢 NEW PICKED QTY:", newPickedQty);
+      console.log("🔢 NEW PICKED QTY:", newPickedQty);
       const updateResult = await client.query(`
         UPDATE putaway_lines
         SET picked_qty = $1,
@@ -147,7 +147,7 @@ console.log("🔢 NEW PICKED QTY:", newPickedQty);
       console.log("📄 UPDATE RESULT:", updateResult.rows);
 
       //Aqui luego se puede buscar la informacion del almacen del usuario
-      const warehouseId = 1;
+      const warehouseId = Number(userLocation.warehouse_id);
 
       console.log("========================================");
       console.log("🚚 INICIANDO MOVIMIENTO INVENTARIO");
@@ -212,7 +212,8 @@ console.log("🔢 NEW PICKED QTY:", newPickedQty);
     console.log("SE CREO YA UNA LINEA: ", insertResult);
 
     //Aqui luego se puede buscar la informacion del almacen del usuario
-    const warehouseId = 1;
+
+  const warehouseId = Number(userLocation.warehouse_id);
 
     await moveInventoryBetweenLocations(client, {
       warehouseId: warehouseId,

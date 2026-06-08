@@ -5,11 +5,25 @@ import { getPickingProductsWithLocationsService, getPickingConfig } from "../ser
 import { selectBestLocation, getMoveLinesOrderedByLocation } from "../services/pickingBestRoute.js";
 import { createInventoryMovement, moveInventoryBetweenLocationsV2, moveInventoryGeneralLocation } from "../services/inventoryService.js"
 import { getOrCreateDefaultLocation } from "../services/pickingBestRoute.js"
+import { buildCitrusConducePayload, createConduce } from "../integrations/citrus/citrus.saleOrder.js"
 
 
 export async function closePicking(req, res) {
   const { pickingId, locationId } = req.body;
-  console.log("PICKING Y LOCAIPN", req.body);
+
+  const userId = req.user?.id;
+  console.log("================================");
+  console.log("🚀 INICIANDO CIERRE DE PICKING");
+  console.log("📥 BODY:", req.body);
+  console.log("================================");
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      title: "Usuario no autenticado",
+      message: "No se encontró el usuario autenticado"
+    });
+  }
 
   if (!pickingId || !locationId) {
     return res.status(400).json({
@@ -23,8 +37,9 @@ export async function closePicking(req, res) {
 
   try {
     await client.query("BEGIN");
+    console.log("🟢 BEGIN iniciado");
 
-const config = await getPickingConfig(client);
+    const config = await getPickingConfig(client);
 
     /*if (!config.allow_picking_without_locations && totalReserved === 0) {*/
 
@@ -33,7 +48,16 @@ const config = await getPickingConfig(client);
 
     // 1️⃣ VALIDAR PICKING
     const pickingResult = await client.query(`
-      SELECT id, name, state
+      SELECT 
+        id,
+        name,
+        state,
+        erp_cliente_id,
+        erp_cliente,
+        erp_direccion_cliente,
+        erp_tienda_id,
+        erp_vendedor_id,
+        sale_id
       FROM stock_picking
       WHERE id = $1
       LIMIT 1
@@ -48,6 +72,8 @@ const config = await getPickingConfig(client);
 
     const picking = pickingResult.rows[0];
 
+    console.log("📦 Picking encontrado:", picking);
+
     if (["cancel", "done"].includes(picking.state)) {
       throw {
         code: "INVALID_STATE",
@@ -58,19 +84,18 @@ const config = await getPickingConfig(client);
     // 2️⃣ OBTENER LÍNEAS
     const linesResult = await client.query(`
       SELECT 
-        sml.id,
-        sml.product_id,
-        sml.product_uom_qty,
-        sml.qty_done,
-        sml.location_id,
-        p.sku
+        sml.*,
+        p.sku,
+        p.erp_id,
+        p.description
       FROM stock_move_line sml
       JOIN products p ON p.id = sml.product_id
       WHERE sml.picking_id = $1
+        AND sml.state NOT IN ('cancel', 'done')
     `, [pickingId]);
 
     const lines = linesResult.rows;
-
+    console.log("📋 Líneas activas del picking:", lines);
     if (lines.length === 0) {
       throw {
         code: "NO_LINES",
@@ -78,44 +103,94 @@ const config = await getPickingConfig(client);
       };
     }
 
+
+    const citrusResult = buildCitrusConducePayload(picking, lines);
+
+    console.log("🍊 Resultado Citrus Payload:", citrusResult);
+
+    if (!citrusResult.success) {
+      throw {
+        code: "CITRUS_VALIDATION_ERROR",
+        title: citrusResult.title,
+        message: citrusResult.message
+      };
+    }
+
+    /*const conduceResult = await createConduce(citrusResult.payload);
+
+    console.log("📤 Resultado createConduce:", conduceResult);
+
+    if (conduceResult.success === false) {
+
+      await client.query("ROLLBACK");
+      console.log("🟥 ERROR EN EL CONDUCE");
+      return res.status(200).json({
+        success: false,
+        title: "ERROR EN CITRUS",
+        message: conduceResult.message || "Error desconocido del ERP",
+        data: conduceResult.data
+      });
+    }*/
+
+    // 4️⃣ ACTUALIZAR stock_move_line
+    await client.query(`
+       UPDATE stock_move_line
+       SET state = 'done',
+           user_id = $1
+       WHERE picking_id = $2
+         AND state NOT IN ('cancel', 'done')
+     `, [userId, pickingId]);
+
+    console.log("✅ stock_move_line actualizado a done");
+    const completedMoveIds = [];
     // 3️⃣ PROCESAR CADA LÍNEA
     for (const line of lines) {
 
       const qtyDone = Number(line.qty_done || 0);
       const qtyPlanned = Number(line.product_uom_qty || 0);
+      console.log("🟨🟨🟨🟨 Procesando movimiento WMS:", {
+        lineId: line.id,
+        sku: line.sku,
+        qtyDone,
+        qtyPlanned
+      });
 
+      if (qtyDone === 0) {
+        console.log("⏭️ Línea ignorada porque qtyDone es 0:", line.sku);
+        continue;
+      }
       if (qtyPlanned === 0) continue;
 
-    if (!config.allow_picking_without_locations) {
+      if (!config.allow_picking_without_locations) {
 
-  // 🔥 MOVER INVENTARIO NORMAL
-  const resultMove = await moveInventoryBetweenLocationsV2(client, {
-    productSku: line.sku,
-    fromLocation: line.location_id,
-    toLocation: locationId,
-    qty: qtyDone,
-    qty_promised: qtyPlanned
-  });
+        // 🔥 MOVER INVENTARIO NORMAL
+        const resultMove = await moveInventoryBetweenLocationsV2(client, {
+          productSku: line.sku,
+          fromLocation: line.location_id,
+          toLocation: locationId,
+          qty: qtyDone,
+          qty_promised: qtyPlanned
+        });
 
-  console.log("✅ RESULTADO MOVE:", resultMove);
+        console.log("✅ RESULTADO MOVE:", resultMove);
 
-} else {
+      } else {
 
-  console.log(
-    "🟥🚨🟨 allow_picking_without_locations=true → usando moveInventoryGeneralLocation"
-  );
+        console.log(
+          "🟥🚨🟨 allow_picking_without_locations=true → usando moveInventoryGeneralLocation"
+        );
 
-  const resultMove = await moveInventoryGeneralLocation(client, {
-    productSku: line.sku,
-    fromLocation: line.location_id,
-    toLocation: locationId,
-    qty: qtyDone,
-    qty_promised: qtyPlanned
-  });
+        const resultMove = await moveInventoryGeneralLocation(client, {
+          productSku: line.sku,
+          fromLocation: line.location_id,
+          toLocation: locationId,
+          qty: qtyDone,
+          qty_promised: qtyPlanned
+        });
 
-  console.log("✅ RESULTADO MOVE GENERAL:", resultMove);
-}
-      console.log(lines);
+        console.log("✅ RESULTADO MOVE GENERAL:", resultMove);
+      }
+      console.log(line);
 
       if (qtyDone === 0) continue;
 
@@ -128,55 +203,141 @@ const config = await getPickingConfig(client);
         movementType: "SHIP",
         referenceType: picking.name,
         referenceId: pickingId,
-        createdBy: 1,
+        createdBy: userId,
         note: `Movimiento por cierre de picking ${picking.name}`
       });
+
+      if (qtyDone === qtyPlanned) {
+
+        console.log("✅ MOVE COMPLETADO");
+
+        completedMoveIds.push(Number(line.move_id));
+
+        console.log("🟨 COMPLETED MOVE IDS:", completedMoveIds);
+      }
+
+      if (
+        qtyDone > 0 &&
+        qtyDone < qtyPlanned
+      ) {
+
+        const remainingQty = qtyPlanned - qtyDone;
+
+        console.log("🟨 PICKING PARCIAL DETECTADO");
+        console.log({
+          lineId: line.id,
+          sku: line.sku,
+          qtyPlanned,
+          qtyDone,
+          remainingQty
+        });
+
+        await client.query(`
+  UPDATE stock_move_line
+  SET product_uom_qty = $1,
+      qty_done = $2
+  WHERE id = $3
+`, [
+          qtyDone,
+          qtyDone,
+          line.id
+        ]);
+
+        await client.query(`
+  INSERT INTO stock_move_line (
+    move_id,
+    picking_id,
+    product_id,
+    product_uom_id,
+    product_uom_qty,
+    qty_done,
+    location_id,
+    warehouse_id,
+    state
+  )
+  VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9
+  )
+`, [
+          line.move_id,
+          line.picking_id,
+          line.product_id,
+          line.product_uom_id,
+          remainingQty,
+          0,
+          line.location_id,
+          line.warehouse_id,
+          "assigned"
+        ]);
+
+        console.log(
+          `🟨 Línea pendiente creada para ${line.sku}. Restante: ${remainingQty}`
+        );
+      }
+
+
+
     }
 
-   /* // 4️⃣ ACTUALIZAR stock_move_line
-    await client.query(`
-      UPDATE stock_move_line
-      SET state = 'done',
-          user_id = $1
-      WHERE picking_id = $2
-    `, [1, pickingId]);
 
-    // 5️⃣ ACTUALIZAR stock_move
-    await client.query(`
-      UPDATE stock_move
-      SET state = 'done'
-      WHERE id IN (
-        SELECT move_id FROM stock_move_line WHERE picking_id = $1
-      )
-    `, [pickingId]);
 
-    // 6️⃣ ACTUALIZAR stock_picking
-    await client.query(`
-      UPDATE stock_picking
-      SET state = 'done'
-      WHERE id = $1
-    `, [pickingId]);*/
+    if (completedMoveIds.length > 0) {
+
+      await client.query(`
+    UPDATE stock_move
+    SET state = 'done'
+    WHERE id = ANY($1::int[])
+  `, [completedMoveIds]);
+
+      console.log(
+        "✅ stock_move actualizado a done:",
+        completedMoveIds
+      );
+    }
+
+    /* // 6️⃣ ACTUALIZAR stock_picking
+     await client.query(`
+       UPDATE stock_picking
+       SET state = 'done'
+       WHERE id = $1
+     `, [pickingId]);
+     
+     console.log("✅ stock_picking actualizado a done");*/
 
     await client.query("COMMIT");
+    console.log("🟢 COMMIT realizado correctamente");
+
 
     return res.status(200).json({
       success: true,
       message: "Picking cerrado correctamente"
     });
 
+    /*return res.status(200).json({
+      success: true,
+      title: "Picking cerrado",
+      message: "Picking cerrado correctamente",
+      conduce: conduceResult
+    });*/
+
   } catch (error) {
     await client.query("ROLLBACK");
 
-    console.error("❌ ERROR closeReceiving:", error);
+    console.error("================================");
+    console.error("❌ ERROR closePicking");
+    console.error(error);
+    console.error("================================");
 
     return res.status(400).json({
       success: false,
       code: error.code || "ERROR",
+      title: error.title || "Error cerrando picking",
       message: error.message || "Error cerrando picking"
     });
 
   } finally {
     client.release();
+    console.log("🔚 Cliente PostgreSQL liberado");
   }
 }
 
@@ -261,13 +422,13 @@ export async function getBestShippingLocation(req, res) {
   GROUP BY location_id
   `
     );
-const assignmentsMap = new Map();
+    const assignmentsMap = new Map();
     console.log(
       "🗺️ Assignments Map:",
       Object.fromEntries(assignmentsMap)
     );
 
-    
+
 
     assignmentsResult.rows.forEach(row => {
       assignmentsMap.set(Number(row.location_id), Number(row.total_lines));
@@ -458,7 +619,10 @@ export async function getPickingDifferences(req, res) {
         sml.product_uom_qty,
         sml.qty_done,
         p.sku,
-        p.description
+        p.description,
+        p.erp_name,
+        p.erp_sku,
+        p.erp_id
       FROM stock_move_line sml
       LEFT JOIN products p ON p.id = sml.product_id
       WHERE sml.picking_id = $1

@@ -908,8 +908,17 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
 }
 
 
-
 export async function createConduce(payloadERP) {
+  console.log("🟨 [CITRUS] Enviando conduce");
+  console.log("📤 Payload:", payloadERP);
+
+  if (!payloadERP) {
+    return {
+      success: false,
+      title: "Payload requerido",
+      message: "No se puede crear conduce sin payload"
+    };
+  }
   try {
 
     // 🔹 1. Formatear fecha
@@ -920,8 +929,20 @@ export async function createConduce(payloadERP) {
       console.log("🟨 PAYLOAD ERP:");
 console.log(JSON.stringify(payloadERP, null, 2));
 
+if (
+  !payloadERP.ConduceDetalles ||
+  !Array.isArray(payloadERP.ConduceDetalles) ||
+  payloadERP.ConduceDetalles.length === 0
+) {
+  return {
+    success: false,
+    title: "Sin líneas",
+    message: "El conduce no tiene líneas para enviar"
+  };
+}
+
     // 🔹 2. Construir detalles dinámicamente
-    const detallesXML = payloadERP.Detalles.map(det => {
+   const detallesXML = payloadERP.ConduceDetalles.map(det => {
 
   console.log("🟦 DETALLE:");
   console.log(det);
@@ -965,12 +986,17 @@ ${detallesXML}
 const data = await callERPCreateConduce(xml);
 
     // 🔹 5. Validar respuesta
-    if (!data || data.Success === 0) {
+if (!data || data.Success === 0) {
 
-      console.log("🟥 ERP ERROR:", data?.Mensaje);
+  console.log("🟥 ERP ERROR:", data?.Mensaje);
 
-      return null;
-    }
+  return {
+    success: false,
+    title: "ERP_ERROR",
+    message: data?.Mensaje || "Error desconocido del ERP",
+    data
+  };
+}
 
     console.log("🟩 CONDUCE CREADO:", data);
 
@@ -982,4 +1008,71 @@ const data = await callERPCreateConduce(xml);
 
     return null;
   }
+}
+
+
+
+export function buildCitrusConducePayload(picking, lines) {
+  console.log("🟦 [CITRUS] Iniciando armado de conduce");
+  console.log("📦 Picking:", picking);
+  console.log("📋 Líneas recibidas:", lines);
+
+  const conduceLines = [];
+
+  for (const line of lines) {
+    const qtyDone = Number(line.qty_done || 0);
+    const qtyPlanned = Number(line.product_uom_qty || 0);
+
+    console.log("🔍 Revisando línea:", {
+      lineId: line.id,
+      sku: line.sku,
+      qtyDone,
+      qtyPlanned
+    });
+
+    if (qtyDone > qtyPlanned) {
+      return {
+        success: false,
+        title: "Cantidad inválida",
+        message: `El producto ${line.sku} tiene qty_done mayor que la cantidad requerida`
+      };
+    }
+
+    if (qtyDone > 0) {
+      conduceLines.push({
+        ItemId: line.erp_id,
+        ItemNombre: line.description,
+        ItemCantidad: qtyDone
+      });
+    }
+  }
+
+  if (conduceLines.length === 0) {
+    return {
+      success: false,
+      title: "Sin productos despachados",
+      message: "Todas las líneas tienen cantidad despachada en cero"
+    };
+  }
+
+  const payload = {
+    ClienteId: picking.erp_cliente_id,
+    ClienteNombre: picking.erp_cliente,
+    ClienteDireccion: picking.erp_direccion_cliente,
+    TiendaId: picking.erp_tienda_id,
+    VendedorId: picking.erp_vendedor_id,
+    OrdenVentaId: picking.sale_id,
+    Estatus: "A",
+    Fecha: new Date().toISOString().slice(0, 19),
+    Nota: `Conduce generado desde WMS para picking ${picking.name}`,
+    ConduceDetalles: conduceLines
+  };
+
+  console.log("✅ [CITRUS] Payload generado:", payload);
+
+  return {
+    success: true,
+    payload,
+    lines: conduceLines
+  };
 }

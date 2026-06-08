@@ -559,7 +559,8 @@ export async function getMoveLinesOrderedByLocation(client, pickingId) {
         p.sku,
         p.description,
         p.erp_name,
-        p.erp_sku
+        p.erp_sku,
+        P.erp_id
 
       FROM stock_move_line sml
 

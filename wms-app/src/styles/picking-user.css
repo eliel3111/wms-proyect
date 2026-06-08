@@ -157,6 +157,12 @@
   box-shadow: none;
 }
 
+.pick-user-location-error {
+    background: #ff0000 !important;
+    border: 2px solid #ff0000;
+    transition: all 0.2s ease;
+}
+
 /* CONTENEDOR */
 .pick-user-location-card {
   border: 1px solid #efefef;
@@ -190,6 +196,19 @@
 /* CODIGO DERECHA */
 .pick-user-location-code {
   font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-weight: 900;
+  color: #212121;
+  letter-spacing: 1px;
+  min-width: 10px;
+  /* 🔥 estilo tipo badge */
+  background: #212121;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.pick-user-product-code {
+  font-size: clamp(1rem, 4vw, 1.5 rem);
   font-weight: 900;
   color: #212121;
   letter-spacing: 1px;

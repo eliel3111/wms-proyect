@@ -98,12 +98,19 @@ export default function PickingFinal() {
             });
             console.log("RESULTADO: ", result);
            if (result.success) {
-                console.log("FUNCIONO")
+                console.log("🟩 FUNCIONO")
                 setConfirmation({
                     show: true,
                     receiptCode: result.receiptCode
                 });
                 setLoading(false);
+            } else {
+                console.log("❌ NO FUNCIONO");
+                openModal({
+                title: result.title,
+                message: result.message,
+            });
+            setLoading(false);
             }
         } else {
 
@@ -125,7 +132,7 @@ async function closeReceiving(payload: CloseReceivingPayload) {
         console.log(payload);
         const response = await apiClient.post("/picking/close", payload);
 
-        console.log("✅ RESPONSE:", response.data);
+        console.log("✅ RESPONSE:", response);
 
         return response.data;
 

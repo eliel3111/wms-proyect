@@ -15,7 +15,7 @@ export async function callERP(endpoint, soapAction, xmlBody) {
     let auth = await getERPAuth();
 
 
-    const url = `https://api.citrus.com.do/40/${endpoint}`;
+    const url = `https://testapi.citrus.com.do/40/${endpoint}`;
     //console.log("SOAP", soapAction);
 
 

@@ -223,11 +223,11 @@ export async function insertNewProductFromERP(client, item) {
     // --------------------------------
 
     const skuResult = await client.query(`
-        SELECT
-            'SKU-' || LPAD(nextval('sku_seq')::text, 5, '0') AS sku
-    `);
+    SELECT
+        'SKU-' || LPAD(nextval('products_sku_seq')::text, 5, '0') AS sku
+`);
 
-    const sku = skuResult.rows[0].sku;
+const sku = skuResult.rows[0].sku;
 
     console.log("🟨 NUEVO SKU:", sku);
 

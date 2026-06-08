@@ -28,6 +28,8 @@ export default function PickingRoute() {
         sku: string;
         description: string;
         erp_name?: string | null;
+        erp_sku?: string | null;
+        erp_id?: number;
     };
 
     type Location = {
@@ -70,6 +72,9 @@ export default function PickingRoute() {
 
     const [qty, setQty] = useState<string>("");
     const qtyRef = useRef<string>("");
+
+    //State de error de location rojo
+    const [locationError, setLocationError] = useState(false);
 
     useEffect(() => {
         currentLineRef.current = currentLine;
@@ -202,9 +207,23 @@ export default function PickingRoute() {
                     console.log("LLEGO DEL BACKKEND: ", data);
 
                     // 🟢 ES UBICACIÓN
+
+
                     if (data.success && data.type === "location") {
                         console.log("📍 UBICACIÓN DETECTADA:", data.data);
+                        console.log("🟨 Current Location: ", currentLineRef.current?.code);
                         handleScanLocation(data.data);
+                        if (data.data.code !== currentLineRef.current?.code) {
+
+                            setLocationError(true);
+
+                            setTimeout(() => {
+                                setLocationError(false);
+                            }, 2000);
+
+                            return;//🟨🟨🟨🟨
+                        }
+
                     }
 
                     // 🔵 ES PRODUCTO
@@ -346,6 +365,10 @@ export default function PickingRoute() {
             focusQtyInput();
         } else {
             console.log("❌ No es el mismo código");
+            openModal({
+                title: "Escanee el producto correcto",
+                message: "El produco leido no es el producto en pantalla."
+            });
         }
 
     }
@@ -678,6 +701,8 @@ export default function PickingRoute() {
                                     received_qty: Math.trunc(Number(line.qty_done)),
                                     min_received_qty: 0,
                                     erp_name: line.erp_name,
+                                    erp_sku: line.erp_sku,
+                                    erp_id: line.erp_id,
 
                                     product_exists: true,
                                     barcodes: [],
@@ -708,10 +733,14 @@ export default function PickingRoute() {
 
                         {/* ORIGEN */}
                         <section
-                            className={`pick-user-location-card ${!fromLocation || fromLocation.code !== currentLine?.code
-                                ? "pick-user-location-empty"
-                                : ""
-                                }`}
+                            className={`pick-user-location-card
+        ${locationError
+                                    ? "pick-user-location-error"
+                                    : !fromLocation || fromLocation.code !== currentLine?.code
+                                        ? "pick-user-location-empty"
+                                        : ""
+                                }
+    `}
                         >
                             <span className="pick-user-location-label">
                                 Lea la ubicación:
@@ -741,8 +770,8 @@ export default function PickingRoute() {
                             <div className="pick-user-location-header">
 
 
-                                <span className="pick-user-location-code">
-                                    {currentLine?.sku}
+                                <span className="pick-user-product-code">
+                                    {currentLine?.erp_name} / {currentLine?.erp_sku} / {currentLine?.description} / {currentLine?.sku} / {currentLine?.erp_id}
                                 </span>
                             </div>
 

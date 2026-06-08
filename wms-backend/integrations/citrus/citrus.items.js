@@ -267,26 +267,30 @@ export async function fetchPurchaseOrdersTest(lastWriteDate) {
 
     //console.log("🚨CPO CHECK 5 - CALL ERP RESULT: ", data);
     const orders = data?.Data?.OrdenCompras || [];
-    //console.log("🚨CPO CHECK 6 - ORDERS RESULT: ", orders);
+    console.log("🚨CPO CHECK 6 - ORDERS RESULT: ", orders);
     for (const order of orders) {
 
       console.log("📦 ERP Orden:", order.Id);
-      console.log("📦 ERP Orden:", order.OrdenCompraDetalles.Item);
+      console.log("📦 ERP Orden:", order.OrdenCompraDetalles);
 
       // 🔥 guarda/actualiza PO
       const wmsId = await syncPurchaseOrder(order);
 
       console.log("🆔 WMS PO ID:", wmsId);
+      console.log("🟨 ESTADO ERP Orden:", order.Estatus);
 
       // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
-      await syncPurchaseOrderLines(order, wmsId);
+      if (order.Estatus !== "C") {
+await syncPurchaseOrderLines(order, wmsId);
+      };
+      
 
-      // 🔎 logs (opcional)
+      /*// 🔎 logs (opcional)
       for (const line of order.OrdenCompraDetalles || []) {
         console.log("  Producto:", line.Item?.Nombre);
         console.log("  SKU:", line.Item?.SKU);
         console.log("  Cantidad:", line.ItemCantidad);
-      }
+      }*/
     }
 
     return data;
@@ -402,6 +406,10 @@ async function syncPurchaseOrderLines(order, purchaseOrderId) {
   line_number: index + 1,
   description: line.ItemDescripcion || line.Item?.Nombre || null
 }));
+
+
+ 
+
 
   // 🔥 QUERY MASIVA
   await db.query(

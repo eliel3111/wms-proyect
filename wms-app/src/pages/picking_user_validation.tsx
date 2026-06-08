@@ -17,6 +17,9 @@ type Diferencia = {
     difference_qty: number;
     product_exists: boolean;
     barcodes: string[];
+    erp_name?: string | null;
+    erp_sku?: string | null;
+    erp_id?: number;
 };
 
 
@@ -62,6 +65,9 @@ export default function PickingValidation() {
                         difference_qty: ordered - received,
                         product_exists: true,
                         barcodes: [],
+                        erp_name: line.erp_name,
+                        erp_sku: line.erp_sku,
+                        erp_id: line.erp_id,
                     };
                 });
                 console.log(result.data);
@@ -126,6 +132,7 @@ export default function PickingValidation() {
                                     ...line,
                                     product_exists: true,
                                     barcodes: [],
+                                    erp_name: line.erp_name,
                                 }}
                                 validation={true}
                             />
@@ -148,22 +155,22 @@ export default function PickingValidation() {
                     <div className="pick-user-validation-footer" >
                         <div>
                             <button
-                        className="btn-finalize-back"
-                        onClick={() => goToOrder(Number(id))}
-                    >
-                        Atras
-                    </button>
+                                className="btn-finalize-back"
+                                onClick={() => goToOrder(Number(id))}
+                            >
+                                Atras
+                            </button>
                         </div>
                         <div>
                             <button
-                            className="btn-finalize-blue"
-                            onClick={() => navigate(`/picking/final/${id}`)}
-                        >
-                            Finalizar
-                        </button>
+                                className="btn-finalize-blue"
+                                onClick={() => navigate(`/picking/final/${id}`)}
+                            >
+                                Finalizar
+                            </button>
                         </div>
-                        
-                        </div>
+
+                    </div>
 
                 </div>
 
