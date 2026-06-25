@@ -375,14 +375,17 @@ async function syncSalesOrder(clientDb, order) {
     const erp_direccion_cliente = order.DireccionCliente ?? null;
 
     // 🔹 Estado
-    const statusMap = {
-      A: "draft",
-      C: "cancel",
-    };
+    const newState =
+      order.Estatus === "C"
+        ? "cancel"
+        : order.Estatus === "F"
+          ? "done"
+          : null;
 
-    const state = statusMap[order.Estatus] || "draft";
+    console.log("🟥🟨 ESTATUS ERP:", order.Estatus);
+    console.log("🟥🟨 ESTATUS WMS:", newState);
 
-    console.log("🟥🟨 ESTATUS FINAL: ", state);
+
 
     /* =========================
        1️⃣ UPDATE
@@ -392,7 +395,11 @@ async function syncSalesOrder(clientDb, order) {
   UPDATE stock_picking
   SET
     sale_id = $1,
-    state = $2,
+    state = CASE
+          WHEN $2::varchar IS NOT NULL
+          THEN $2::varchar
+          ELSE state
+        END,
     erp_location_id = $3,
     erp_location_dest_id = $4,
     order_name = $5,
@@ -405,7 +412,7 @@ async function syncSalesOrder(clientDb, order) {
   RETURNING id, order_name
 `, [
       saleId,
-      state,
+      newState,
       locationId,
       locationDestId,
       saleName,
@@ -452,7 +459,7 @@ async function syncSalesOrder(clientDb, order) {
 `, [
       erpId,
       saleId,
-      state,
+      newState ?? "draft",
       'outgoing',
       locationId,
       locationDestId,
@@ -653,12 +660,16 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
 
         const moveResult = await clientDb.query(
           `
-  SELECT EXISTS (
-    SELECT 1
-    FROM stock_move
-    WHERE erp_product_id = $1
+  SELECT 
+    id,
+    product_qty,
+    reserved_qty,
+    state
+  FROM stock_move
+  WHERE erp_product_id = $1
     AND picking_id = $2
-  ) AS move_exists
+  LIMIT 1
+  FOR UPDATE
   `,
           [
             erp_product_id,
@@ -666,8 +677,8 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
           ]
         );
 
-        const moveExists =
-          moveResult.rows[0].move_exists;
+        const moveExists = moveResult.rows.length > 0;
+        const currentMove = moveResult.rows[0] || null;
 
         console.log("VALIDAR SI MOVE EXISTE", moveExists);
 
@@ -733,57 +744,48 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
         ===================================== */
 
         if (moveExists) {
+          console.log("🟦 UPDATE MOVE:", erp_move_id);
 
-          console.log(
-            "🟦 UPDATE MOVE:",
-            erp_move_id
-          );
+          const currentReservedQty = Number(currentMove.reserved_qty || 0);
+          const newProductQty = Number(product_qty || 0);
 
-          const updateFields = [
-            `product_qty = $1`,
-            `reference = $2`,
-            `product_id = $3`,
-            `product_uom_id = $4`,
-            `write_date = now()`
-          ];
-
-          const params = [
-            product_qty,
-            reference,
-            product_id,
-            product_uom_id
-          ];
-
-          // 🔥 SOLO UPDATE STATE SI TIENE VALOR
-          if (state) {
-            updateFields.push(`state = $5`);
-
-            params.push(state);
-          }
-
-          params.push(
-            erp_product_id,
-            pickingIdInt
-          );
-
-          const whereIndex1 =
-            params.length - 1;
-
-          const whereIndex2 =
-            params.length;
+          console.log("🟨 MOVE ACTUAL:", {
+            moveId: currentMove.id,
+            oldProductQty: currentMove.product_qty,
+            currentReservedQty,
+            newProductQty
+          });
 
           await clientDb.query(
             `
-            UPDATE stock_move
-            SET
-              ${updateFields.join(", ")}
-
-            WHERE erp_product_id = $${whereIndex1}
-            AND picking_id = $${whereIndex2}
-            `,
-            params
+    UPDATE stock_move
+    SET
+      product_qty = $1,
+      reserved_qty = LEAST(COALESCE(reserved_qty, 0), $1),
+      reference = $2,
+      product_id = $3,
+      product_uom_id = $4,
+      write_date = now()
+      ${state ? `, state = $5` : ``}
+    WHERE id = $${state ? 6 : 5}
+    `,
+            state
+              ? [
+                newProductQty,
+                reference,
+                product_id,
+                product_uom_id,
+                state,
+                currentMove.id
+              ]
+              : [
+                newProductQty,
+                reference,
+                product_id,
+                product_uom_id,
+                currentMove.id
+              ]
           );
-
         }
 
         /* =====================================
@@ -926,37 +928,37 @@ export async function createConduce(payloadERP) {
       .toISOString()
       .slice(0, 19);
 
-      console.log("🟨 PAYLOAD ERP:");
-console.log(JSON.stringify(payloadERP, null, 2));
+    console.log("🟨 PAYLOAD ERP:");
+    console.log(JSON.stringify(payloadERP, null, 2));
 
-if (
-  !payloadERP.ConduceDetalles ||
-  !Array.isArray(payloadERP.ConduceDetalles) ||
-  payloadERP.ConduceDetalles.length === 0
-) {
-  return {
-    success: false,
-    title: "Sin líneas",
-    message: "El conduce no tiene líneas para enviar"
-  };
-}
+    if (
+      !payloadERP.ConduceDetalles ||
+      !Array.isArray(payloadERP.ConduceDetalles) ||
+      payloadERP.ConduceDetalles.length === 0
+    ) {
+      return {
+        success: false,
+        title: "Sin líneas",
+        message: "El conduce no tiene líneas para enviar"
+      };
+    }
 
     // 🔹 2. Construir detalles dinámicamente
-   const detallesXML = payloadERP.ConduceDetalles.map(det => {
+    const detallesXML = payloadERP.ConduceDetalles.map(det => {
 
-  console.log("🟦 DETALLE:");
-  console.log(det);
+      console.log("🟦 DETALLE:");
+      console.log(det);
 
-  return  `<ConduceDetalle>
+      return `<ConduceDetalle>
 <ItemId>${det.ItemId}</ItemId>
 <ItemNombre>${det.ItemNombre ?? ''}</ItemNombre>
 <ItemCantidad>${det.ItemCantidad}</ItemCantidad>
 </ConduceDetalle>`;
-}).join("");
+    }).join("");
 
     // 🔹 3. Construir XML SOAP
     const xml =
-`<?xml version="1.0" encoding="utf-8"?>
+      `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
 xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -982,21 +984,21 @@ ${detallesXML}
 
     console.log("🟨 XML CONDUCE:", xml);
 
-  // 🔹 4. Llamar ERP SOAP
-const data = await callERPCreateConduce(xml);
+    // 🔹 4. Llamar ERP SOAP
+    const data = await callERPCreateConduce(xml);
 
     // 🔹 5. Validar respuesta
-if (!data || data.Success === 0) {
+    if (!data || data.Success === 0) {
 
-  console.log("🟥 ERP ERROR:", data?.Mensaje);
+      console.log("🟥 ERP ERROR:", data?.Mensaje);
 
-  return {
-    success: false,
-    title: "ERP_ERROR",
-    message: data?.Mensaje || "Error desconocido del ERP",
-    data
-  };
-}
+      return {
+        success: false,
+        title: "ERP_ERROR",
+        message: data?.Mensaje || "Error desconocido del ERP",
+        data
+      };
+    }
 
     console.log("🟩 CONDUCE CREADO:", data);
 

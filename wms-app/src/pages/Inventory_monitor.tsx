@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import "../styles/picking.css";
 import "../styles/InventoryMonitor.css"
-import PickingProcess from "../components/PickingProcess.tsx"
-import PickingActive from "../components/PickingActive.tsx"
+import PickingProcess from "../components/PickingProcess.tsx";
+import PickingActive from "../components/PickingActive.tsx";
+import InventorySession from "../components/InventorySession.tsx"
 import MobileBlocker from "../components/MobileBlocker.tsx";
 import { BarChart3, Clipboard } from "lucide-react";
 
 export default function MonitorInventory() {
     const [isMobile, setIsMobile] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [view, setView] = useState("pickers-active");
+    const [view, setView] = useState("inventory-session");
 
 
 
@@ -76,7 +77,7 @@ export default function MonitorInventory() {
 
 
                         <button
-                            onClick={() => setView("pickers-active")}
+                            onClick={() => setView("inventory-session")}
                             className="sidebar-button"
                         >
                             <BarChart3 size={22} color="red" />
@@ -84,7 +85,7 @@ export default function MonitorInventory() {
                         </button>
 
                         <button
-                            onClick={() => setView("picking-process")}
+                            onClick={() => setView("inventory-posted")}
                             className="sidebar-button"
                         >
                             <Clipboard size={22} />
@@ -144,8 +145,8 @@ export default function MonitorInventory() {
 
             {/* Main content */}
             <main className="main" aria-label="Contenido principal">
-                {view === "pickers-active" && <PickingActive />}
-                {view === "picking-process" && <PickingProcess />}
+                {view === "inventory-session" && <InventorySession />}
+                {view === "inventory-posted" && <PickingProcess />}
 
             </main>
         </div>

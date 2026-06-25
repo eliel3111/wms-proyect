@@ -58,20 +58,32 @@ export async function createPutawayLine(req, res) {
 
     const sessionId = sessionResult.rows[0].id;
     console.log("✅ SESSION ID:", sessionId);
-
-    // 2️⃣ Validar que from_location es RECEIVING
+//--------------------------------------------------------------
     const locResult = await client.query(`
-      SELECT id, location_type
-      FROM locations
-      WHERE id = $1 AND is_active = true
-    `, [fromLocationId]);
+  SELECT
+      id,
+      warehouse_id,
+      location_type
+  FROM locations
+  WHERE id = $1
+    AND is_active = true
+`, [fromLocationId]);
 
-    if (locResult.rowCount === 0 || locResult.rows[0].location_type !== "RECEIVING") {
-      console.log("❌ INVALID RECEIVING LOCATION");
-      throw { code: "INVALID_RECEIVING_LOCATION" };
-    }
+if (
+  locResult.rowCount === 0 ||
+  locResult.rows[0].location_type !== "RECEIVING"
+) {
+  console.log("❌ INVALID RECEIVING LOCATION");
+  throw { code: "INVALID_RECEIVING_LOCATION" };
+}
 
-    console.log("📍 LOCATION RESULT:", locResult.rows);
+const sourceWarehouseId =
+  Number(locResult.rows[0].warehouse_id);
+
+console.log("📍 LOCATION RESULT:", locResult.rows);
+console.log("🏬 SOURCE WAREHOUSE:", sourceWarehouseId);
+
+//-------------------------------------------------------
 
     // 3️⃣ Validar stock disponible (usando qty_available)
     const stockResult = await client.query(`
@@ -99,7 +111,12 @@ export async function createPutawayLine(req, res) {
 
 
 
-    const userLocation = await getUserActiveLocation(client, req.user.id);
+    const userLocation =
+    await getUserActiveLocation(
+        client,
+        req.user.id,
+        sourceWarehouseId
+    );
     console.log("📍 USER LOCATION:", userLocation);
     if (!userLocation) {
       console.log("❌ USER LOCATION NOT FOUND");
@@ -165,7 +182,7 @@ export async function createPutawayLine(req, res) {
 
         const movementResult =
           await moveInventoryBetweenLocations(client, {
-            warehouseId,
+            warehouseId: sourceWarehouseId,
             productSku: product.sku,
             fromLocationId,
             toLocationId: userLocation.id,
@@ -216,7 +233,7 @@ export async function createPutawayLine(req, res) {
   const warehouseId = Number(userLocation.warehouse_id);
 
     await moveInventoryBetweenLocations(client, {
-      warehouseId: warehouseId,
+      warehouseId: sourceWarehouseId,
       productSku: product.sku,
       fromLocationId: fromLocationId,
       toLocationId: userLocation.id,
@@ -683,20 +700,7 @@ export async function dropPutaway(req, res) {
       });
     }
 
-    /* -----------------------------
-       3️⃣ Obtener dock del usuario
-    ------------------------------*/
-    const userLocation = await getUserActiveLocation(client, req.user.id);
-
-    if (!userLocation) {
-      return res.status(404).json({
-        success: false,
-        error: "USER_LOCATION_NOT_FOUND"
-      });
-    }
-    console.log("SE BUSCO LA UBICACION DEL USUARIO: ", userLocation);
-    console.log("alerta alerta", userLocation);
-    const dockLocationId = Number(userLocation.id);
+    
 
     /* -----------------------------
        4️⃣ Validar ubicación destino
@@ -715,8 +719,30 @@ export async function dropPutaway(req, res) {
     }
 
     const toLocation = locationResult.rows[0];
-    console.log(toLocation);
+    const sourceWarehouseId = Number(toLocation.warehouse_id);
 
+
+
+
+    /* -----------------------------
+       3️⃣ Obtener dock del usuario
+    ------------------------------*/
+    const userLocation = await getUserActiveLocation(
+  client,
+  req.user.id,
+  sourceWarehouseId
+);
+
+    if (!userLocation) {
+      return res.status(404).json({
+        success: false,
+        error: "USER_LOCATION_NOT_FOUND"
+      });
+    }
+    console.log("SE BUSCO LA UBICACION DEL USUARIO: ", userLocation);
+    console.log("alerta alerta", userLocation);
+    const dockLocationId = Number(userLocation.id);
+    
     /* -----------------------------
    4️⃣ Traer líneas disponibles en dock (FOR UPDATE)
 ------------------------------*/

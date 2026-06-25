@@ -268,12 +268,26 @@
 
 
 @media (max-width: 768px) {
+
+
     .modal-header {
-        width: 90%;
+        width: 100%;
+        background-color: #868788;
+        border-radius: 0;
+    }
+
+    .fullscreen-body {
+        padding: 0;
     }
 
     .modal-container {
-        width: 90%;
+        width: 100%;
+        flex: 1;
+
+
+
+        border-radius: 0;
+        box-shadow: none;
     }
 
     .ordered-qty {

@@ -3,7 +3,14 @@ import "../styles/ModalError.css";
 import { useModal } from "../context/ModalContext";
 
 export default function ModalError() {
-  const { isOpen, title, message, buttonText, closeModal } = useModal();
+  const {
+    isOpen,
+    title,
+    message,
+    buttonText,
+    titleColor,
+    closeModal
+  } = useModal();
 
   if (!isOpen) return null;
 
@@ -13,7 +20,9 @@ export default function ModalError() {
         className="modal-error-content"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2>{title}</h2>
+        <h2 style={{ color: titleColor ?? "red" }}>
+          {title}
+        </h2>
         <p>{message}</p>
 
         <button className="modal-error-button" onClick={closeModal}>

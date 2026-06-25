@@ -61,26 +61,45 @@ export async function getActiveStorageLocationByCode(client, code) {
 
 /*SERVICIO: Utiliza el id del usuario para buscar si tiene un location asignado a el y si lo tiene entonces buscar la informacion de ese location asignado a el*/
 
-export async function getUserActiveLocation(client, userId) {
+export async function getUserActiveLocation(
+  client,
+  userId,
+  sourceWarehouseId
+) {
 
   console.log("================================");
   console.log("🔍 GET USER ACTIVE LOCATION");
   console.log("USER ID:", userId);
 
+  const warehouseId = Number(sourceWarehouseId);
+
+console.log("🏬 SOURCE WAREHOUSE:", warehouseId);
+
+if (!warehouseId) {
+  throw {
+    code: "INVALID_SOURCE_WAREHOUSE",
+    message: "Source warehouse not provided"
+  };
+}
+
   // Buscar ubicación existente
   const result = await client.query(`
-    SELECT
-      l.id,
-      l.code,
-      l.warehouse_id,
-      l.location_type
-    FROM user_locations ul
-    JOIN locations l
-      ON l.id = ul.location_id
-    WHERE ul.user_id = $1
-      AND l.is_active = true
-    LIMIT 1
-  `, [userId]);
+  SELECT
+    l.id,
+    l.code,
+    l.warehouse_id,
+    l.location_type
+  FROM user_locations ul
+  JOIN locations l
+    ON l.id = ul.location_id
+  WHERE ul.user_id = $1
+    AND l.warehouse_id = $2
+    AND l.is_active = true
+  LIMIT 1
+`, [
+  userId,
+  warehouseId
+]);
 
   console.log("ROW COUNT:", result.rowCount);
   console.log("ROWS:", result.rows);
@@ -97,23 +116,7 @@ export async function getUserActiveLocation(client, userId) {
   // Buscar warehouse del usuario
   //--------------------------------------------------
 
-  const userResult = await client.query(`
-    SELECT warehouse_id
-    FROM users
-    WHERE id = $1
-    LIMIT 1
-  `, [userId]);
-
-  console.log("👤 USER RESULT:", userResult.rows);
-
-  if (userResult.rowCount === 0) {
-    throw {
-      code: "USER_NOT_FOUND",
-      message: `User ${userId} not found`
-    };
-  }
-
-  const warehouseId = userResult.rows[0].warehouse_id;
+  
 
   if (!warehouseId) {
     throw {

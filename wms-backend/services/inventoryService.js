@@ -1077,3 +1077,51 @@ DO UPDATE SET code = EXCLUDED.code
     }
   };
 }
+
+
+
+
+//un servicio más pequeño que reserve exactamente la cantidad pendiente que acabas de crear en la nueva stock_move_line.
+export async function reserveMoveLineQuantity(
+  client,
+  line,
+  qtyToReserve
+) {
+
+  console.log("================================");
+  console.log("🚀 RESERVE MOVE LINE QUANTITY");
+  console.log("LINE:", line);
+  console.log("QTY TO RESERVE:", qtyToReserve);
+  console.log("================================");
+
+  const result = await client.query(`
+    UPDATE inventory_by_location
+    SET qty_reserved =
+        qty_reserved + LEAST(qty_available, $1)
+    WHERE product_sku = $2
+      AND warehouse_id = $3
+      AND location_id = $4
+      AND qty_available > 0
+    RETURNING
+      qty_on_hand,
+      qty_reserved,
+      qty_available
+  `, [
+    qtyToReserve,
+    line.sku,
+    line.warehouse_id,
+    line.location_id
+  ]);
+
+  console.log("📦 RESULTADO RESERVA:");
+  console.log(result.rows);
+
+  if (result.rowCount === 0) {
+    throw {
+      code: "RESERVE_ERROR",
+      message: "No fue posible reservar inventario"
+    };
+  }
+
+  return result.rows[0];
+}

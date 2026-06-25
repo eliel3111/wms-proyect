@@ -202,7 +202,7 @@
 
 .block.empty {
     background: #FFD54F;
-    border: 2px dashed #212121;
+    
     padding: 28px;
     display: flex;
     align-items: center;
@@ -211,7 +211,7 @@
 
 .block.ready {
     background: #FFD54F;
-    border: 2px dashed #212121;
+    
 }
 
 /* TEXTO */
@@ -250,7 +250,7 @@
 .block-product.empty {
     background: #FFD54F;
     /* amarillo suave */
-    border: 2px dashed #212121;
+    
     padding: 24px;
     display: flex;
     align-items: center;
@@ -317,6 +317,31 @@
 
 .pop-in {
     animation: popIn 0.25s ease-out;
+}
+
+@media (max-width: 768px) {
+
+    .transfer-page {
+        width: 100vw;
+        min-height: auto;
+        padding: 0;
+        margin: 0;
+    }
+
+    .transfer-card {
+        width: 100vw;
+        min-height: auto; /* 👈 quitar 100vh */
+        height: auto;     /* 👈 altura según contenido */
+
+        max-width: none;
+
+        margin: 0;
+        border-radius: 0;
+
+        box-sizing: border-box;
+
+        padding: 16px;
+    }
 }
 
 @keyframes popIn {

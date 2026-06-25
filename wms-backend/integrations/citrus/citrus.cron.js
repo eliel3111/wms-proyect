@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { syncAllItems } from "./citrus.sync.js";
 import {syncAllPurchaseOrders} from "./citrus.sync.js"
+import { getActiveSaleOrders } from "./citrus.saleOrder.js"
 
 
 let running = false;
@@ -11,7 +12,12 @@ const MIN_INTERVAL = 10000; // 10 segundos
 export function startCitrusCron() {
   console.log("🟢 Citrus cron started");
 
-  cron.schedule("*/10 * * * * *", async () => {
+  // =================================
+  // CITRUS SYNC
+  // Cada 3 minutos en segundo 0
+  // 00:00, 03:00, 06:00...
+  // =================================
+  cron.schedule("0 */1 * * * *", async () => {
     const now = Date.now();
 
     // 🚫 Evitar ejecuciones simultáneas o muy seguidas
@@ -46,4 +52,32 @@ export function startCitrusCron() {
 
     running = false;
   });
+
+
+   // =================================
+  // SALE ORDERS
+  // Cada minuto en segundo 30
+  // 00:30, 01:30, 02:30...
+  // =================================
+  cron.schedule("30 * * * * *", async () => {
+
+  console.log("================================");
+  console.log("⏰ CRON PURCHASE ORDERS");
+  console.log(new Date().toISOString());
+  console.log("================================");
+
+  try {
+
+    await getActiveSaleOrders();
+
+    console.log("✅ SALES ORDERS FINALIZADO");
+
+  } catch (error) {
+
+    console.error("❌ ERROR SALES ORDERS");
+    console.error(error);
+
+  }
+
+});
 }

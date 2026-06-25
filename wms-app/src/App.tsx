@@ -27,6 +27,7 @@ import PickingValidation from "./pages/picking_user_validation.tsx";
 import PickingFinal from "./pages/picking_user_final.tsx"
 import BarcodePage from "./pages/Barcode-main.tsx";
 import MonitorInventory from "./pages/Inventory_monitor.tsx"
+import Inventory_count from "./pages/Inventory_count.tsx"
 
 
 
@@ -88,6 +89,7 @@ function App() {
 
           {/*INVENTORY */}
           <Route path="/inventory-monitor" element={<MonitorInventory />} />
+          <Route path="/inventory-count" element={<Inventory_count />} />
 
         </Route>
 

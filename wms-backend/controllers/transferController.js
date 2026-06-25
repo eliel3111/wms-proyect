@@ -186,17 +186,19 @@ export async function scanPutawayCode(req, res) {
         /* ======================================
            2️⃣ ¿ES UN PRODUCTO?
         ====================================== */
-        const productResult = await db.query(`
-      SELECT 
-        p.id,
-        p.sku,
-        p.description,
-        p.uom
-      FROM product_barcodes pb
-      JOIN products p ON p.sku = pb.product_sku
-      WHERE UPPER(pb.barcode) = $1
-      LIMIT 1
-    `, [normalized]);
+    const productResult = await db.query(`
+  SELECT DISTINCT
+    p.id,
+    p.sku,
+    p.description,
+    p.uom
+  FROM products p
+  LEFT JOIN product_barcodes pb
+    ON pb.product_sku = p.sku
+  WHERE UPPER(pb.barcode) = $1
+     OR UPPER(p.sku) = $1
+  LIMIT 1
+`, [normalized]);
 
         if (productResult.rowCount === 0) {
             return res.json({
@@ -351,7 +353,11 @@ export async function createTransferLine(req, res) {
 
 
         // 5️⃣ Ubicación destino del usuario
-        const userLocation = await getUserActiveLocation(client, userId);
+       const userLocation = await getUserActiveLocation(
+    client,
+    userId,
+    warehouse_id
+);
 
         if (!userLocation) {
             throw new AppError(

@@ -61,7 +61,7 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
       AND l.location_type = 'STORAGE'
   `, [skuList]);
 
-console.log("📦 INVENTORY RESULT:", inventoryResult.rows);
+  console.log("📦 INVENTORY RESULT:", inventoryResult.rows);
 
   // ==============================
   // 5️⃣ MAP INVENTORY
@@ -91,11 +91,11 @@ console.log("📦 INVENTORY RESULT:", inventoryResult.rows);
   LIMIT 1
 `);
 
-if (warehouseResult.rowCount === 0) {
-  throw new Error("No existe warehouse por defecto");
-}
+  if (warehouseResult.rowCount === 0) {
+    throw new Error("No existe warehouse por defecto");
+  }
 
-const warehouseId = warehouseResult.rows[0].id;
+  const warehouseId = warehouseResult.rows[0].id;
 
   // ==============================
   // 6️⃣ CONFIG + FALLBACK
@@ -105,7 +105,7 @@ const warehouseId = warehouseResult.rows[0].id;
   let defaultLocation = null;
 
   if (config.allow_picking_without_locations) {
-    
+
     defaultLocation = await getOrCreateDefaultLocation(client, warehouseId);
   }
 
@@ -169,14 +169,14 @@ const warehouseId = warehouseResult.rows[0].id;
   }
 
   if (
-  !hasAtLeastOneLocation &&
-  !config.allow_picking_without_locations
-) {
-  return {
-    data: [],
-    message: "Ningún producto tiene inventario en ubicaciones",
-  };
-}
+    !hasAtLeastOneLocation &&
+    !config.allow_picking_without_locations
+  ) {
+    return {
+      data: [],
+      message: "Ningún producto tiene inventario en ubicaciones",
+    };
+  }
 
   return {
     data: Array.from(resultMap.values()),
@@ -572,6 +572,7 @@ export async function getMoveLinesOrderedByLocation(client, pickingId) {
         ON p.id = sml.product_id
 
       WHERE sml.picking_id = $1
+  AND sml.state NOT IN ('done', 'cancel')
 
       ORDER BY 
         l.tramo DESC,

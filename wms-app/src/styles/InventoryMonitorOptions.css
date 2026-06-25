@@ -1,0 +1,419 @@
+.inventory-monitor-container-option {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+/* ==========================
+   HEADER
+========================== */
+
+.inventory-monitor-session-up {
+  width: 100%;
+  padding: 20px;
+
+  border-bottom: 1px solid #f3f4f6;
+
+  box-sizing: border-box;
+}
+
+.inventory-session-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.inventory-session-subtitle {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ==========================
+   BODY
+========================== */
+
+.inventory-monitor-session-middle {
+  width: 100%;
+  padding: 20px;
+
+  display: flex;
+  flex-direction: column;
+
+  box-sizing: border-box;
+}
+
+.inventory-session-row {
+  width: 100%;
+  padding: 10px 0;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  box-sizing: border-box;
+}
+
+.inventory-session-header {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.inventory-session-code {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.inventory-session-label {
+  min-width: 110px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.inventory-session-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 14px;
+
+  border-radius: 999px;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  border: 1px solid transparent;
+}
+
+.inventory-session-status.draft {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.inventory-session-status.in-progress {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.inventory-session-status.review {
+  background: #fffbeb;
+  color: #965206;
+  border-color: #fde68a;
+}
+
+.inventory-session-status.posted {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+
+.inventory-session-status.cancelled {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+/* ==========================
+   FOOTER
+========================== */
+
+.inventory-monitor-session-down {
+  width: 100%;
+
+  padding: 20px;
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  border-top: 1px solid #f3f4f6;
+
+  box-sizing: border-box;
+}
+
+.inventory-session-close-btn,
+.inventory-session-action-btn {
+  border: none;
+  border-radius: 8px;
+
+  padding: 12px 18px;
+ margin-left: 28px;
+ margin-top: 20px;
+  cursor: pointer;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  transition: all 0.2s ease;
+}
+
+.inventory-session-close-btn {
+  background: #dc2626;
+  color: white;
+}
+
+.inventory-session-close-btn:hover {
+  background: #b91c1c;
+}
+
+.inventory-session-action-btn {
+  background: #2563eb;
+  color: white;
+}
+
+.inventory-session-action-btn:hover {
+  background: #1d4ed8;
+}
+
+/* ==========================
+   MOBILE
+========================== */
+
+@media (max-width: 768px) {
+  .inventory-monitor-session-down {
+    flex-direction: column;
+  }
+
+  .inventory-session-close-btn,
+  .inventory-session-action-btn {
+    width: 100%;
+  }
+
+  .inventory-session-row {
+    flex-wrap: wrap;
+  }
+
+  .inventory-session-label {
+    min-width: auto;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.inventory-monitor-container-options {
+  width: 100%;
+  height: auto;
+  padding: 24px 0;
+  background: #ffffff;
+  border-radius: 12px;
+
+  box-sizing: border-box;
+}
+
+.inventory-monitor-adjuments,
+.inventory-monitor-options,
+.inventory-monitor-alert {
+  width: 100%;
+  height: auto;
+  padding-left: 28px;
+  padding-right: 28px;
+  box-sizing: border-box;
+}
+
+.inventory-monitor-adjuments {
+  margin-bottom: 18px;
+}
+
+.inventory-monitor-adjuments-arriba {
+  width: 100%;
+  height: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1f2937;
+}
+
+.inventory-monitor-adjuments-arriba svg {
+  color: #2563eb;
+}
+
+.inventory-monitor-adjuments-arriba h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.inventory-monitor-adjuments-abajo {
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+  font-size: 15px;
+  color: #64748b;
+}
+
+.inventory-monitor-options {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.inventory-monitor-option {
+  position: relative;
+  flex: 1;
+  min-height: 150px;
+  padding: 28px 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.inventory-monitor-option:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.inventory-monitor-option.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.option-radio {
+  position: absolute;
+  top: 20px;
+  left: 18px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.inventory-monitor-option.selected .option-radio {
+  border: 6px solid #2563eb;
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.option-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.option-icon.calendar {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.option-icon.flash {
+  background: #dcfce7;
+  color: #22c55e;
+}
+
+.option-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.option-title-row h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.option-title-row span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inventory-monitor-option p {
+  margin: 18px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #334155;
+  text-align: center;
+}
+
+.inventory-monitor-alert {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+  margin-left: 28px;
+  margin-right: 28px;
+  width: auto;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #b45309;
+}
+
+.inventory-monitor-alert svg {
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.inventory-monitor-alert p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.inventory-monitor-alert span {
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .inventory-monitor-options {
+    flex-direction: column;
+  }
+
+  .inventory-monitor-option {
+    padding: 26px 24px;
+  }
+
+  .option-header {
+    justify-content: flex-start;
+    padding-left: 24px;
+  }
+}

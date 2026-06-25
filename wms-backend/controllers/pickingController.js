@@ -3,9 +3,10 @@ import { getActiveStorageLocationByCode } from "../services/locationService.js";
 import { reserveInventoryForMove } from "../services/pickingBestRoute.js"
 import { getPickingProductsWithLocationsService, getPickingConfig } from "../services/pickingBestRoute.js";
 import { selectBestLocation, getMoveLinesOrderedByLocation } from "../services/pickingBestRoute.js";
-import { createInventoryMovement, moveInventoryBetweenLocationsV2, moveInventoryGeneralLocation } from "../services/inventoryService.js"
+import { createInventoryMovement, moveInventoryBetweenLocationsV2, moveInventoryGeneralLocation, reserveMoveLineQuantity } from "../services/inventoryService.js"
 import { getOrCreateDefaultLocation } from "../services/pickingBestRoute.js"
 import { buildCitrusConducePayload, createConduce } from "../integrations/citrus/citrus.saleOrder.js"
+import { reserveMissingQtyForExistingMoveLines } from "../services/pickingReservationExisting.service.js";
 
 
 export async function closePicking(req, res) {
@@ -116,7 +117,7 @@ export async function closePicking(req, res) {
       };
     }
 
-    /*const conduceResult = await createConduce(citrusResult.payload);
+    const conduceResult = await createConduce(citrusResult.payload);
 
     console.log("📤 Resultado createConduce:", conduceResult);
 
@@ -130,7 +131,7 @@ export async function closePicking(req, res) {
         message: conduceResult.message || "Error desconocido del ERP",
         data: conduceResult.data
       });
-    }*/
+    }
 
     // 4️⃣ ACTUALIZAR stock_move_line
     await client.query(`
@@ -223,42 +224,36 @@ export async function closePicking(req, res) {
 
         const remainingQty = qtyPlanned - qtyDone;
 
-        console.log("🟨 PICKING PARCIAL DETECTADO");
-        console.log({
-          lineId: line.id,
-          sku: line.sku,
-          qtyPlanned,
-          qtyDone,
-          remainingQty
-        });
-
+        // Ajustar línea original
         await client.query(`
-  UPDATE stock_move_line
-  SET product_uom_qty = $1,
-      qty_done = $2
-  WHERE id = $3
-`, [
+    UPDATE stock_move_line
+    SET product_uom_qty = $1,
+        qty_done = $2
+    WHERE id = $3
+  `, [
           qtyDone,
           qtyDone,
           line.id
         ]);
 
-        await client.query(`
-  INSERT INTO stock_move_line (
-    move_id,
-    picking_id,
-    product_id,
-    product_uom_id,
-    product_uom_qty,
-    qty_done,
-    location_id,
-    warehouse_id,
-    state
-  )
-  VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9
-  )
-`, [
+        // Crear línea pendiente
+        const newMoveLine = await client.query(`
+    INSERT INTO stock_move_line (
+      move_id,
+      picking_id,
+      product_id,
+      product_uom_id,
+      product_uom_qty,
+      qty_done,
+      location_id,
+      warehouse_id,
+      state
+    )
+    VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8,$9
+    )
+    RETURNING *
+  `, [
           line.move_id,
           line.picking_id,
           line.product_id,
@@ -270,8 +265,15 @@ export async function closePicking(req, res) {
           "assigned"
         ]);
 
+        // Reservar pendiente
+        await reserveMoveLineQuantity(
+          client,
+          line,
+          remainingQty
+        );
+
         console.log(
-          `🟨 Línea pendiente creada para ${line.sku}. Restante: ${remainingQty}`
+          `🟨 Línea pendiente creada y reservada para ${line.sku}. Restante: ${remainingQty}`
         );
       }
 
@@ -295,14 +297,34 @@ export async function closePicking(req, res) {
       );
     }
 
-    /* // 6️⃣ ACTUALIZAR stock_picking
-     await client.query(`
-       UPDATE stock_picking
-       SET state = 'done'
-       WHERE id = $1
-     `, [pickingId]);
-     
-     console.log("✅ stock_picking actualizado a done");*/
+    //CONFIRMAR SI TODO SE RECIBIO TODAS LAS LINEAS Y SI SE RECIBIO CERRAR EL PICKING.
+
+    const allLinesCompleted = lines.every(line => {
+      const qtyDone = Number(line.qty_done || 0);
+      const qtyPlanned = Number(line.product_uom_qty || 0);
+
+      return qtyDone === qtyPlanned;
+    });
+
+    console.log("🟨 ALL LINES COMPLETED:", allLinesCompleted);
+
+    if (allLinesCompleted) {
+
+      await client.query(`
+    UPDATE stock_picking
+    SET state = 'done'
+    WHERE id = $1
+  `, [pickingId]);
+
+      console.log("✅ stock_picking actualizado a done");
+
+    } else {
+
+      console.log(
+        "🟨 Picking parcialmente despachado, permanece abierto"
+      );
+
+    }
 
     await client.query("COMMIT");
     console.log("🟢 COMMIT realizado correctamente");
@@ -1106,20 +1128,30 @@ export async function getPickingProductsWithLocations(req, res) {
         continue;
       }
 
-
+      //🟨🟨🟨🟨🟨🟨🟨
       // 🚫 2. Validación para NO ejecutar reserva
       if (totalQty > 0) {
-        console.log("⛔ Ya existen líneas, se omite reserva");
+        console.log("🟡 Ya existen líneas, revisando si falta reservar diferencia...");
+
+        const resultExisting = await reserveMissingQtyForExistingMoveLines(
+          client,
+          move
+        );
+
+        console.log("🟢 Resultado reserva con líneas existentes:", resultExisting);
+
+        totalReserved += Number(resultExisting.reserved || 0);
 
         results.push({
           product_id: productId,
-          reserved: 0,
-          skipped: true
+          reserved: resultExisting.reserved,
+          skipped: resultExisting.skipped || false,
+          message: resultExisting.message,
         });
 
-        continue; // 👈 salta al siguiente move
+        continue;
       }
-
+      //🟨🟨🟨🟨🟨🟨🟨
 
       console.log("RESERVAR MOVE: ", move);
       // 🔥 3. Ejecutar reserva SOLO si no hay líneas
@@ -1931,7 +1963,7 @@ export async function getPickings(req, res) {
        2️⃣ OBTENER PICKINGS
     ========================= */
     const pickingResult = await db.query(`
-      SELECT id, name, user_id, erp_cliente
+      SELECT id, name, user_id, erp_cliente, order_name
       FROM stock_picking
       WHERE state NOT IN ('done', 'cancel')
         AND picking_type = 'outgoing'
@@ -2036,7 +2068,7 @@ export async function getPickings(req, res) {
 
       return {
         id: p.id,
-        name: p.name,
+        name: p.order_name,
         erp_cliente: p.erp_cliente,
         picker_id: pickerId,
         picker_active: pickerActive,

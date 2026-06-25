@@ -221,7 +221,7 @@
 .block-location.empty {
   background: #FFD54F;
   /* amarillo suave */
-  border: 2px dashed #212121;
+  
   padding: 24px;
   display: flex;
   align-items: center;
@@ -237,7 +237,7 @@
 }
 
 .block-qty.ready {
-  border: 2px dashed #212121;
+  
   background: #FFD54F;
   box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.15);
 }

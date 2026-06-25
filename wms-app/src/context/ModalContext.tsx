@@ -7,7 +7,8 @@ type ModalState = {
     title: string;
     message: string;
     buttonText: string;
-    onCloseCallback?: () => void; // 👈 NUEVO
+    titleColor?: string; // 👈 NUEVO
+    onCloseCallback?: () => void;
 };
 
 type ModalContextType = ModalState & {
@@ -19,11 +20,12 @@ const ModalContext = createContext<ModalContextType | null>(null);
 
 export function ModalProvider({ children }: { children: ReactNode }) {
     const [modal, setModal] = useState<ModalState>({
-        isOpen: false,
-        title: "Error",
-        message: "",
-        buttonText: "Cerrar",
-    });
+    isOpen: false,
+    title: "Error",
+    message: "",
+    buttonText: "Cerrar",
+    titleColor: "red", // 👈 rojo por defecto
+});
 
     function openModal(
         data: Partial<Omit<ModalState, "isOpen">> & {
