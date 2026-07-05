@@ -80,8 +80,8 @@ export default function InventoryMonitorOptions({
     <div className="inventory-monitor-container-options">
       <div className="inventory-monitor-adjuments">
         <div className="inventory-monitor-adjuments-arriba">
-          <Settings size={22} />
-          <h3>Modo de Ajuste de Inventario</h3>
+          <Settings size={32} />
+          <h3>MODO DE AJSUTE DE INVENTARIO</h3>
         </div>
 
         <div className="inventory-monitor-adjuments-abajo">

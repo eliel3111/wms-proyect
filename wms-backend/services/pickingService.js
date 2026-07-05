@@ -4,7 +4,7 @@ import { db } from "../db.js";
 // SERVICE: VALIDATE PICKING
 // =====================================================
 export async function validatePickingService(picking_id) {
-    
+
     if (!picking_id) {
         return {
             success: false,

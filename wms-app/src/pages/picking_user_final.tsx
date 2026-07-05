@@ -161,11 +161,11 @@ async function closeReceiving(payload: CloseReceivingPayload) {
     
     if (confirmation.show) {
            return <ConfirmationScreen
-                title="¡RECEPCIÓN CERRADA!"
-                message={`Recepción ${confirmation.receiptCode} completada`}
+                title="¡PEDIDO CERRADO!"
+                message={`Pedido entregado en ${location?.code}.`}
                 autoCloseMs={3000}
                 onFinish={() => {
-                    navigate("/menu");
+                    navigate("/picking-user-init");
                 }}
             />
         

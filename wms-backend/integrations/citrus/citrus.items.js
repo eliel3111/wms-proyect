@@ -249,7 +249,7 @@ export async function fetchPurchaseOrdersTest(lastWriteDate) {
    <soapenv:Body>
       <tem:BuscarOrdenesCompras>
          <tem:ordenCompraWhere>
-            <bas:CantidadPorPagina>10</bas:CantidadPorPagina>
+            <bas:CantidadPorPagina>100</bas:CantidadPorPagina>
             
             ${dateFilter}
          </tem:ordenCompraWhere>

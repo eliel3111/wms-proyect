@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import "../styles/picking.css";
 import "../styles/InventoryMonitor.css"
-import PickingProcess from "../components/PickingProcess.tsx";
-import PickingActive from "../components/PickingActive.tsx";
+import InventoryLive from "../components/InventoryLive.tsx";
 import InventorySession from "../components/InventorySession.tsx"
 import MobileBlocker from "../components/MobileBlocker.tsx";
 import { BarChart3, Clipboard } from "lucide-react";
@@ -146,7 +145,7 @@ export default function MonitorInventory() {
             {/* Main content */}
             <main className="main" aria-label="Contenido principal">
                 {view === "inventory-session" && <InventorySession />}
-                {view === "inventory-posted" && <PickingProcess />}
+                {view === "inventory-posted" && <InventoryLive />}
 
             </main>
         </div>

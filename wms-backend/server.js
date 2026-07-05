@@ -26,6 +26,8 @@ import { createConduce } from "./integrations/citrus/citrus.saleOrder.js";
 import {getActiveSaleOrders} from "./integrations/citrus/citrus.saleOrder.js"
 import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js";
 import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
+import { buscarTodasLasExistenciasAlmacen } from "./integrations/citrus/citrus.erpStockSync.js";
+import cron from "node-cron";
 
 //ALEGRA
 import { alegraItemsService, alegraItemCategoriesService, alegraWarehousesService } from "./integrations/alegra/alegraItemService.js";
@@ -135,7 +137,7 @@ const orders =
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-startCitrusCron();
+//startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {
@@ -291,6 +293,38 @@ app.post("/test-create-conduce", async (req, res) => {
   }
 
 });
+
+
+/* ==================================================
+   TEST BUSCAR EXISTENCIA ALMACEN
+================================================== */
+
+//let syncExistenciaRunning = false;
+
+//cron.schedule("*/30 * * * * *", async () => {
+  /*if (syncExistenciaRunning) {
+    console.log("⏳ Sync existencia almacén ya está corriendo, se omite esta vuelta");
+    return;
+  }
+
+  syncExistenciaRunning = true;
+
+  try {
+    console.log("====================================");
+    console.log("⏱️ CRON EXISTENCIA ALMACÉN INICIADO");
+    console.log("====================================");
+
+    const data = await buscarTodasLasExistenciasAlmacen();
+
+    console.log("✅ CRON EXISTENCIA ALMACÉN FINALIZADO");
+
+  } catch (error) {
+    console.error("🔥 ERROR CRON EXISTENCIA ALMACÉN:");
+    console.error(error.message);
+  } finally {
+    syncExistenciaRunning = false;
+  }
+});*/
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 

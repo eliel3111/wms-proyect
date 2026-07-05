@@ -1,5 +1,3 @@
-
-
 export async function getPickingProductsWithLocationsService(client, pickingId) {
   console.log("🧠 [SERVICE] Procesando picking:", pickingId);
 
@@ -325,7 +323,7 @@ export async function reserveInventoryForMove(client, move) {
   }
 
 
-  if (config.allow_picking_without_locations) {
+  if (1 == 1) {
     console.log("🟥🟨 CONTINUAMOS");
   } else {
     moveLines.forEach((row, index) => {
@@ -352,7 +350,7 @@ export async function reserveInventoryForMove(client, move) {
     resultQuery = await client.query(
       `
   UPDATE inventory_by_location ibl
-  SET 
+  SET
     qty_reserved = ibl.qty_reserved + LEAST(ibl.qty_available, data.qty)
   FROM (
     VALUES ${moveLines
@@ -363,7 +361,7 @@ export async function reserveInventoryForMove(client, move) {
     AND ibl.warehouse_id = data.warehouse_id
     AND ibl.location_id = data.location_id
     AND ibl.qty_available > 0
-  RETURNING 
+  RETURNING
     ibl.location_id,
     ibl.qty_reserved,
     ibl.qty_available
@@ -525,7 +523,7 @@ export async function reserveInventoryForMove(client, move) {
 
   await client.query(`
     UPDATE stock_move
-    SET 
+    SET
         reserved_qty = $1,
         note = $2,
         state = $3
@@ -543,7 +541,7 @@ export async function reserveInventoryForMove(client, move) {
 export async function getMoveLinesOrderedByLocation(client, pickingId) {
   try {
     const query = `
-      SELECT 
+      SELECT
         sml.id,
         sml.move_id,
         sml.product_id,
@@ -564,7 +562,7 @@ export async function getMoveLinesOrderedByLocation(client, pickingId) {
 
       FROM stock_move_line sml
 
-      INNER JOIN locations l 
+      INNER JOIN locations l
         ON l.id = sml.location_id
        AND l.warehouse_id = sml.warehouse_id
 
@@ -574,7 +572,7 @@ export async function getMoveLinesOrderedByLocation(client, pickingId) {
       WHERE sml.picking_id = $1
   AND sml.state NOT IN ('done', 'cancel')
 
-      ORDER BY 
+      ORDER BY
         l.tramo DESC,
         l.nivel DESC
     `;
@@ -659,3 +657,12 @@ export async function getOrCreateDefaultLocation(client, warehouseId) {
     throw error;
   }
 }
+
+
+
+
+
+
+
+
+

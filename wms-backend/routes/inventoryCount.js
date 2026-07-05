@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -33,5 +33,9 @@ router.post("/session/cancel", authMiddleware, cancelInventorySession);
 
 // Finaliza una sesión de inventario y la mueve a estado review.
 router.post("/session/complete", authMiddleware, completeInventorySession);
+
+
+//obtener summary
+router.get("/live-summary", authMiddleware, getInventoryLiveSummary);
 
 export default router;

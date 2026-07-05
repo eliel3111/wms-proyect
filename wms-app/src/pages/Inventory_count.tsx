@@ -5,7 +5,7 @@ import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
 import { LoadingScreen } from "../components/LoadingScreen";
 import type { ApiErrorResponse } from "../types/apiError";
-import { errorTitles } from "../constants/errorTitles";
+
 
 
 type Location = {
@@ -48,6 +48,7 @@ export default function Inventory_count() {
 
 
     const scanBuffer = useRef<string>("");
+    const lastScannerKeyTimeRef = useRef<number>(0);
     const qtyInputRef = useRef<HTMLInputElement | null>(null);
 
 
@@ -110,49 +111,103 @@ export default function Inventory_count() {
         }
     }
 
+    function normalizeScannedCode(raw: string) {
+        let scanned = String(raw || "")
+            .replace(/[\r\n]+/g, "")
+            .trim()
+            .toUpperCase();
+
+        // Protección extra:
+        // Si llega "10ST-A1-02", lo convierte en "ST-A1-02"
+        const prefixes = ["ST-", "GC-", "USER-", "DESPACHO"];
+
+        for (const prefix of prefixes) {
+            const index = scanned.indexOf(prefix);
+
+            if (index > 0) {
+                scanned = scanned.slice(index);
+                break;
+            }
+        }
+
+        return scanned;
+    }
+
     /* =======================
        SCANNER LISTENER
     ======================= */
     useEffect(() => {
         async function handleKeyDown(e: KeyboardEvent) {
+            const target = e.target as HTMLElement;
             const isEndKey = e.key === "Enter" || e.key === "Tab";
 
-            if (isEndKey) {
-                const scanned = scanBuffer.current
-                    .replace(/[\r\n]+/g, "")
-                    .trim()
-                    .toUpperCase();
-
+            // =====================================================
+            // 1. NO capturar lo que escribes en inputs
+            // =====================================================
+            if (
+                target.tagName === "INPUT" ||
+                target.tagName === "TEXTAREA" ||
+                target.isContentEditable
+            ) {
                 scanBuffer.current = "";
+                lastScannerKeyTimeRef.current = 0;
+                return;
+            }
+
+            // =====================================================
+            // 2. Termina el scan con Enter o Tab
+            // =====================================================
+            if (isEndKey) {
+                e.preventDefault();
+
+                const rawScanned = scanBuffer.current;
+
+                // Limpiar inmediatamente
+                scanBuffer.current = "";
+                lastScannerKeyTimeRef.current = 0;
+
+                const scanned = normalizeScannedCode(rawScanned);
 
                 if (!scanned) return;
 
+                console.log("📡 SCAN RAW:", rawScanned);
                 console.log("📡 SCAN RECIBIDO:", scanned);
+                console.log("📍 LOCATION ACTUAL REF:", fromLocationRef.current);
+                console.log("📦 PRODUCTO ACTUAL REF:", currentLineRef.current);
+                console.log("🔢 QTY ACTUAL REF:", qtyRef.current);
 
                 try {
                     const res = await apiClient.post("/inventory/scanned", {
                         productScanned: scanned,
                         locationScanned: fromLocationRef.current?.code ?? null
                     });
+
                     console.log("RESPUESTA:", res);
+
                     const data = res.data;
 
                     // 🟢 ES UBICACIÓN
                     if (data.success && data.type === "location") {
                         closeModal();
+
                         console.log("📍 UBICACIÓN DETECTADA:", data.data);
+
                         handleScanLocation(data.data);
-                        setQty(data.qty);
+
+                        setQty(data.qty || "");
+                        qtyRef.current = String(data.qty || "");
                     }
 
                     // 🔵 ES PRODUCTO
                     else if (data.success && data.type === "product") {
                         closeModal();
+
+                        console.log("📦 PRODUCTO DETECTADO:", data.data);
+
                         handleScanProduct(data.data);
                     }
 
-
-                    // 🔴 NO ES NADA
+                    // 🔴 ERROR
                     else if (!data.success) {
                         console.log("❌ ERROR:", data.message);
 
@@ -164,22 +219,40 @@ export default function Inventory_count() {
                         return;
                     }
 
-
-
                 } catch (error) {
-                    console.error("🔥 Error llamando /transfer/scan-product:", error);
+                    console.error("🔥 Error llamando /inventory/scanned:", error);
                 }
 
-            } else {
-                // Solo acumula caracteres normales del scanner
-                if (e.key.length === 1) {
-                    scanBuffer.current += e.key;
+                return;
+            }
+
+            // =====================================================
+            // 3. Acumular caracteres del scanner
+            // =====================================================
+            if (e.key.length === 1) {
+                const now = Date.now();
+
+                // Si pasó mucho tiempo entre teclas, era escritura manual vieja.
+                // Limpiamos para que no se pegue con el scan nuevo.
+                if (
+                    lastScannerKeyTimeRef.current &&
+                    now - lastScannerKeyTimeRef.current > 300
+                ) {
+                    scanBuffer.current = "";
                 }
+
+                scanBuffer.current += e.key;
+                lastScannerKeyTimeRef.current = now;
+
+                console.log("⌨️ BUFFER SCANNER:", scanBuffer.current);
             }
         }
 
         window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
     }, []);
 
     /* =======================
@@ -187,49 +260,57 @@ export default function Inventory_count() {
     ======================= */
 
     async function onSave() {
-    if (!currentLine || !fromLocation || !sessionId) {
-        return;
-    }
+        if (!currentLine || !fromLocation || !sessionId) {
+            return;
+        }
 
-    const qtyNumber = Number(qty);
+        const qtyNumber = Number(qty);
 
-    if (!qty || qtyNumber < 0) {
-        openModal({
-            title: "Cantidad inválida",
-            message: "Ingrese una cantidad válida."
-        });
-        return;
-    }
-
-    try {
-
-        const result = await applyInventoryCount({
-            locationSelected: fromLocation.id,
-            productSelected: currentLine.id,
-            qty: qtyNumber
-        });
-
-        if (!result.success) {
+        if (!qty || qtyNumber < 0) {
             openModal({
-                title: result.title,
-                message: result.message
+                title: "Cantidad inválida",
+                message: "Ingrese una cantidad válida."
             });
             return;
         }
 
-        setQty("");
-        setCurrentLine(null);
+        try {
 
-        openModal({
-            title: result.title || "Conteo guardado",
-            message: result.message || "El conteo fue registrado correctamente."
-        });
+            const result = await applyInventoryCount({
+                locationSelected: fromLocation.id,
+                productSelected: currentLine.id,
+                qty: qtyNumber
+            });
 
-    } catch (error) {
-        console.error("Error guardando conteo:", error);
+            if (!result.success) {
+                openModal({
+                    title: result.title,
+                    message: result.message
+                });
+                return;
+            }
+
+            setQty("");
+            setCurrentLine(null);
+            setFromLocation(null);
+
+            qtyRef.current = "";
+            currentLineRef.current = null;
+            fromLocationRef.current = null;
+            scanBuffer.current = "";
+            lastScannerKeyTimeRef.current = 0;
+            qtyInputRef.current?.blur();
+
+            openModal({
+                title: result.title || "Conteo guardado",
+                message: result.message || "El conteo fue registrado correctamente."
+            });
+
+        } catch (error) {
+            console.error("Error guardando conteo:", error);
+        }
     }
-}
-   
+
 
     // FUNCTION: Handle scanned location code
     function handleScanLocation(
@@ -272,8 +353,16 @@ export default function Inventory_count() {
         */
 
         setFromLocation(parsedLocation);
+        fromLocationRef.current = parsedLocation;
 
         setCurrentLine(null);
+        currentLineRef.current = null;
+
+        setQty("");
+        qtyRef.current = "";
+
+        scanBuffer.current = "";
+        lastScannerKeyTimeRef.current = 0;
 
 
     }
@@ -281,41 +370,41 @@ export default function Inventory_count() {
 
 
     async function applyInventoryCount(payload: {
-    locationSelected: number;
-    productSelected: number;
-    qty: number;
-}) {
-    try {
+        locationSelected: number;
+        productSelected: number;
+        qty: number;
+    }) {
+        try {
 
-        const res = await apiClient.post(
-            "/inventory/apply-count",
-            payload
-        );
+            const res = await apiClient.post(
+                "/inventory/apply-count",
+                payload
+            );
 
-        return res.data;
+            return res.data;
 
-    } catch (error: any) {
+        } catch (error: any) {
 
-        const data =
-            error.response?.data as ApiErrorResponse | undefined;
+            const data =
+                error.response?.data as ApiErrorResponse | undefined;
 
-        if (!data) {
+            if (!data) {
+                openModal({
+                    title: "Error",
+                    message: "Error desconocido."
+                });
+
+                throw error;
+            }
+
             openModal({
-                title: "Error",
-                message: "Error desconocido."
+                title: data.title || "Error",
+                message: data.message
             });
 
             throw error;
         }
-
-        openModal({
-            title: data.title || "Error",
-            message: data.message
-        });
-
-        throw error;
     }
-}
 
 
     //FUNTION: To hanfle scanned product code
@@ -365,10 +454,16 @@ export default function Inventory_count() {
         console.log("✅ PRODUCTO PARSEADO:", parsedProduct);
         console.log("📍 UBICACIÓN ACTUAL:", fromLocationRef.current);
 
-        setCurrentLine(parsedProduct);   // ✅ ahora sí es ScannedProduct
-        setQty("");
-        focusQtyInput();
+        setCurrentLine(parsedProduct);
+        currentLineRef.current = parsedProduct;
 
+        setQty("");
+        qtyRef.current = "";
+
+        scanBuffer.current = "";
+        lastScannerKeyTimeRef.current = 0;
+
+        focusQtyInput();
 
     }
 
@@ -419,7 +514,7 @@ export default function Inventory_count() {
                                 )}
                             </div>
                         </>) : (<div className="scan-product-hint">
-                            LEA UNA UBICACIÓN DE DESTINO
+                            LEA UNA UBICACIÓN
                         </div>)}
                 </section>
 
@@ -480,13 +575,20 @@ export default function Inventory_count() {
                         className="qty-input"
                         type="number"
                         value={qty}
-                        onChange={(e) => setQty(e.target.value)}
+                        onFocus={() => {
+                            scanBuffer.current = "";
+                            lastScannerKeyTimeRef.current = 0;
+                        }}
+                        onChange={(e) => {
+                            setQty(e.target.value);
+                            qtyRef.current = e.target.value;
+                        }}
                     />
                 </section>
 
                 {/* BOTONES */}
                 <section className="block-actions">
-                    <button className="btn btn-exit" onClick={() => navigate("/transfer")}>
+                    <button className="btn btn-exit" onClick={() => navigate("/menu")}>
                         Salir
                     </button>
 

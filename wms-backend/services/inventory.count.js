@@ -3,63 +3,109 @@ import { getIO } from "../socket.js";
 import pool from "../db.js";
 
 export async function emitInventorySummary(client) {
-  console.log("inicio resumen 🟥🟩🟨🟪");
+  console.log("🚀 Inicio resumen");
 
+  // ==============================
+  // CONTADORES
+  // ==============================
   const summaryResult = await client.query(`
-    SELECT 
+    SELECT
       ibl.counted_by AS user_id,
       u.full_name,
       COUNT(*)::int AS total_lines_counted
     FROM inventory_by_location ibl
-    JOIN users u ON u.id = ibl.counted_by
+    JOIN users u
+      ON u.id = ibl.counted_by
     WHERE ibl.inventory_quantity > 0
       AND ibl.counted_by IS NOT NULL
     GROUP BY ibl.counted_by, u.full_name
     ORDER BY total_lines_counted DESC
   `);
 
-  console.log("RESULTADO DB 🟥: ", summaryResult.rows);
+  // ==============================
+  // TOTAL DE PRODUCTOS A CONTAR
+  // ==============================
+  const totalProductsResult = await client.query(`
+    SELECT COUNT(*)::int AS total_products
+FROM inventory_by_location
+WHERE qty_on_hand > 0
+  `);
 
-  // 🔴 SI NO HAY DATA → TERMINAR
+  const totalProducts = Number(
+    totalProductsResult.rows[0]?.total_products || 0
+  );
+
+  // ==============================
+  // SI NO HAY CONTEOS
+  // ==============================
   if (summaryResult.rows.length === 0) {
-    console.log("⚠️ No hay datos de inventario, no se emite nada");
-    return {
+
+    const response = {
       success: true,
       summary: [],
       total: 0,
+      totalProducts,
+      totalPercent: 0,
     };
+
+    getIO()
+      .to("inventory_summary")
+      .emit("inventory_summary", response);
+
+    return response;
   }
 
-  // 🔥 PRIMERO calcular total
+  // ==============================
+  // TOTAL CONTADO
+  // ==============================
   const total = summaryResult.rows.reduce(
-    (acc, row) => acc + row.total_lines_counted,
+    (acc, row) => acc + Number(row.total_lines_counted),
     0
   );
 
-  // 🔥 LUEGO construir summary con %
-  const summary = summaryResult.rows.map(row => ({
-    user_id: row.user_id,
+  // ==============================
+  // RESUMEN POR USUARIO
+  // ==============================
+  const summary = summaryResult.rows.map((row) => ({
+    user_id: Number(row.user_id),
     full_name: row.full_name,
-    total_lines_counted: row.total_lines_counted,
-    porcent: total > 0
-      ? Number(((row.total_lines_counted / total) * 100).toFixed(2))
-      : 0,
+    total_lines_counted: Number(row.total_lines_counted),
+
+    // <-- el frontend espera "percent"
+    percent:
+      total > 0
+        ? Number(
+          ((Number(row.total_lines_counted) / total) * 100).toFixed(2)
+        )
+        : 0,
   }));
 
-  const io = getIO();
+  // ==============================
+  // PORCENTAJE GENERAL
+  // ==============================
+  const totalPercent =
+    totalProducts > 0
+      ? Number(((total / totalProducts) * 100).toFixed(2))
+      : 0;
 
-  io.to("inventory_summary").emit("inventory_update", {
-    summary,
-    total,
-  });
-
-  console.log("RESULTADO FINAL 🟩:", { summary, total });
-
-  return {
+  const response = {
     success: true,
     summary,
     total,
+    totalProducts,
+    totalPercent,
   };
+
+  // ==============================
+  // WEBSOCKET
+  // ==============================
+  getIO()
+    .to("inventory_summary")
+    .emit("inventory_summary", response);
+
+  console.log("🟢 INVENTORY SUMMARY:", response);
+
+  return response;
 }
 
 
@@ -82,26 +128,26 @@ export async function getInventorySessionStatusService() {
 
     if (companyResult.rowCount === 0) {
       console.log(
-    "❌ Empresa no encontrada"
-);
-    return {
+        "❌ Empresa no encontrada"
+      );
+      return {
         success: false,
         title: "Empresa no encontrada",
         message: "No existe una empresa activa configurada."
-    };
-}
+      };
+    }
 
     const company = companyResult.rows[0];
 
-const adjustmentMode =
-    company.inventory_adjustment_mode || "final";
+    const adjustmentMode =
+      company.inventory_adjustment_mode || "final";
 
-console.log(
-    "🟩 Empresa activa:",
-    company.id,
-    "Modo:",
-    adjustmentMode
-);
+    console.log(
+      "🟩 Empresa activa:",
+      company.id,
+      "Modo:",
+      adjustmentMode
+    );
 
     const sessionResult = await client.query(
       `

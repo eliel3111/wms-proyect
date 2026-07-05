@@ -18,7 +18,7 @@
 
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-
+z-index: 999;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease,

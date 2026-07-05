@@ -259,8 +259,9 @@
 
 .inventory-monitor-adjuments-arriba h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .inventory-monitor-adjuments-abajo {

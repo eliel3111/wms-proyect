@@ -68,6 +68,7 @@ export default function PickingRoute() {
     const [currentLine, setCurrentLine] = useState<StockMoveLine | null>(null);
     const currentLineRef = useRef<StockMoveLine | null>(null);
     const scanBuffer = useRef<string>("");
+    const lastScannerKeyTimeRef = useRef<number>(0);
 
 
     const [qty, setQty] = useState<string>("");
@@ -75,6 +76,19 @@ export default function PickingRoute() {
 
     //State de error de location rojo
     const [locationError, setLocationError] = useState(false);
+
+    function logScannerState(label: string, scanned?: string) {
+        console.log(`🧪 ${label}`, {
+            scanned,
+            fromLocation_state: fromLocation,
+            fromLocation_ref: fromLocationRef.current,
+            currentLine_ref: currentLineRef.current,
+            selectedProduct_ref: selectedProductRef.current,
+            qty_ref: qtyRef.current,
+            pickingId_ref: pickingIdRef.current,
+            isModalOpen_ref: isModalOpenRef.current,
+        });
+    }
 
     useEffect(() => {
         currentLineRef.current = currentLine;
@@ -169,32 +183,86 @@ export default function PickingRoute() {
     }, [pickings]);
 
 
+    function normalizeScannedCode(raw: string) {
+        let scanned = String(raw || "")
+            .replace(/[\r\n]+/g, "")
+            .trim()
+            .toUpperCase();
+
+        // Protección extra:
+        // Si por error llega "10ST-A1-02", lo convierte en "ST-A1-02"
+        const prefixes = ["ST-", "GC-", "USER-", "DESPACHO"];
+
+        for (const prefix of prefixes) {
+            const index = scanned.indexOf(prefix);
+
+            if (index > 0) {
+                scanned = scanned.slice(index);
+                break;
+            }
+        }
+
+        return scanned;
+    }
     /* =======================
        SCANNER LISTENER
     ======================= */
     useEffect(() => {
         async function handleKeyDown(e: KeyboardEvent) {
+            const target = e.target as HTMLElement;
             const isEndKey = e.key === "Enter" || e.key === "Tab";
-            closeModal();
+
+            // =====================================================
+            // 1. NO capturar lo que escribes en inputs
+            // =====================================================
+            if (
+                target.tagName === "INPUT" ||
+                target.tagName === "TEXTAREA" ||
+                target.isContentEditable
+            ) {
+                // Si estás escribiendo cantidad, no contaminar el scanner buffer
+                scanBuffer.current = "";
+                lastScannerKeyTimeRef.current = 0;
+                return;
+            }
+closeModal();
+            // =====================================================
+            // 2. Si la ruta no está iniciada, no acumular teclas
+            // =====================================================
             if (!isModalOpenRef.current) {
-                openModal({
-                    title: "INICIE LA RECOGIDA",
-                    message: "Primero debe iniciar la ruta dando click a Recoger."
-                });
+                scanBuffer.current = "";
+                lastScannerKeyTimeRef.current = 0;
+
+                if (isEndKey) {
+                    openModal({
+                        title: "INICIE LA RECOGIDA",
+                        message: "Primero debe iniciar la ruta dando click a Recoger."
+                    });
+                }
+
                 return;
             }
 
+            // =====================================================
+            // 3. Termina el scan con Enter o Tab
+            // =====================================================
             if (isEndKey) {
-                const scanned = scanBuffer.current
-                    .replace(/[\r\n]+/g, "")
-                    .trim()
-                    .toUpperCase();
+                e.preventDefault();
 
+                const rawScanned = scanBuffer.current;
+
+                // Limpiar inmediatamente
                 scanBuffer.current = "";
+                lastScannerKeyTimeRef.current = 0;
+
+                const scanned = normalizeScannedCode(rawScanned);
 
                 if (!scanned) return;
 
+                console.log("📡 SCAN RAW:", rawScanned);
                 console.log("📡 SCAN RECIBIDO:", scanned);
+
+                logScannerState("ANTES DE LLAMAR BACKEND /picking/scan", scanned);
 
                 try {
                     const res = await apiClient.post("/picking/scan", {
@@ -205,25 +273,24 @@ export default function PickingRoute() {
                     const data = res.data;
 
                     console.log("LLEGO DEL BACKKEND: ", data);
+                    logScannerState("DESPUÉS DE RESPUESTA BACKEND", scanned);
 
                     // 🟢 ES UBICACIÓN
-
-
                     if (data.success && data.type === "location") {
                         console.log("📍 UBICACIÓN DETECTADA:", data.data);
                         console.log("🟨 Current Location: ", currentLineRef.current?.code);
-                        handleScanLocation(data.data);
-                        if (data.data.code !== currentLineRef.current?.code) {
 
+                        handleScanLocation(data.data);
+
+                        if (data.data.code !== currentLineRef.current?.code) {
                             setLocationError(true);
 
                             setTimeout(() => {
                                 setLocationError(false);
                             }, 2000);
 
-                            return;//🟨🟨🟨🟨
+                            return;
                         }
-
                     }
 
                     // 🔵 ES PRODUCTO
@@ -231,12 +298,10 @@ export default function PickingRoute() {
                         handleScanProduct(data.data);
                     }
 
-
                     // 🔴 NO ES NADA
                     else if (!data.success && data.code === "NOT_FOUND") {
                         console.log("❌ CÓDIGO NO VÁLIDO:", data.message);
 
-                        // ❌ No hay ubicación todavía
                         if (!fromLocationRef.current) {
                             openModal({
                                 title: "Escanee una ubicación",
@@ -245,7 +310,6 @@ export default function PickingRoute() {
                             return;
                         }
 
-                        // ❌ Ya hay ubicación, pero no hay producto válido
                         if (fromLocationRef.current && !currentLineRef.current) {
                             openModal({
                                 title: "Escanee un producto válido",
@@ -254,64 +318,71 @@ export default function PickingRoute() {
                             return;
                         }
 
-                        // ⚠️ Caso extra (opcional, por seguridad)
                         openModal({
                             title: "Código no válido",
                             message: "El código escaneado no corresponde a una ubicación ni a un producto."
                         });
                     }
 
-
                     else if (!data.success && data.code === "NO_LOCATION") {
-
                         openModal({
-                            title:
-                                "Primero escanea una ubicación",
+                            title: "Primero escanea una ubicación",
                             message: "Primero debe escanear una ubicación válida antes de escanear un producto."
                         });
-
                     }
 
                     else if (!data.success && data.code === "NOT_IN_PICKING") {
-
                         openModal({
-                            title:
-                                data.title,
+                            title: data.title,
                             message: data.message
                         });
-
                     }
 
                     else if (!data.success && data.code === "INVALID_CODE") {
-
                         openModal({
-                            title:
-                                "Verifique el código que leyó.",
+                            title: "Verifique el código que leyó.",
                             message: "El código no corresponde a una ubicación ni a un producto."
                         });
-
                     }
 
-
-                    // 🟡 Cualquier otro caso raro
                     else {
                         console.log("⚠️ RESPUESTA DESCONOCIDA:", data);
                     }
 
                 } catch (error) {
-                    console.error("🔥 Error llamando /transfer/scan-product:", error);
+                    console.error("🔥 Error llamando /picking/scan:", error);
                 }
 
-            } else {
-                // Solo acumula caracteres normales del scanner
-                if (e.key.length === 1) {
-                    scanBuffer.current += e.key;
+                return;
+            }
+
+            // =====================================================
+            // 4. Acumular caracteres del scanner
+            // =====================================================
+            if (e.key.length === 1) {
+                const now = Date.now();
+
+                // Si pasó mucho tiempo entre teclas, era escritura manual anterior.
+                // Limpiamos el buffer para que no se mezcle con el scan nuevo.
+                if (
+                    lastScannerKeyTimeRef.current &&
+                    now - lastScannerKeyTimeRef.current > 300
+                ) {
+                    scanBuffer.current = "";
                 }
+
+                scanBuffer.current += e.key;
+                lastScannerKeyTimeRef.current = now;
+
+                console.log("⌨️ BUFFER SCANNER:", scanBuffer.current);
             }
         }
 
         window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
     }, []);
 
 
@@ -319,15 +390,43 @@ export default function PickingRoute() {
     function handleScanLocation(location: { id: string; code: string }) {
         if (!location?.id || !location?.code) return;
 
+        const newLocation: Location = {
+            id: location.id,
+            code: location.code,
+        };
 
+        console.log("📍 HANDLE SCAN LOCATION - ANTES:", {
+            location_recibida: location,
+            fromLocation_state_antes: fromLocation,
+            fromLocation_ref_antes: fromLocationRef.current,
+            currentLine_ref: currentLineRef.current,
+        });
 
-        setFromLocation(location);   // ✅ guardar ubicación
+        setFromLocation(newLocation);
+
+        // ✅ IMPORTANTE:
+        // Actualiza el ref inmediatamente, porque setFromLocation es asincrónico.
+        fromLocationRef.current = newLocation;
+
         setSelectedProduct({
             id: -1,
             sku: ""
         } as any);
-        setQty("");                        // 🔥 limpiar cantidad
 
+        selectedProductRef.current = {
+            id: -1,
+            sku: "",
+        };
+
+        setQty("");
+        qtyRef.current = "";
+
+        console.log("📍 HANDLE SCAN LOCATION - DESPUÉS:", {
+            fromLocation_state_despues: newLocation,
+            fromLocation_ref_despues: fromLocationRef.current,
+            selectedProduct_ref: selectedProductRef.current,
+            qty_ref: qtyRef.current,
+        });
     }
 
     // FUNCTION: Handle scanned product
@@ -493,7 +592,12 @@ export default function PickingRoute() {
             setFromLocation(null);
             setSelectedProduct(null);
             setQty("");
-
+            fromLocationRef.current = null;
+            selectedProductRef.current = null;
+            qtyRef.current = "";
+            scanBuffer.current = "";
+            lastScannerKeyTimeRef.current = 0;
+            qtyInputRef.current?.blur();
 
             setStartedPicking(false);
 
@@ -790,6 +894,10 @@ export default function PickingRoute() {
                                     className="qty-input"
                                     type="number"
                                     value={qty}
+                                    onFocus={() => {
+                                        scanBuffer.current = "";
+                                        lastScannerKeyTimeRef.current = 0;
+                                    }}
                                     onChange={(e) => {
                                         const value = Number(e.target.value);
                                         const max = Math.trunc(Number(currentLine?.product_uom_qty || 0));

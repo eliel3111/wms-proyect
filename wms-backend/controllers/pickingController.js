@@ -170,7 +170,7 @@ export async function closePicking(req, res) {
           fromLocation: line.location_id,
           toLocation: locationId,
           qty: qtyDone,
-          qty_promised: qtyPlanned
+          qty_promised: 0 //or qtyPlanned 🟧 RESERVACION
         });
 
         console.log("✅ RESULTADO MOVE:", resultMove);
@@ -186,7 +186,7 @@ export async function closePicking(req, res) {
           fromLocation: line.location_id,
           toLocation: locationId,
           qty: qtyDone,
-          qty_promised: qtyPlanned
+          qty_promised: 0 // or qtyPlanned  🟧 RESERVACION
         });
 
         console.log("✅ RESULTADO MOVE GENERAL:", resultMove);
@@ -265,12 +265,12 @@ export async function closePicking(req, res) {
           "assigned"
         ]);
 
-        // Reservar pendiente
-        await reserveMoveLineQuantity(
+        // Reservar pendiente 🟧🟧🟧🟧🟧 RESERVACION
+        /*await reserveMoveLineQuantity(
           client,
           line,
           remainingQty
-        );
+        );*/
 
         console.log(
           `🟨 Línea pendiente creada y reservada para ${line.sku}. Restante: ${remainingQty}`
@@ -1087,7 +1087,9 @@ export async function getPickingProductsWithLocations(req, res) {
     console.log("enricheddata ", enrichedData);
 
 
+  
     let totalReserved = 0;
+let hasPickingChanges = false;
     let results = [];
 
     /* ==============================
@@ -1131,26 +1133,44 @@ export async function getPickingProductsWithLocations(req, res) {
       //🟨🟨🟨🟨🟨🟨🟨
       // 🚫 2. Validación para NO ejecutar reserva
       if (totalQty > 0) {
-        console.log("🟡 Ya existen líneas, revisando si falta reservar diferencia...");
+  console.log("🟡 Ya existen líneas, revisando si falta reservar diferencia...");
 
-        const resultExisting = await reserveMissingQtyForExistingMoveLines(
-          client,
-          move
-        );
+  const resultExisting = await reserveMissingQtyForExistingMoveLines(
+    client,
+    move
+  );
 
-        console.log("🟢 Resultado reserva con líneas existentes:", resultExisting);
+  console.log("🟢 Resultado reserva con líneas existentes:", resultExisting);
 
-        totalReserved += Number(resultExisting.reserved || 0);
+  const reservedQty = Number(resultExisting?.reserved || 0);
+  const createdQty = Number(resultExisting?.createdQty || 0);
+  const releasedQty = Number(resultExisting?.released || 0);
 
-        results.push({
-          product_id: productId,
-          reserved: resultExisting.reserved,
-          skipped: resultExisting.skipped || false,
-          message: resultExisting.message,
-        });
+  totalReserved += reservedQty;
 
-        continue;
-      }
+  // ✅ Importante:
+  // Aunque reserved sea 0, puede haber cambios reales en stock_move_line.
+  if (
+    resultExisting?.changed === true ||
+    resultExisting?.case === "ORDER_INCREASED" ||
+    resultExisting?.case === "ORDER_DECREASED"
+  ) {
+    hasPickingChanges = true;
+  }
+
+  results.push({
+    product_id: productId,
+    reserved: reservedQty,
+    createdQty,
+    released: releasedQty,
+    changed: resultExisting?.changed || false,
+    case: resultExisting?.case || null,
+    skipped: resultExisting?.skipped || false,
+    message: resultExisting?.message || "",
+  });
+
+  continue;
+}
       //🟨🟨🟨🟨🟨🟨🟨
 
       console.log("RESERVAR MOVE: ", move);
@@ -1177,18 +1197,21 @@ export async function getPickingProductsWithLocations(req, res) {
 
     const config = await getPickingConfig(client);
 
-    if (!config.allow_picking_without_locations && totalReserved === 0) {
+    if (
+  !config.allow_picking_without_locations &&
+  totalReserved === 0 &&
+  !hasPickingChanges
+) {
+  console.log("⚠️ No se reservó nada y no hubo cambios en stock_move_line");
 
-      console.log("⚠️ No se reservó nada");
+  await client.query("ROLLBACK");
 
-      await client.query("ROLLBACK");
-
-      return res.status(200).json({
-        success: true,
-        message: "No se pudo reservar inventario",
-        data: finalResult,
-      });
-    }
+  return res.status(200).json({
+    success: true,
+    message: "No se pudo reservar inventario",
+    data: finalResult,
+  });
+}
 
 
 

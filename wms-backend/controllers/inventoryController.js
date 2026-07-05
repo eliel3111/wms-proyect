@@ -1,30 +1,89 @@
 import { db } from "../db.js";
-import { updateInventoryByCount } from "../services/inventoryService.js";
+import { saveInventoryByCount } from "../services/inventoryService.js";
 import { getInventorySessionStatusService } from "../services/inventory.count.js";
 import { emitInventorySummary } from "../services/inventory.count.js";
+import { buscarTodasLasExistenciasAlmacen } from "../integrations/citrus/citrus.erpStockSync.js";
+
 
 export async function inventoryScan(req, res) {
   try {
     const { productScanned, locationScanned } = req.body;
 
-    console.log("UBICACION: ", locationScanned);
-    console.log("PRODUCT: ", productScanned);
+    console.log("1️⃣  UBICACION: ", locationScanned);
+    console.log("2️⃣  PRODUCT: ", productScanned);
 
     // 1️⃣ Si NO hay nada
     if (!productScanned && !locationScanned) {
+      console.log("❌ Debe escanear una ubicación o un producto.");
       return res.json({
         success: false,
         title: "Escaneo requerido",
         message: "Debe escanear una ubicación o un producto."
       });
     }
-// SOLO ubicación
-if (
-    (locationScanned && !productScanned) ||
-    (locationScanned === productScanned)
-) {
 
-    const location = await db.query(`
+    // ==============================
+    // VALIDAR ESTADO DE LA SESIÓN
+    // ==============================
+
+    const result = await getInventorySessionStatusService();
+
+    //console.log("📦 Resultado sesión:", result);
+
+    if (!result.success) {
+      console.log("❌ No se pudo obtener el estado de la sesión.");
+
+      return res.json({
+        success: false,
+        title: "Error de sesión",
+        message: "No se pudo obtener el estado actual de la sesión de inventario."
+      });
+    }
+
+    /*console.log(
+      "📦 Sesión activa:",
+      result.hasActiveSession,
+      "| Estado:",
+      result.session?.status ?? "Sin sesión"
+    );*/
+
+    // No existe una sesión activa
+    if (!result.hasActiveSession || !result.session) {
+      console.log("❌ No existe una sesión de inventario activa.");
+
+      return res.json({
+        success: false,
+        title: "No hay una sesión activa",
+        message: "Debe crear e iniciar una sesión de inventario antes de realizar conteos."
+      });
+    }
+
+    // Existe la sesión pero NO está iniciada
+    if (result.session.status !== "in-progress") {
+      console.log(
+        `❌ La sesión ${result.session.code} se encuentra en estado '${result.session.status}'.`
+      );
+
+      return res.json({
+        success: false,
+        title: "Sesión no iniciada",
+        message:
+          "La sesión de inventario aún no ha sido iniciada. Inicie la sesión antes de comenzar a contar productos."
+      });
+    }
+
+    console.log(
+      `✅ Sesión ${result.session.code} en estado '${result.session.status}'. Puede continuar.`
+    );
+
+
+    // SOLO ubicación
+    if (
+      (locationScanned && !productScanned) ||
+      (locationScanned === productScanned)
+    ) {
+
+      const location = await db.query(`
         SELECT id, code
         FROM locations
         WHERE code = $1
@@ -32,26 +91,29 @@ if (
         LIMIT 1
     `, [locationScanned]);
 
-    if (location.rows.length === 0) {
+      if (location.rows.length === 0) {
+        console.log("❌ La ubicación escaneada no existe o no está activa.");
         return res.json({
-            success: false,
-            title: "Ubicación inválida",
-            message: "La ubicación escaneada no existe o no está activa."
+          success: false,
+          title: "Ubicación inválida",
+          message: "La ubicación escaneada no existe o no está activa."
         });
-    }
+      }
 
-    return res.json({
+      console.log("✅✅ UBICACION confirmada: ", location.rows[0])
+
+      return res.json({
         success: true,
         type: "location",
         data: location.rows[0]
-    });
-}
+      });
+    }
 
 
-// NO se encontró producto pero podría ser ubicación
-if (!locationScanned && productScanned) {
+    // NO se encontró producto pero podría ser ubicación
+    if (!locationScanned && productScanned) {
 
-    const location = await db.query(`
+      const location = await db.query(`
         SELECT id, code
         FROM locations
         WHERE code = $1
@@ -59,26 +121,30 @@ if (!locationScanned && productScanned) {
         LIMIT 1
     `, [productScanned]);
 
-    if (location.rows.length === 0) {
+      if (location.rows.length === 0) {
+        console.log("❌ Tiene que leer una ubicacion valida primero.");
         return res.json({
-            success: false,
-            title: "Ubicación inválida",
-            message: "Tiene que leer una ubicacion valida primero."
+          success: false,
+          title: "Ubicación inválida",
+          message: "Tiene que leer una ubicacion valida primero."
         });
-    }
+      }
 
-    return res.json({
+      console.log("✅✅ UBICACION confirmada: ", location.rows[0])
+
+      return res.json({
         success: true,
         type: "location",
         data: location.rows[0]
-    });
-}
+      });
+    }
 
 
-    
+
 
     // 3️⃣ Si viene producto SIN ubicación → ERROR
     if (productScanned && !locationScanned) {
+      console.log("❌ Debe escanear una ubicación antes de escanear un producto.");
       return res.json({
         success: false,
         title: "Falta ubicación",
@@ -96,6 +162,7 @@ if (!locationScanned && productScanned) {
     `, [locationScanned]);
 
     if (location.rows.length === 0) {
+      console.log("❌ La ubicación escaneada no existe o no está activa.");
       return res.json({
         success: false,
         title: "Ubicación inválida",
@@ -105,6 +172,8 @@ if (!locationScanned && productScanned) {
 
     const locationId = location.rows[0].id;
 
+    console.log("✅✅ UBICACION confirmada: ", locationId);
+    console.log("🟨 Buscando PRODUCTO escaneado : ", productScanned);
     // 5️⃣ Buscar producto
     const productResult = await db.query(`
   SELECT 
@@ -127,6 +196,7 @@ if (!locationScanned && productScanned) {
 `, [productScanned]);
 
     if (productResult.rows.length === 0) {
+      console.log("❌ El código escaneado no corresponde a ningún producto.");
       return res.json({
         success: false,
         title: "Producto no encontrado",
@@ -135,10 +205,11 @@ if (!locationScanned && productScanned) {
     }
 
     const product = productResult.rows[0];
+    console.log("✅✅ PRODUCTO confirmada: ", product);
 
     // 6️⃣ Buscar inventario en esa ubicación
     let qty = 0;
-
+    console.log("🟨 Buscando inventario de esta ubicacion: ", locationId, "y este producto: ", product.sku);
     const inventoryResult = await db.query(`
       SELECT inventory_quantity
       FROM inventory_by_location
@@ -149,7 +220,7 @@ if (!locationScanned && productScanned) {
 
     if (inventoryResult.rows.length > 0) {
       const inventoryQty = Number(inventoryResult.rows[0].inventory_quantity);
-
+      console.log("✅✅ INVENTARIO confirmada: ", inventoryResult.rows[0]);
       if (inventoryQty > 0) {
         qty = inventoryQty;
       }
@@ -186,7 +257,7 @@ export async function applyInventoryCount(req, res) {
 
     await client.query("BEGIN");
 
-    const result = await updateInventoryByCount(client, {
+    const result = await saveInventoryByCount(client, {
       locationSelected,
       productSelected,
       qty,
@@ -222,6 +293,33 @@ export async function applyInventoryCount(req, res) {
 
 
 
+export async function getInventoryLiveSummary(req, res) {
+  const client = await db.connect();
+
+  try {
+    const summary = await emitInventorySummary(client);
+
+    console.log("Resumen 🟥🟩🟨🟪", summary);
+
+    return res.json(summary);
+
+  } catch (error) {
+    console.error("❌ Error getInventoryLiveSummary:", error);
+
+    return res.status(500).json({
+      success: false,
+      title: "No se pudo obtener el resumen",
+      message: "Ocurrió un error interno."
+    });
+
+  } finally {
+    client.release();
+  }
+}
+
+
+
+
 
 // Obtiene el estado actual del monitor de inventario para determinar si existe una sesión activa y la configuración de ajuste.
 export async function getInventorySessionStatus(req, res) {
@@ -248,7 +346,7 @@ export async function getInventorySessionStatus(req, res) {
 
     console.log(
       "📦 Resultado:",
-      `Session=${result.hasActiveSession}`,
+      `Session=${result}`,
       `Mode=${result.adjustmentMode}`
     );
 
@@ -440,6 +538,67 @@ export async function updateInventoryAdjustmentMode(req, res) {
 }
 
 
+//🟨🟨 funcion para iniciar la sincronizacion de buscar todas las existencias del erp y llevarnos a la base de datos del wms y tener snapshot de la existencias antes del almacen.
+let syncExistenciaRunning = false;
+
+async function runSyncExistenciaAlmacenOnce(client, sessionId) {
+
+  if (!client) {
+    return {
+      success: false,
+      message: "client es requerido para sincronizar existencia.",
+    };
+  }
+  if (!sessionId) {
+    return {
+      success: false,
+      skipped: false,
+      message: "sessionId es requerido para sincronizar existencia.",
+    };
+  }
+
+  if (syncExistenciaRunning) {
+    console.log("⏳ Sync existencia almacén ya está corriendo, se omite esta ejecución");
+
+    return {
+      success: true,
+      skipped: true,
+      message: "La sincronización ya estaba corriendo.",
+    };
+  }
+
+  syncExistenciaRunning = true;
+
+  try {
+    console.log("====================================");
+    console.log("⏱️ SYNC EXISTENCIA ALMACÉN INICIADO");
+    console.log("🆔 SESSION ID:", sessionId);
+    console.log("====================================");
+
+    const data = await buscarTodasLasExistenciasAlmacen(client, sessionId);
+
+    console.log("✅ SYNC EXISTENCIA ALMACÉN FINALIZADO");
+
+    return {
+      success: true,
+      skipped: false,
+      data,
+    };
+
+  } catch (error) {
+    console.error("🔥 ERROR SYNC EXISTENCIA ALMACÉN:");
+    console.error(error);
+
+    return {
+      success: false,
+      skipped: false,
+      message: error.message || "Error sincronizando existencia almacén",
+    };
+
+  } finally {
+    syncExistenciaRunning = false;
+  }
+}
 
 
 
@@ -452,6 +611,7 @@ export async function createInventorySession(req, res) {
     console.log("🟦🟦🟦 ================================");
     console.log("🟨 INVENTORY MONITOR");
     console.log("🆕 CREANDO NUEVA SESIÓN");
+
 
 
     //const userId = 2;
@@ -495,6 +655,8 @@ export async function createInventorySession(req, res) {
         "⛔ SESIÓN ACTIVA:",
         activeSession.code
       );
+
+
 
       await client.query("ROLLBACK");
 
@@ -585,6 +747,8 @@ export async function createInventorySession(req, res) {
       session.code
     );
 
+
+
     // =====================================
     // OBTENER NOMBRE USUARIO
     // =====================================
@@ -605,32 +769,56 @@ export async function createInventorySession(req, res) {
         ? userResult.rows[0]
         : null;
 
+    // =====================================
+    // SINCRONIZAR EXISTENCIA CON SESSION ID
+    // =====================================
+
+    const syncResult = await runSyncExistenciaAlmacenOnce(client, session.id);
+
+    if (!syncResult.success) {
+      await client.query("ROLLBACK");
+
+      return res.status(200).json({
+        success: false,
+        title: "Error sincronizando inventario",
+        message:
+          syncResult.message ||
+          "No se pudo sincronizar la existencia del almacén.",
+      });
+    }
+
+
+
     await client.query("COMMIT");
 
     console.log("🟩 SESIÓN CREADA CORRECTAMENTE");
     console.log("🟦🟦🟦 ================================");
 
+
+
+
+
     return res.status(200).json({
-  success: true,
-  title: "SESSION_CREATED",
-  message: "Sesión de inventario creada correctamente.",
+      success: true,
+      title: "SESSION_CREATED",
+      message: "Sesión de inventario creada correctamente.",
 
-  hasActiveSession: true,
+      hasActiveSession: true,
 
-  adjustmentMode,
+      adjustmentMode,
 
-  session: {
-    id: session.id,
-    code: session.code,
-    user_id: session.user_id,
-    full_name: user?.full_name || "",
-    status: session.status,
-    start_date: session.start_date,
-    end_date: session.end_date,
-    created_at: session.created_at,
-    updated_at: session.updated_at
-  }
-});
+      session: {
+        id: session.id,
+        code: session.code,
+        user_id: session.user_id,
+        full_name: user?.full_name || "",
+        status: session.status,
+        start_date: session.start_date,
+        end_date: session.end_date,
+        created_at: session.created_at,
+        updated_at: session.updated_at
+      }
+    });
 
   } catch (error) {
 

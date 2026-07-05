@@ -1,6 +1,9 @@
 // services/inventoryService.js
 import { db } from "../db.js";
 
+
+
+
 export async function moveInventory(req, res) {
   const {
     productSku,
@@ -93,12 +96,12 @@ export async function moveInventoryBetweenLocationsV2(
     };
   }
 
-  if (qty > qty_promised) {
+  /*if (qty > qty_promised) {
     throw {
       code: "QTY_GT_PROMISED",
       message: "No puedes mover más de lo comprometido"
     };
-  }
+  }*/
 
   // 1️⃣ Obtener warehouses
   const locationsResult = await client.query(`
@@ -803,8 +806,233 @@ export async function createInventoryMovement(client, {
 }
 
 
+export async function saveInventoryByCount(
+  client,
+  {
+    locationSelected,
+    productSelected,
+    qty,
+    userId,
+    referenceId = null,
+    note = "Ajuste por conteo físico",
+  }
+) {
+  console.log("🟦 saveInventoryByCount INICIADO");
 
+  // 1) Validar los 3 datos obligatorios
+  if (!locationSelected || !productSelected || qty == null) {
+    console.log("❌ Datos incompletos:", {
+      locationSelected,
+      productSelected,
+      qty,
+    });
 
+    return {
+      success: false,
+      title: "Datos incompletos",
+      message: "Debe enviar ubicación, producto y cantidad.",
+    };
+  }
+
+  console.log("1️⃣ UBICACIÓN LEÍDA:", locationSelected);
+  console.log("2️⃣ PRODUCTO LEÍDO:", productSelected);
+  console.log("3️⃣ CANTIDAD RECIBIDA:", qty);
+
+  const countedQty = Number(qty);
+
+  if (Number.isNaN(countedQty) || countedQty < 0) {
+    console.log("❌ Cantidad inválida:", qty);
+
+    return {
+      success: false,
+      title: "Cantidad inválida",
+      message: "La cantidad contada no es válida.",
+    };
+  }
+
+  // 2) Validar ubicación
+  const locationResult = await client.query(
+    `
+    SELECT id, warehouse_id
+    FROM locations
+    WHERE id = $1
+      AND is_active = true
+    LIMIT 1
+    `,
+    [locationSelected]
+  );
+
+  if (locationResult.rows.length === 0) {
+    console.log("❌ Ubicación inválida:", locationSelected);
+
+    return {
+      success: false,
+      title: "Ubicación inválida",
+      message: "La ubicación que leíste no existe o no está activa.",
+    };
+  }
+
+  const locationId = locationResult.rows[0].id;
+  const warehouseId = locationResult.rows[0].warehouse_id;
+
+  console.log("✅ Ubicación confirmada:", {
+    locationId,
+    warehouseId,
+  });
+
+  // 3) Validar producto
+  const productResult = await client.query(
+    `
+    SELECT id, sku
+    FROM products
+    WHERE id = $1
+      AND status = 'ACTIVE'
+      AND deleted_erp = false
+    LIMIT 1
+    `,
+    [productSelected]
+  );
+
+  if (productResult.rows.length === 0) {
+    console.log("❌ Producto inválido:", productSelected);
+
+    return {
+      success: false,
+      title: "Producto inválido",
+      message: "El producto no existe, no está activo o fue eliminado del ERP.",
+    };
+  }
+
+  const productId = productResult.rows[0].id;
+  const productSku = productResult.rows[0].sku;
+
+  console.log("✅ Producto confirmado:", {
+    productId,
+    productSku,
+  });
+
+  // 4) Buscar línea actual con LOCK
+  const invResult = await client.query(
+    `
+    SELECT id, qty_on_hand, qty_reserved, inventory_quantity
+    FROM inventory_by_location
+    WHERE location_id = $1
+      AND product_sku = $2
+    FOR UPDATE
+    `,
+    [locationId, productSku]
+  );
+
+  let inventoryRowId = null;
+  let oldQtyOnHand = 0;
+  let previousInventoryQuantity = null;
+  let action = "SKIP";
+  let difference = 0;
+  let wasCreated = false;
+
+  // 5) Si existe, actualizar SOLO inventory_quantity
+  if (invResult.rows.length > 0) {
+    const row = invResult.rows[0];
+
+    inventoryRowId = row.id;
+    oldQtyOnHand = Number(row.qty_on_hand || 0);
+    previousInventoryQuantity =
+      row.inventory_quantity == null
+        ? null
+        : Number(row.inventory_quantity);
+
+    difference = countedQty - oldQtyOnHand;
+
+    if (difference > 0) action = "GAIN";
+    if (difference < 0) action = "LOSS";
+    if (difference === 0) action = "SKIP";
+
+    console.log("✅ Línea existente encontrada:", {
+      inventoryRowId,
+      oldQtyOnHand,
+      previousInventoryQuantity,
+      countedQty,
+      difference,
+      action,
+    });
+
+    await client.query(
+      `
+      UPDATE inventory_by_location
+      SET
+        inventory_quantity = $1,
+        counted_by = $2,
+        counted_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $3
+      `,
+      [countedQty, userId, inventoryRowId]
+    );
+  } else {
+    // 6) Si no existe, crear línea nueva
+    oldQtyOnHand = 0;
+    previousInventoryQuantity = null;
+    difference = countedQty;
+    action = countedQty > 0 ? "GAIN" : "SKIP";
+    wasCreated = true;
+
+    console.log("🟨 No existía línea. Creando nueva línea:", {
+      warehouseId,
+      locationId,
+      productSku,
+      countedQty,
+      userId,
+    });
+
+    const insertResult = await client.query(
+      `
+      INSERT INTO inventory_by_location (
+        warehouse_id,
+        location_id,
+        product_sku,
+        qty_on_hand,
+        inventory_quantity,
+        qty_reserved,
+        old_qty_on_hand,
+        counted_by,
+        counted_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, 0.00, $4, 0.00, 0.00, $5, NOW(), NOW())
+      RETURNING id
+      `,
+      [warehouseId, locationId, productSku, countedQty, userId]
+    );
+
+    inventoryRowId = insertResult.rows[0].id;
+  }
+
+  console.log("✅ Conteo guardado correctamente:", {
+    inventoryRowId,
+    productSku,
+    locationId,
+    countedQty,
+  });
+
+  return {
+    success: true,
+    title: "Conteo guardado",
+    message: "El conteo fue guardado correctamente.",
+    data: {
+      inventoryRowId,
+      productId,
+      productSku,
+      locationId,
+      warehouseId,
+      countedQty,
+      previousInventoryQuantity,
+      oldQtyOnHand,
+      difference,
+      action,
+      wasCreated,
+    },
+  };
+}
 
 
 export async function updateInventoryByCount(client, {
@@ -824,15 +1052,22 @@ export async function updateInventoryByCount(client, {
     };
   }
 
-  const countedQty = Number(qty);
+  console.log("1️⃣  UBICACION LEIDA: ", locationSelected);
+  console.log("2️⃣  PRODUCTO LEIDA: ", productSelected);
+  
 
+  const countedQty = Number(qty);
+  
   if (Number.isNaN(countedQty) || countedQty < 0) {
+console.log("❌ La cantidad contada no es válida.");
     return {
       success: false,
       title: "No se pudo guardar conteo",
       message: "La cantidad contada no es válida."
     };
   }
+
+  console.log("3️⃣  CANTIDAD CONTADA: ", countedQty);
 
   // 2) Validar ubicación y obtener warehouse_id
   const locationResult = await client.query(
@@ -846,6 +1081,7 @@ export async function updateInventoryByCount(client, {
   );
 
   if (locationResult.rows.length === 0) {
+    console.log("❌ La ubicación que leíste no es correcta.");
     return {
       success: false,
       title: "No se pudo guardar conteo",
@@ -854,6 +1090,8 @@ export async function updateInventoryByCount(client, {
   }
 
   const { id: locationId, warehouse_id: warehouseId } = locationResult.rows[0];
+
+  console.log("✅ Ubicacion fue confirmada: ", locationId);
 
   // 3) Validar producto
   const productResult = await client.query(
@@ -869,6 +1107,7 @@ export async function updateInventoryByCount(client, {
   );
 
   if (productResult.rows.length === 0) {
+    console.log("❌ El producto no existe o no está activo.");
     return {
       success: false,
       title: "No se pudo guardar conteo",
@@ -877,6 +1116,8 @@ export async function updateInventoryByCount(client, {
   }
 
   const { id: productId, sku: productSku } = productResult.rows[0];
+
+  console.log("✅ PRODUCTO fue confirmado: ", productSku, "ID: ", productId);
 
   // 4) Buscar línea actual con lock
   const invResult = await client.query(
@@ -900,19 +1141,21 @@ export async function updateInventoryByCount(client, {
 
   if (invResult.rows.length > 0) {
     const row = invResult.rows[0];
+    console.log("✅ linea de inventario para ese producto y ubicacion: ", row);
     inventoryRowId = row.id;
     oldQtyOnHand = Number(row.qty_on_hand || 0);
 
     const qtyReserved = Number(row.qty_reserved || 0);
 
     // 5) Validar reservado > contado
-    if (qtyReserved > countedQty) {
+    /*if (qtyReserved > countedQty) {
+      console.log("❌ El producto no existe o no está activo.");
       return {
         success: false,
         title: "No se pudo guardar conteo",
         message: "La cantidad reservada es mayor la contada."
       };
-    }
+    }*/
 
     difference = countedQty - oldQtyOnHand;
 
