@@ -272,8 +272,8 @@ export async function moveInventoryGeneralLocation(
   const fromWarehouse = fromLoc.warehouse_id;
   const toWarehouse = toLoc.warehouse_id;
 
-// 2️⃣ Inventario origen
-const fromResult = await client.query(`
+  // 2️⃣ Inventario origen
+  const fromResult = await client.query(`
   SELECT
     id,
     qty_available,
@@ -285,35 +285,35 @@ const fromResult = await client.query(`
     AND location_id = $3
   FOR UPDATE
 `, [
-  fromWarehouse,
-  productSku,
-  Number(fromLocation)
-]);
+    fromWarehouse,
+    productSku,
+    Number(fromLocation)
+  ]);
 
-// 3️⃣ Descontar origen SOLO SI EXISTE Y TIENE STOCK
-if (fromResult.rowCount > 0) {
+  // 3️⃣ Descontar origen SOLO SI EXISTE Y TIENE STOCK
+  if (fromResult.rowCount > 0) {
 
-  const fromInv = fromResult.rows[0];
+    const fromInv = fromResult.rows[0];
 
-  const currentOnHand =
-    Number(fromInv.qty_on_hand || 0);
+    const currentOnHand =
+      Number(fromInv.qty_on_hand || 0);
 
-  const currentReserved =
-    Number(fromInv.qty_reserved || 0);
+    const currentReserved =
+      Number(fromInv.qty_reserved || 0);
 
-  if (currentOnHand > 0) {
+    if (currentOnHand > 0) {
 
-    const qtyToSubtract = Math.min(
-      Number(qty),
-      currentOnHand
-    );
+      const qtyToSubtract = Math.min(
+        Number(qty),
+        currentOnHand
+      );
 
-    const reservedToSubtract = Math.min(
-      Number(qty_promised),
-      currentReserved
-    );
+      const reservedToSubtract = Math.min(
+        Number(qty_promised),
+        currentReserved
+      );
 
-    await client.query(`
+      await client.query(`
       UPDATE inventory_by_location
       SET
         qty_on_hand = qty_on_hand - $1,
@@ -321,33 +321,33 @@ if (fromResult.rowCount > 0) {
         updated_at = now()
       WHERE id = $3
     `, [
-      qtyToSubtract,
-      reservedToSubtract,
-      fromInv.id
-    ]);
+        qtyToSubtract,
+        reservedToSubtract,
+        fromInv.id
+      ]);
 
-    console.log("✅ INVENTARIO DESCONTADO DEL ORIGEN:", {
-      qtyToSubtract,
-      reservedToSubtract,
-      fromInvId: fromInv.id
-    });
+      console.log("✅ INVENTARIO DESCONTADO DEL ORIGEN:", {
+        qtyToSubtract,
+        reservedToSubtract,
+        fromInvId: fromInv.id
+      });
+
+    } else {
+
+      console.log(
+        "⚠️ El origen existe pero no tiene stock. No se descuenta nada."
+      );
+    }
 
   } else {
 
     console.log(
-      "⚠️ El origen existe pero no tiene stock. No se descuenta nada."
+      "⚠️ No existe inventario en origen. No se descuenta nada."
     );
   }
 
-} else {
-
-  console.log(
-    "⚠️ No existe inventario en origen. No se descuenta nada."
-  );
-}
-
-// 4️⃣ Buscar inventario destino
-const toResult = await client.query(`
+  // 4️⃣ Buscar inventario destino
+  const toResult = await client.query(`
   SELECT id
   FROM inventory_by_location
   WHERE warehouse_id = $1
@@ -355,19 +355,19 @@ const toResult = await client.query(`
     AND location_id = $3
   FOR UPDATE
 `, [
-  toWarehouse,
-  productSku,
-  Number(toLocation)
-]);
+    toWarehouse,
+    productSku,
+    Number(toLocation)
+  ]);
 
-let toInvId;
+  let toInvId;
 
-// 5️⃣ Crear destino si no existe
-if (toResult.rowCount === 0) {
+  // 5️⃣ Crear destino si no existe
+  if (toResult.rowCount === 0) {
 
-  console.log("➕ CREANDO INVENTARIO DESTINO");
+    console.log("➕ CREANDO INVENTARIO DESTINO");
 
-  const insertResult = await client.query(`
+    const insertResult = await client.query(`
     INSERT INTO inventory_by_location (
       warehouse_id,
       product_sku,
@@ -384,38 +384,38 @@ if (toResult.rowCount === 0) {
     )
     RETURNING id
   `, [
-    toWarehouse,
-    productSku,
-    Number(toLocation)
-  ]);
+      toWarehouse,
+      productSku,
+      Number(toLocation)
+    ]);
 
-  toInvId = insertResult.rows[0].id;
+    toInvId = insertResult.rows[0].id;
 
-} else {
+  } else {
 
-  toInvId = toResult.rows[0].id;
-}
+    toInvId = toResult.rows[0].id;
+  }
 
-// 6️⃣ Siempre sumar destino
-await client.query(`
+  // 6️⃣ Siempre sumar destino
+  await client.query(`
   UPDATE inventory_by_location
   SET
     qty_on_hand = qty_on_hand + $1,
     updated_at = now()
   WHERE id = $2
 `, [
-  qty,
-  toInvId
-]);
+    qty,
+    toInvId
+  ]);
 
-console.log("✅ INVENTARIO SUMADO EN DESTINO:", {
-  qty,
-  toInvId
-});
+  console.log("✅ INVENTARIO SUMADO EN DESTINO:", {
+    qty,
+    toInvId
+  });
 
-return {
-  success: true
-};
+  return {
+    success: true
+  };
 }
 
 
@@ -550,38 +550,38 @@ return {
 
 
 export async function moveInventoryBetweenLocations(
-    client,
-    {
-        warehouseId,
-        productSku,
-        fromLocationId,
-        toLocationId,
-        qty
-    }
+  client,
+  {
+    warehouseId,
+    productSku,
+    fromLocationId,
+    toLocationId,
+    qty
+  }
 ) {
 
-    console.log("====================================");
-    console.log("🚚 MOVE INVENTORY BETWEEN LOCATIONS");
-    console.log("====================================");
+  console.log("====================================");
+  console.log("🚚 MOVE INVENTORY BETWEEN LOCATIONS");
+  console.log("====================================");
 
-    console.log("📥 PARAMETROS:");
-    console.log({
-        warehouseId,
-        productSku,
-        fromLocationId,
-        toLocationId,
-        qty
-    });
+  console.log("📥 PARAMETROS:");
+  console.log({
+    warehouseId,
+    productSku,
+    fromLocationId,
+    toLocationId,
+    qty
+  });
 
-    try {
+  try {
 
-        // =====================================================
-        // 1️⃣ BUSCAR INVENTARIO ORIGEN
-        // =====================================================
+    // =====================================================
+    // 1️⃣ BUSCAR INVENTARIO ORIGEN
+    // =====================================================
 
-        console.log("🔍 PASO 1 - BUSCANDO INVENTARIO ORIGEN");
+    console.log("🔍 PASO 1 - BUSCANDO INVENTARIO ORIGEN");
 
-        const fromResult = await client.query(`
+    const fromResult = await client.query(`
             SELECT
                 id,
                 qty_on_hand,
@@ -594,48 +594,48 @@ export async function moveInventoryBetweenLocations(
             FOR UPDATE
         `, [warehouseId, productSku, fromLocationId]);
 
-        console.log("✅ PASO 1 COMPLETADO");
+    console.log("✅ PASO 1 COMPLETADO");
 
-        console.log("📦 INVENTARIO ORIGEN ENCONTRADO:");
-        console.log(fromResult.rows);
+    console.log("📦 INVENTARIO ORIGEN ENCONTRADO:");
+    console.log(fromResult.rows);
 
-        if (fromResult.rowCount === 0) {
-            throw {
-                code: "ORIGIN_NOT_FOUND",
-                message: "No existe inventario en la ubicación de origen"
-            };
-        }
+    if (fromResult.rowCount === 0) {
+      throw {
+        code: "ORIGIN_NOT_FOUND",
+        message: "No existe inventario en la ubicación de origen"
+      };
+    }
 
-        const fromInv = fromResult.rows[0];
+    const fromInv = fromResult.rows[0];
 
-        console.log("📦 FROM INVENTORY:");
-        console.log(fromInv);
+    console.log("📦 FROM INVENTORY:");
+    console.log(fromInv);
 
-        // =====================================================
-        // 2️⃣ VALIDAR DISPONIBLE
-        // =====================================================
+    // =====================================================
+    // 2️⃣ VALIDAR DISPONIBLE
+    // =====================================================
 
-        console.log("🔍 PASO 2 - VALIDANDO DISPONIBLE");
+    console.log("🔍 PASO 2 - VALIDANDO DISPONIBLE");
 
-        console.log("REQUESTED:", qty);
-        console.log("AVAILABLE:", fromInv.qty_available);
+    console.log("REQUESTED:", qty);
+    console.log("AVAILABLE:", fromInv.qty_available);
 
-        if (Number(qty) > Number(fromInv.qty_available)) {
-            throw {
-                code: "QTY_EXCEEDS_AVAILABLE",
-                message: "Cantidad mayor a la disponible en la ubicación de origen"
-            };
-        }
+    if (Number(qty) > Number(fromInv.qty_available)) {
+      throw {
+        code: "QTY_EXCEEDS_AVAILABLE",
+        message: "Cantidad mayor a la disponible en la ubicación de origen"
+      };
+    }
 
-        console.log("✅ PASO 2 COMPLETADO");
+    console.log("✅ PASO 2 COMPLETADO");
 
-        // =====================================================
-        // 3️⃣ RESTAR ORIGEN
-        // =====================================================
+    // =====================================================
+    // 3️⃣ RESTAR ORIGEN
+    // =====================================================
 
-        console.log("🔍 PASO 3 - UPDATE ORIGEN");
+    console.log("🔍 PASO 3 - UPDATE ORIGEN");
 
-        const updateOriginResult = await client.query(`
+    const updateOriginResult = await client.query(`
             UPDATE inventory_by_location
             SET qty_on_hand = qty_on_hand - $1,
                 updated_at = now()
@@ -643,18 +643,18 @@ export async function moveInventoryBetweenLocations(
             RETURNING *
         `, [qty, fromInv.id]);
 
-        console.log("✅ PASO 3 COMPLETADO");
+    console.log("✅ PASO 3 COMPLETADO");
 
-        console.log("📦 INVENTARIO ORIGEN ACTUALIZADO:");
-        console.log(updateOriginResult.rows[0]);
+    console.log("📦 INVENTARIO ORIGEN ACTUALIZADO:");
+    console.log(updateOriginResult.rows[0]);
 
-        // =====================================================
-        // 4️⃣ BUSCAR DESTINO
-        // =====================================================
+    // =====================================================
+    // 4️⃣ BUSCAR DESTINO
+    // =====================================================
 
-        console.log("🔍 PASO 4 - BUSCANDO DESTINO");
+    console.log("🔍 PASO 4 - BUSCANDO DESTINO");
 
-        const toResult = await client.query(`
+    const toResult = await client.query(`
             SELECT id
             FROM inventory_by_location
             WHERE warehouse_id = $1
@@ -663,22 +663,22 @@ export async function moveInventoryBetweenLocations(
             FOR UPDATE
         `, [warehouseId, productSku, Number(toLocationId)]);
 
-        console.log("✅ PASO 4 COMPLETADO");
+    console.log("✅ PASO 4 COMPLETADO");
 
-        console.log("📦 DESTINO:");
-        console.log(toResult.rows);
+    console.log("📦 DESTINO:");
+    console.log(toResult.rows);
 
-        let toInvId;
+    let toInvId;
 
-        // =====================================================
-        // 5️⃣ CREAR DESTINO SI NO EXISTE
-        // =====================================================
+    // =====================================================
+    // 5️⃣ CREAR DESTINO SI NO EXISTE
+    // =====================================================
 
-        if (toResult.rowCount === 0) {
+    if (toResult.rowCount === 0) {
 
-            console.log("🔍 PASO 5 - CREANDO DESTINO");
+      console.log("🔍 PASO 5 - CREANDO DESTINO");
 
-            const insertResult = await client.query(`
+      const insertResult = await client.query(`
                 INSERT INTO inventory_by_location
                 (
                     warehouse_id,
@@ -698,29 +698,29 @@ export async function moveInventoryBetweenLocations(
                 RETURNING *
             `, [warehouseId, productSku, Number(toLocationId)]);
 
-            console.log("✅ PASO 5 COMPLETADO");
+      console.log("✅ PASO 5 COMPLETADO");
 
-            console.log("📦 DESTINO CREADO:");
-            console.log(insertResult.rows[0]);
+      console.log("📦 DESTINO CREADO:");
+      console.log(insertResult.rows[0]);
 
-            toInvId = insertResult.rows[0].id;
+      toInvId = insertResult.rows[0].id;
 
-        } else {
+    } else {
 
-            console.log("✅ DESTINO YA EXISTE");
+      console.log("✅ DESTINO YA EXISTE");
 
-            toInvId = toResult.rows[0].id;
-        }
+      toInvId = toResult.rows[0].id;
+    }
 
-        console.log("📦 DESTINATION ID:", toInvId);
+    console.log("📦 DESTINATION ID:", toInvId);
 
-        // =====================================================
-        // 6️⃣ SUMAR DESTINO
-        // =====================================================
+    // =====================================================
+    // 6️⃣ SUMAR DESTINO
+    // =====================================================
 
-        console.log("🔍 PASO 6 - UPDATE DESTINO");
+    console.log("🔍 PASO 6 - UPDATE DESTINO");
 
-        const updateDestinationResult = await client.query(`
+    const updateDestinationResult = await client.query(`
             UPDATE inventory_by_location
             SET qty_on_hand = qty_on_hand + $1,
                 updated_at = now()
@@ -728,43 +728,43 @@ export async function moveInventoryBetweenLocations(
             RETURNING *
         `, [qty, toInvId]);
 
-        console.log("✅ PASO 6 COMPLETADO");
+    console.log("✅ PASO 6 COMPLETADO");
 
-        console.log("📦 DESTINO ACTUALIZADO:");
-        console.log(updateDestinationResult.rows[0]);
+    console.log("📦 DESTINO ACTUALIZADO:");
+    console.log(updateDestinationResult.rows[0]);
 
-        console.log("🎉 MOVIMIENTO COMPLETADO");
+    console.log("🎉 MOVIMIENTO COMPLETADO");
 
-        return {
-            success: true
-        };
+    return {
+      success: true
+    };
 
-    } catch (err) {
+  } catch (err) {
 
-        console.log("====================================");
-        console.log("🔥 ERROR MOVE INVENTORY");
-        console.log("====================================");
+    console.log("====================================");
+    console.log("🔥 ERROR MOVE INVENTORY");
+    console.log("====================================");
 
-        console.log("ERROR:");
-        console.log(err);
+    console.log("ERROR:");
+    console.log(err);
 
-        console.log("MESSAGE:");
-        console.log(err.message);
+    console.log("MESSAGE:");
+    console.log(err.message);
 
-        console.log("CODE:");
-        console.log(err.code);
+    console.log("CODE:");
+    console.log(err.code);
 
-        console.log("DETAIL:");
-        console.log(err.detail);
+    console.log("DETAIL:");
+    console.log(err.detail);
 
-        console.log("HINT:");
-        console.log(err.hint);
+    console.log("HINT:");
+    console.log(err.hint);
 
-        console.log("STACK:");
-        console.log(err.stack);
+    console.log("STACK:");
+    console.log(err.stack);
 
-        throw err;
-    }
+    throw err;
+  }
 }
 
 
@@ -818,6 +818,78 @@ export async function saveInventoryByCount(
   }
 ) {
   console.log("🟦 saveInventoryByCount INICIADO");
+
+  //PENDIENTE POR ACTUALIZAR 🟧🟧🟧🟧🟧🟧
+  // =====================================
+  // VALIDAR SESIÓN DE INVENTARIO ACTIVA
+  // Solo se puede leer/contar si hay una sola sesión
+  // y está en estado in-progress
+  // =====================================
+
+  console.log("🔍 VALIDANDO SESIÓN DE INVENTARIO");
+
+  const sessionResult = await client.query(`
+  SELECT
+    id,
+    code,
+    status
+  FROM inventory_sessions
+  WHERE status IN ('draft', 'in-progress')
+  ORDER BY created_at ASC
+`);
+
+  console.log("📋 SESIONES ABIERTAS ENCONTRADAS:", sessionResult.rows.length);
+
+  if (sessionResult.rows.length === 0) {
+    console.log("❌ No hay sesión de inventario abierta");
+
+    return res.status(200).json({
+      success: false,
+      title: "No hay sesión de inventario",
+      message: "Debe crear e iniciar una sesión de inventario antes de leer productos.",
+    });
+  }
+
+  if (sessionResult.rows.length > 1) {
+    console.log("❌ Hay más de una sesión abierta:", sessionResult.rows);
+
+    return res.status(200).json({
+      success: false,
+      title: "Más de una sesión abierta",
+      message: "Solo puede haber una sesión de inventario en draft o in-progress.",
+    });
+  }
+
+  const activeSession = sessionResult.rows[0];
+
+  console.log("📦 SESIÓN ENCONTRADA:", {
+    id: activeSession.id,
+    code: activeSession.code,
+    status: activeSession.status,
+  });
+
+  if (activeSession.status === "draft") {
+    console.log("⚠️ La sesión está en draft. Debe iniciarse antes de contar.");
+
+    return res.status(200).json({
+      success: false,
+      title: "Sesión no iniciada",
+      message: "Debe iniciar la sesión de inventario antes de leer productos.",
+    });
+  }
+
+  if (activeSession.status !== "in-progress") {
+    console.log("❌ Estado de sesión inválido:", activeSession.status);
+
+    return res.status(200).json({
+      success: false,
+      title: "Sesión inválida",
+      message: "Solo puede leer productos cuando la sesión está en progreso.",
+    });
+  }
+
+  console.log("✅ Todo bien. La sesión está en progreso:", activeSession.code);
+  //PENDIENTE POR ACTUALIZAR 🟧🟧🟧🟧🟧🟧
 
   // 1) Validar los 3 datos obligatorios
   if (!locationSelected || !productSelected || qty == null) {
@@ -1054,12 +1126,12 @@ export async function updateInventoryByCount(client, {
 
   console.log("1️⃣  UBICACION LEIDA: ", locationSelected);
   console.log("2️⃣  PRODUCTO LEIDA: ", productSelected);
-  
+
 
   const countedQty = Number(qty);
-  
+
   if (Number.isNaN(countedQty) || countedQty < 0) {
-console.log("❌ La cantidad contada no es válida.");
+    console.log("❌ La cantidad contada no es válida.");
     return {
       success: false,
       title: "No se pudo guardar conteo",

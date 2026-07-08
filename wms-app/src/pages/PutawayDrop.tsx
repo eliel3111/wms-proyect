@@ -94,9 +94,20 @@ export default function PutawayPickPage() {
   }, []);
 
 
+
   {/*ESCUCHA LA LECTURA DEL SCANER*/ }
   useEffect(() => {
     async function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        scanBuffer.current = "";
+        return;
+      }
 
       const isEndKey =
         e.key === "Enter" ||
@@ -434,7 +445,10 @@ export default function PutawayPickPage() {
               placeholder="0"
               value={qty}
               onChange={(e) => onQtyChange(e.target.value)}
-              onFocus={(e) => e.target.select()}
+              onFocus={(e) => {
+                scanBuffer.current = "";
+                e.target.select();
+              }}
             />
           </div>
 

@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -37,5 +37,13 @@ router.post("/session/complete", authMiddleware, completeInventorySession);
 
 //obtener summary
 router.get("/live-summary", authMiddleware, getInventoryLiveSummary);
+
+
+//Obtener reporte final de inventario en excell
+router.get(
+  "/report/final",
+  authMiddleware,
+  getInventoryFinalReport
+);
 
 export default router;

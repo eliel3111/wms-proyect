@@ -1,7 +1,9 @@
 import { CalendarDays, Zap, AlertTriangle, Settings } from "lucide-react";
 import apiClient from "../services/apiClient";
+import { useState } from "react";
 import { useModal } from "../context/ModalContext";
 import type { AdjustmentMode, InventorySession } from "./InventorySession";
+import { SyncERPFullScreen } from "../components/SyncERPFullScreen";
 
 type Props = {
   adjustmentMode: AdjustmentMode;
@@ -17,6 +19,7 @@ export default function InventoryMonitorOptions({
   setSession
 }: Props) {
   const { openModal } = useModal();
+  const [loading, setLoading] = useState(false);
 
   const handleChangeMode = async (mode: AdjustmentMode) => {
     try {
@@ -50,11 +53,12 @@ export default function InventoryMonitorOptions({
 
   const handleCreateSession = async () => {
     try {
+      setLoading(true);
       const response = await apiClient.post("/inventory/new-session", {});
       const data = response.data;
 
       if (!data.success) {
-        
+        setLoading(false);
         openModal({
         title: data.title,
         message: data.message,
@@ -65,16 +69,21 @@ export default function InventoryMonitorOptions({
       setHasActiveSession(data.hasActiveSession);
       setAdjustmentMode(data.adjustmentMode);
       setSession(data.session);
+      setLoading(false);
     } catch (error) {
       console.error("❌ Error creando sesión:", error);
 
-      
+      setLoading(false);
       openModal({
         title: "Error creando sesión",
         message: "No se pudo crear la sesión de inventario.",
       });
     }
   };
+
+  if (loading) {
+        return <SyncERPFullScreen />;
+    }
 
   return (
     <div className="inventory-monitor-container-options">

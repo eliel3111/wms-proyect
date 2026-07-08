@@ -1,0 +1,57 @@
+.sync-erp-fullscreen {
+  width: 100%;
+  min-height: 100vh;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: #f8fafc;
+}
+
+.sync-erp-content {
+  width: 100%;
+  max-width: 720px;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 40px 28px;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.sync-erp-spinner {
+  width: 64px;
+  height: 64px;
+  border: 6px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: sync-erp-spin 0.9s linear infinite;
+}
+
+.sync-erp-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.sync-erp-subtitle {
+  font-size: 16px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+@keyframes sync-erp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

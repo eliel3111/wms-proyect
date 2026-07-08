@@ -3,6 +3,7 @@ import { saveInventoryByCount } from "../services/inventoryService.js";
 import { getInventorySessionStatusService } from "../services/inventory.count.js";
 import { emitInventorySummary } from "../services/inventory.count.js";
 import { buscarTodasLasExistenciasAlmacen } from "../integrations/citrus/citrus.erpStockSync.js";
+import { getInventoryFinalReportExcelService } from "../services/inventoryFinalReportExcel.service.js";
 
 
 export async function inventoryScan(req, res) {
@@ -1620,5 +1621,301 @@ export async function completeInventorySession(req, res) {
 
     client.release();
 
+  }
+}
+
+
+
+
+
+
+
+
+
+//Obtener reporte final de inventario en excell
+// Obtener reporte final de inventario en Excel
+export async function getInventoryFinalReport(req, res) {
+  const client = await db.connect();
+  let transactionStarted = false;
+  let committed = false;
+
+  try {
+    console.log("🟦🟦🟦 ================================");
+    console.log("📄 INVENTORY REPORT");
+    console.log("📌 GENERANDO REPORTE FINAL");
+    console.log("🟦🟦🟦 ================================");
+
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const sessionResult = await client.query(`
+      SELECT id, code, status, user_id, start_date, end_date, created_at, updated_at
+      FROM inventory_sessions
+      WHERE status IN ('draft', 'in-progress', 'review')
+      ORDER BY updated_at DESC
+    `);
+
+    if (sessionResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(200).json({
+        success: false,
+        title: "No hay sesión de inventario",
+        message: "No existe una sesión de inventario activa para generar el reporte final.",
+      });
+    }
+
+    const reviewSession = sessionResult.rows.find(
+      (session) => session.status === "review"
+    );
+
+    if (!reviewSession) {
+      await client.query("ROLLBACK");
+
+      return res.status(200).json({
+        success: false,
+        title: "Sesión no está en revisión",
+        message: "Para generar el reporte final, la sesión debe estar en estado review.",
+      });
+    }
+
+    const sessionId = Number(reviewSession.id);
+
+    console.log("✅ SESIÓN REVIEW:", {
+      sessionId,
+      code: reviewSession.code,
+      status: reviewSession.status,
+    });
+
+    const countedProductsResult = await client.query(
+      `
+      WITH counted AS (
+        SELECT
+          ibl.product_sku,
+          SUM(COALESCE(ibl.inventory_quantity, 0))::numeric AS total_inventory_qty
+        FROM inventory_by_location ibl
+        WHERE ibl.counted_by IS NOT NULL
+          AND ibl.counted_at IS NOT NULL
+        GROUP BY ibl.product_sku
+      ),
+      prepared AS (
+        SELECT
+          p.erp_id::bigint AS erp_id,
+          $1::bigint AS session_id,
+          c.product_sku AS sku,
+          p.erp_name,
+          p.erp_sku,
+          p.description,
+          c.total_inventory_qty,
+          COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
+          COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
+          CASE WHEN eis.item_id IS NULL THEN false ELSE true END AS exist_erp,
+          false AS product_no_exist
+        FROM counted c
+        JOIN products p
+          ON p.sku = c.product_sku
+        LEFT JOIN erp_inventory_snapshot eis
+          ON eis.item_id = p.erp_id
+         AND eis.session_inventory_id = $1
+        WHERE p.erp_id IS NOT NULL
+      )
+      INSERT INTO inventory_erp_report (
+        erp_id,
+        session_id,
+        sku,
+        erp_name,
+        erp_sku,
+        description,
+        total_inventory_qty,
+        erp_stock,
+        unit_cost,
+        exist_erp,
+        product_no_exist,
+        updated_at
+      )
+      SELECT
+        erp_id,
+        session_id,
+        sku,
+        erp_name,
+        erp_sku,
+        description,
+        total_inventory_qty,
+        erp_stock,
+        unit_cost,
+        exist_erp,
+        product_no_exist,
+        NOW()
+      FROM prepared
+      ON CONFLICT (erp_id, session_id)
+      DO UPDATE SET
+        sku = EXCLUDED.sku,
+        erp_name = EXCLUDED.erp_name,
+        erp_sku = EXCLUDED.erp_sku,
+        description = EXCLUDED.description,
+        total_inventory_qty = EXCLUDED.total_inventory_qty,
+        erp_stock = EXCLUDED.erp_stock,
+        unit_cost = EXCLUDED.unit_cost,
+        exist_erp = EXCLUDED.exist_erp,
+        product_no_exist = EXCLUDED.product_no_exist,
+        updated_at = NOW()
+      RETURNING
+        erp_id,
+        session_id,
+        sku AS product_sku,
+        erp_name,
+        erp_sku,
+        description,
+        total_inventory_qty,
+        erp_stock,
+        unit_cost,
+        difference,
+        status,
+        exist_erp,
+        product_no_exist
+      `,
+      [sessionId]
+    );
+
+    const countedProducts = countedProductsResult.rows;
+    const wmsIds = countedProducts.map((item) => Number(item.erp_id));
+
+    console.log("📦 TOTAL PRODUCTOS CONTADOS WMS:", countedProducts.length);
+    console.log("🆔 TOTAL ERP IDS EN WMS:", wmsIds.length);
+
+    const productsMissingResult = await client.query(
+      `
+      WITH missing AS (
+        SELECT
+          eis.item_id::bigint AS erp_id,
+          $1::bigint AS session_id,
+          p.sku,
+          p.erp_name,
+          p.erp_sku,
+          p.description,
+          0::numeric AS total_inventory_qty,
+          COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
+          COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
+          true AS exist_erp,
+          CASE WHEN p.sku IS NULL THEN true ELSE false END AS product_no_exist
+        FROM erp_inventory_snapshot eis
+        LEFT JOIN LATERAL (
+          SELECT sku, erp_name, erp_sku, description
+          FROM products
+          WHERE erp_id = eis.item_id
+          LIMIT 1
+        ) p ON true
+        WHERE eis.session_inventory_id = $1
+          AND COALESCE(eis.erp_stock, 0) > 0
+          AND NOT (eis.item_id = ANY($2::bigint[]))
+      )
+      INSERT INTO inventory_erp_report (
+        erp_id,
+        session_id,
+        sku,
+        erp_name,
+        erp_sku,
+        description,
+        total_inventory_qty,
+        erp_stock,
+        unit_cost,
+        exist_erp,
+        product_no_exist,
+        updated_at
+      )
+      SELECT
+        erp_id,
+        session_id,
+        sku,
+        erp_name,
+        erp_sku,
+        description,
+        total_inventory_qty,
+        erp_stock,
+        unit_cost,
+        exist_erp,
+        product_no_exist,
+        NOW()
+      FROM missing
+      ON CONFLICT (erp_id, session_id)
+      DO UPDATE SET
+        sku = EXCLUDED.sku,
+        erp_name = EXCLUDED.erp_name,
+        erp_sku = EXCLUDED.erp_sku,
+        description = EXCLUDED.description,
+        total_inventory_qty = EXCLUDED.total_inventory_qty,
+        erp_stock = EXCLUDED.erp_stock,
+        unit_cost = EXCLUDED.unit_cost,
+        exist_erp = EXCLUDED.exist_erp,
+        product_no_exist = EXCLUDED.product_no_exist,
+        updated_at = NOW()
+      RETURNING
+        erp_id AS item_id,
+        session_id,
+        erp_stock,
+        unit_cost,
+        sku,
+        description,
+        erp_name,
+        erp_sku,
+        product_no_exist,
+        difference,
+        status,
+        exist_erp
+      `,
+      [sessionId, wmsIds]
+    );
+
+    const productsMissing = productsMissingResult.rows;
+
+    console.log("🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:", productsMissing.length);
+
+    
+
+    
+
+
+
+
+        const result = await getInventoryFinalReportExcelService(client, sessionId);
+
+    if (!result.success) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
+
+      return res.status(200).json(result);
+    }
+
+    await client.query("COMMIT");
+    committed = true;
+    transactionStarted = false;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${result.fileName}"`
+    );
+
+    return res.send(result.buffer);
+  } catch (error) {
+    if (transactionStarted && !committed) {
+      await client.query("ROLLBACK");
+    }
+
+    console.log("🟥 ERROR GENERANDO REPORTE FINAL");
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      title: "Error generando reporte",
+      message: "Ocurrió un error al generar el reporte final de inventario.",
+      error: error.message,
+    });
+  } finally {
+    client.release();
   }
 }

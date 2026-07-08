@@ -168,15 +168,15 @@ app.get("/test-sync-items", async (req, res) => {
 
         console.log("✅ TEST FINALIZADO");
 
-       /* return res.json({
+        return res.json({
             success: true,
             total_items: items.length,
             message: "Sync test completed"
-        });*/
-        return res.json({
+        });
+        /*return res.json({
             success: true,
             message: "Sync test completed"
-        });
+        });*/
 
     } catch (error) {
 

@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import "../styles/picking.css";
 import "../styles/InventoryMonitor.css"
 import InventoryLive from "../components/InventoryLive.tsx";
-import InventorySession from "../components/InventorySession.tsx"
+import InventorySession from "../components/InventorySession.tsx";
+import InventoryReport from "../components/InventoryReport";
 import MobileBlocker from "../components/MobileBlocker.tsx";
-import { BarChart3, Clipboard } from "lucide-react";
+import { BarChart3, Clipboard, Monitor  } from "lucide-react";
 
 export default function MonitorInventory() {
     const [isMobile, setIsMobile] = useState(false);
@@ -87,8 +88,16 @@ export default function MonitorInventory() {
                             onClick={() => setView("inventory-posted")}
                             className="sidebar-button"
                         >
+                            <Monitor  size={22} />
+                            <span>Pantalla Monitor</span>
+                        </button>
+
+                        <button
+                            onClick={() => setView("inventory-report")}
+                            className="sidebar-button"
+                        >
                             <Clipboard size={22} />
-                            <span>Reporte en Vivo</span>
+                            <span>Reportes Finales</span>
                         </button>
                     </nav>
                 </div>
@@ -146,6 +155,7 @@ export default function MonitorInventory() {
             <main className="main" aria-label="Contenido principal">
                 {view === "inventory-session" && <InventorySession />}
                 {view === "inventory-posted" && <InventoryLive />}
+                {view === "inventory-report" && <InventoryReport  />}
 
             </main>
         </div>
