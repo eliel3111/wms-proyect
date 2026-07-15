@@ -7,135 +7,267 @@ import {
     getLocalERPDate,
     isERPDateGreater
 } from "../../services/time.service.js";
+import { syncPurchaseOrder, syncPurchaseOrderLines } from "./citrus.items.js"
 
 
 //🚨🚨🚨🚨🚨Me quede en actualizar esto para ordenes de compra, la ordenes de compra llegan juntas con las lineas, tengo que buscar por fecha, pero primero chequiar si hay de actualizacion si no hay entonces usar de creacion. Solo he tocado syncAllPurchaseOrders tengo que moficar fetchAllItems(maxWriteDate); y luego adentro de fetch modificar callERP( si es necesario, quizas no🚨🚨🚨🚨🚨*/
 export async function syncAllPurchaseOrders() {
-    //console.log("🚨CPO CHECK 2");
     const model = "citrus.purchase";
 
     let lock = null;
     let maxWriteDate = null;
 
     try {
-
-        console.log("🚀🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥 Sync PURCHASE ORDERS iniciado");
+        console.log(
+            "🚀🟥🟥🟥🟥🟥🟥🟥🟥 Sync PURCHASE ORDERS iniciado"
+        );
 
         lock = await lockSyncControl(model);
 
         if (!lock) {
-            console.log(`[SYNC] ${model} ya está corriendo`);
-            return;
+            console.log(
+                `[SYNC] ${model} ya está corriendo`
+            );
+
+            return [];
         }
-        //console.log("🚨CPO CHECK 3", lock);
+
         maxWriteDate = lock.lastWriteDate;
 
-        console.log("LAST WRITE DATE:", maxWriteDate);
+        console.log(
+            "LAST WRITE DATE:",
+            maxWriteDate
+        );
 
         /* ===============================
-           1️⃣ LLAMAR ERP
+           1. CONSULTAR CITRUS
         =============================== */
 
-        const pucharseOrders = await fetchPurchaseOrdersTest(maxWriteDate);
+        const purchaseOrdersResponse =
+            await fetchPurchaseOrdersTest(maxWriteDate);
 
-        const orders = pucharseOrders?.Data?.OrdenCompras || [];
-        //console.log("VER ORDENES DE COMPRAS: ", orders);
-        orders.forEach((order) => {
-            //console.log("LINEAS:", order.OrdenCompraDetalles);
-        });
+        const orders =
+            purchaseOrdersResponse?.Data?.OrdenCompras || [];
 
+        console.log(
+            "📦 ÓRDENES RECIBIDAS PARA PROCESAR:",
+            orders.length
+        );
         if (orders.length === 0) {
-            console.log("⚠️ ERP no devolvió órdenes");
+            console.log(
+                "⚠️ ERP no devolvió órdenes"
+            );
 
-            await db.query(`
+            await db.query(
+                `
         UPDATE sync_control
         SET
           status = 'success',
           updated_at = now(),
           error_message = NULL
         WHERE model = $1
-      `, [model]);
+        `,
+                [model]
+            );
 
-            return;
-        }
-
-        //console.log(`📦 ${orders} órdenes recibidas`);
+            return [];
+        };
 
         /* ===============================
-           2️⃣ CALCULAR NUEVA FECHA
+           2. ABRIR TRANSACCIÓN
         =============================== */
 
-        let newMaxWriteDate = maxWriteDate;
+        const clientDb = await db.connect();
 
-        for (const order of orders) {
-
-            const orderDate =
-                order.FechaActualizacion ||
-                order.FechaCreacion;
-
-            if (!orderDate) continue;
-console.log("🟩 HORA ACTUAL", getLocalERPDate())
-            console.log("🟨HORA DE LA ORDEN", orderDate);
+        try {
+            await clientDb.query("BEGIN");
 
             console.log(
-                "🟥 HORA DE BASE DE DATO: ",
-                normalizeERPDate(newMaxWriteDate)
+                "🟢 BEGIN PURCHASE ORDERS"
             );
 
-            console.log(
-                "ORDERDATE > MAXWRITEDATE",
-                isERPDateGreater(
-                    orderDate,
-                    normalizeERPDate(newMaxWriteDate)
-                )
-            );
+            /* ===============================
+               3. PROCESAR ÓRDENES
+            =============================== */
 
-            if (
-                isERPDateGreater(
-                    orderDate,
-                    normalizeERPDate(newMaxWriteDate)
-                )
-            ) {
+            for (const order of orders) {
+                console.log(
+                    "================================"
+                );
 
-                newMaxWriteDate = orderDate;
+                console.log(
+                    "🟥 ORDEN DE COMPRA:",
+                    order.Id
+                );
 
-            } else {
+                const purchaseOrderId =
+                    await syncPurchaseOrder(
+                        clientDb,
+                        order
+                    );
 
-                newMaxWriteDate = getLocalERPDate();
+                if (!purchaseOrderId) {
+                    throw new Error(
+                        `No se pudo sincronizar la orden ERP ${order.Id}`
+                    );
+                }
+
+                console.log(
+                    "🆔 WMS PURCHASE ORDER ID:",
+                    purchaseOrderId
+                );
+
+                console.log(
+                    "🟨 ESTADO ERP:",
+                    order.Estatus
+                );
+
+                // Si está cancelada/cerrada,
+                // actualiza encabezado pero no las líneas.
+                if (order.Estatus !== "C") {
+                    await syncPurchaseOrderLines(
+                        clientDb,
+                        order,
+                        purchaseOrderId
+                    );
+                } else {
+                    console.log(
+                        "⛔ Orden cancelada; se ignoran sus líneas"
+                    );
+                }
+
+                /* ===============================
+                   4. ACTUALIZAR FECHA MÁXIMA
+                =============================== */
+
+                const writeDate =
+                    order.FechaActualizacion ||
+                    order.FechaCreacion;
+
+                if (!writeDate) {
+                    console.log(
+                        "⚠️ Orden sin fecha:",
+                        order.Id
+                    );
+
+                    continue;
+                }
+
+                const writeDateDate =
+                    new Date(writeDate);
+
+                const maxWriteDateDate =
+                    new Date(maxWriteDate);
+
+                if (
+                    Number.isNaN(
+                        writeDateDate.getTime()
+                    )
+                ) {
+                    console.log(
+                        "⚠️ Fecha inválida:",
+                        writeDate
+                    );
+
+                    continue;
+                }
+
+                console.log(
+                    "🟨 FECHA ORDEN:",
+                    writeDateDate.toISOString()
+                );
+
+                console.log(
+                    "🟥 FECHA MÁXIMA:",
+                    maxWriteDateDate.toISOString()
+                );
+
+                if (
+                    writeDateDate.getTime() >
+                    maxWriteDateDate.getTime()
+                ) {
+                    /*
+                      Guarda la fecha exacta.
+                      Como tus operaciones son UPSERT,
+                      no pasa nada si Citrus devuelve
+                      nuevamente una orden con la misma fecha.
+                    */
+                    maxWriteDate = writeDate;
+
+                    console.log(
+                        "🆕 NUEVA MAX WRITE DATE:",
+                        maxWriteDate
+                    );
+                }
             }
+
+            /* ===============================
+               5. ACTUALIZAR CONTROL
+            =============================== */
+
+            await clientDb.query(
+                `
+        UPDATE sync_control
+        SET
+          last_write_date = $1,
+          status = 'success',
+          updated_at = now(),
+          error_message = NULL
+        WHERE model = $2
+        `,
+                [
+                    maxWriteDate,
+                    model
+                ]
+            );
+
+            await clientDb.query("COMMIT");
+
+            console.log(
+                "✅ Sync Purchase Orders terminado"
+            );
+
+        } catch (dbError) {
+            await clientDb.query("ROLLBACK");
+
+            console.error(
+                "🔴 ROLLBACK PURCHASE ORDERS:",
+                dbError
+            );
+
+            throw dbError;
+
+        } finally {
+            clientDb.release();
+
+            console.log(
+                "🔚 Cliente PostgreSQL liberado"
+            );
         }
 
-        console.log("🆕 NEW MAX DATE:", newMaxWriteDate);
-
-        /* ===============================
-           3️⃣ GUARDAR
-        =============================== */
-
-        await db.query(`
-      UPDATE sync_control
-      SET
-        last_write_date = $1,
-        status = 'success',
-        updated_at = now(),
-        error_message = NULL
-      WHERE model = $2
-    `, [newMaxWriteDate, model]);
-
-        console.log("✅🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪 Sync Purchase Orders terminado");
+        return orders;
 
     } catch (error) {
-
-        //console.error(`[SYNC ERROR] citrus.purchase`, error.message);
+        console.error(
+            `[SYNC ERROR] ${model}:`,
+            error.message
+        );
 
         if (lock?.id) {
-            await db.query(`
+            await db.query(
+                `
         UPDATE sync_control
         SET
           status = 'failed',
           updated_at = now(),
           error_message = $1
         WHERE model = $2
-      `, [error.message, model]);
+        `,
+                [
+                    error.message,
+                    model
+                ]
+            );
         }
 
         throw error;

@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -45,5 +45,15 @@ router.get(
   authMiddleware,
   getInventoryFinalReport
 );
+
+
+//Obtener reporte de inventario por ubicaciones
+router.get(
+  "/report/locations",
+  getInventoryLocationsReport
+);
+
+
+
 
 export default router;

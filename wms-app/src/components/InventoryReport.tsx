@@ -4,7 +4,7 @@ import {
     Info,
     CheckSquare,
 } from "lucide-react";
-import {  useState } from "react";
+import { useState } from "react";
 import { useModal } from "../context/ModalContext";
 import "../styles/InventoryReport.css";
 import apiClient from "../services/apiClient";
@@ -39,66 +39,127 @@ const reports: ReportOption[] = [
 export default function InventoryReport() {
 
     const [hoveredReport, setHoveredReport] = useState<ReportOption | null>(null);
-  const { openModal } = useModal();
+    const { openModal } = useModal();
 
-async function handleReporteFinalInventario() {
-  console.log("📄 Ejecutando Reporte Final del Inventario");
+    //REPORTE FINAL DEL INVENTARIO
+    async function handleReporteFinalInventario() {
+        console.log("📄 Ejecutando Reporte Final del Inventario");
 
-  try {
-    const response = await apiClient.get("/inventory/report/final", {
-      responseType: "blob",
-    });
+        try {
+            const response = await apiClient.get("/inventory/report/final", {
+                responseType: "blob",
+            });
 
-    const contentType = response.headers["content-type"];
+            const contentType = response.headers["content-type"];
 
-    // Si el backend devuelve JSON de error, aunque responseType sea blob,
-    // hay que convertirlo a texto y luego a JSON.
-    if (contentType?.includes("application/json")) {
-      const text = await response.data.text();
-      const data = JSON.parse(text);
+            // Si el backend devuelve JSON de error, aunque responseType sea blob,
+            // hay que convertirlo a texto y luego a JSON.
+            if (contentType?.includes("application/json")) {
+                const text = await response.data.text();
+                const data = JSON.parse(text);
 
-      if (!data.success) {
-        openModal({
-          title: data.title || "Error",
-          message: data.message || "No se pudo generar el reporte final.",
-        });
+                if (!data.success) {
+                    openModal({
+                        title: data.title || "Error",
+                        message: data.message || "No se pudo generar el reporte final.",
+                    });
 
-        return;
-      }
+                    return;
+                }
+            }
+
+            // Si llegó aquí, asumimos que el backend devolvió el Excel
+            const blob = new Blob([response.data], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", "inventario-fisico.xlsx");
+            document.body.appendChild(link);
+            link.click();
+
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            console.log("✅ Reporte final descargado correctamente");
+        } catch (error) {
+            console.error("❌ Error generando reporte final:", error);
+
+            openModal({
+                title: "Error generando reporte",
+                message: "No se pudo generar el reporte final del inventario.",
+            });
+        }
     }
 
-    // Si llegó aquí, asumimos que el backend devolvió el Excel
-    const blob = new Blob([response.data], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "inventario-fisico.xlsx");
-    document.body.appendChild(link);
-    link.click();
-
-    link.remove();
-    window.URL.revokeObjectURL(url);
-
-    console.log("✅ Reporte final descargado correctamente");
-  } catch (error) {
-    console.error("❌ Error generando reporte final:", error);
-
-    openModal({
-      title: "Error generando reporte",
-      message: "No se pudo generar el reporte final del inventario.",
-    });
-  }
-}
-
-    function handleReporteInventarioFisicoUbicacion() {
+    //REPORTE DE INVENTARIO POR UBICACIONES
+    async function handleReporteInventarioFisicoUbicacion() {
         console.log("📍 Ejecutando Reporte del Inventario Físico con Ubicación");
 
-        // Aquí luego puedes llamar tu API
-        // apiClient.get("/inventory/report/by-location")
+        try {
+            const response = await apiClient.get(
+                "/inventory/report/locations",
+                {
+                    responseType: "blob",
+                }
+            );
+
+            const contentType =
+                response.headers["content-type"];
+
+            // El backend puede devolver JSON si ocurre una validación
+            if (contentType?.includes("application/json")) {
+                const text = await response.data.text();
+                const data = JSON.parse(text);
+
+                openModal({
+                    title: data.title || "Error",
+                    message:
+                        data.message ||
+                        "No se pudo generar el reporte.",
+                });
+
+                return;
+            }
+
+            const blob = new Blob([response.data], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+
+            const url =
+                window.URL.createObjectURL(blob);
+
+            const link =
+                document.createElement("a");
+
+            link.href = url;
+            link.download =
+                "inventario-fisico-ubicaciones.xlsx";
+
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            window.URL.revokeObjectURL(url);
+
+            console.log(
+                "✅ Reporte de ubicaciones descargado"
+            );
+        } catch (error) {
+            console.error(
+                "❌ Error descargando reporte:",
+                error
+            );
+
+            openModal({
+                title: "Error generando reporte",
+                message:
+                    "No se pudo descargar el reporte de inventario con ubicaciones.",
+            });
+        }
     }
 
     function handleReporteAuditoria() {

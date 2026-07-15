@@ -137,7 +137,7 @@ const orders =
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-//startCitrusCron();
+startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {

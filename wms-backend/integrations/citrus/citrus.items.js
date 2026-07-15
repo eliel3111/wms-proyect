@@ -230,74 +230,171 @@ export async function fetchPurchaseOrdersTest(lastWriteDate) {
     console.log("PURCHASE FECHA DE INICIO: ", fechaInicioFormatted);
     console.log("FECHA DE FINAL: ", fechaFinFormatted);
 
+   const baseDate = new Date(lastWriteDate);
 
-    //Filtro para quitar y poner la fecha.
-    const useDateFilter = false;
-    const dateFilter = useDateFilter
-      ? `
-    <tem:EsFecha>true</tem:EsFecha>
-    <tem:FechaInicio>${fechaInicioFormatted}</tem:FechaInicio>
-    <tem:FechaFin>${fechaFinFormatted}</tem:FechaFin>
-  `
-      : "";
+// Inicio del día
+const startOfDay = new Date(baseDate);
+startOfDay.setHours(0, 0, 0, 0);
 
-    const xml = `
+// Fin del día
+const endOfDay = new Date(baseDate);
+endOfDay.setHours(23, 59, 59, 0);
+
+const fechaInicioFormattedNewPO = formatLocalDate(startOfDay);
+const fechaFinFormattedNewPO = formatLocalDate(endOfDay);
+
+console.log("🟨 PURCHASE FECHA DE INICIO: ", fechaInicioFormattedNewPO);
+console.log("🟨 FECHA DE FINAL: ", fechaFinFormattedNewPO);
+
+
+
+
+const xml = `
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
                   xmlns:tem="http://tempuri.org/" 
                   xmlns:bas="BaseModel.Where">
    <soapenv:Header/>
    <soapenv:Body>
       <tem:BuscarOrdenesCompras>
+         <!--Optional:-->
          <tem:ordenCompraWhere>
             <bas:CantidadPorPagina>100</bas:CantidadPorPagina>
-            
-            ${dateFilter}
+            <tem:EsFecha>true</tem:EsFecha>
+            <tem:FechaInicio>${fechaInicioFormattedNewPO}</tem:FechaInicio>
+            <tem:FechaFin>${fechaFinFormattedNewPO}</tem:FechaFin>
          </tem:ordenCompraWhere>
       </tem:BuscarOrdenesCompras>
    </soapenv:Body>
 </soapenv:Envelope>
 `;
 
-
-    const data = await callERPPurchase(
+    const data1 = await callERPPurchase(
       "CxP/OrdenCompraService.asmx",
       "http://tempuri.org/BuscarOrdenesCompras",
       xml
     );
 
-    //console.log("🚨CPO CHECK 5 - CALL ERP RESULT: ", data);
-    const orders = data?.Data?.OrdenCompras || [];
-    console.log("🚨CPO CHECK 6 - ORDERS RESULT: ", orders);
-    for (const order of orders) {
-
-      console.log("📦 ERP Orden:", order.Id);
-      //console.log("📦 ERP Orden:", order.OrdenCompraDetalles);
-
-      // 🔥 guarda/actualiza PO
-      const wmsId = await syncPurchaseOrder(order);
-
-      console.log("🆔 WMS PO ID:", wmsId);
-      console.log("🟨 ESTADO ERP Orden:", order.Estatus);
-
-      // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
-      if (order.Estatus !== "C") {
-await syncPurchaseOrderLines(order, wmsId);
-      };
-      
-
-      /*// 🔎 logs (opcional)
-      for (const line of order.OrdenCompraDetalles || []) {
-        console.log("  Producto:", line.Item?.Nombre);
-        console.log("  SKU:", line.Item?.SKU);
-        console.log("  Cantidad:", line.ItemCantidad);
-      }*/
+          if (!data1) {
+      throw new Error(
+        "Citrus no devolvió respuesta al buscar órdenes de compra NUEVAS"
+      );
     }
+
+    if (data1.Success === 0) {
+      throw new Error(
+        data.Mensaje ||
+        "Citrus devolvió un error al buscar órdenes de compra NUEVAS"
+      );
+    }
+
+
+
+    const xml2 = `
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:tem="http://tempuri.org/"
+                  xmlns:bas="BaseModel.Where">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <tem:BuscarOrdenesCompras>
+            <!--Optional:-->
+            <tem:ordenCompraWhere>
+                <bas:Pagina>0</bas:Pagina>
+                <bas:CantidadPorPagina>100</bas:CantidadPorPagina>
+                <tem:EsFechaActualizacion>true</tem:EsFechaActualizacion>
+                <tem:FechaInicioActualizacion>${fechaInicioFormatted}</tem:FechaInicioActualizacion>
+                <tem:FechaFinActualizacion>${fechaFinFormatted}</tem:FechaFinActualizacion>
+            </tem:ordenCompraWhere>
+        </tem:BuscarOrdenesCompras>
+    </soapenv:Body>
+</soapenv:Envelope>
+`;
+
+
+
+
+    const data2 = await callERPPurchase(
+      "CxP/OrdenCompraService.asmx",
+      "http://tempuri.org/BuscarOrdenesCompras",
+      xml2
+    );
+
+      if (!data2) {
+      throw new Error(
+        "Citrus no devolvió respuesta al buscar órdenes de compra ACTUALIZADAS"
+      );
+    }
+
+    if (data2.Success === 0) {
+      throw new Error(
+        data.Mensaje ||
+        "Citrus devolvió un error al buscar órdenes de compra ACTUALIZADA"
+      );
+    }
+
+    // Órdenes creadas
+const ordersData1 =
+  data1?.Data?.OrdenCompras || [];
+
+// Órdenes actualizadas
+const ordersData2 =
+  data2?.Data?.OrdenCompras || [];
+
+console.log(
+  "📦 Órdenes nuevas:",
+  ordersData1.length
+);
+
+console.log(
+  "♻️ Órdenes actualizadas:",
+  ordersData2.length
+);
+
+// Unir y eliminar duplicados por el ID del ERP
+const ordersMap = new Map();
+
+for (const order of [
+  ...ordersData1,
+  ...ordersData2
+]) {
+  if (!order?.Id) continue;
+
+  ordersMap.set(
+    Number(order.Id),
+    order
+  );
+}
+
+const orders = Array.from(
+  ordersMap.values()
+);
+
+console.log(
+  "📦 TOTAL ÓRDENES ÚNICAS:",
+  orders.length
+);
+
+// Crear una respuesta unificada
+const data = {
+  ...(data1 || data2),
+  Data: {
+    ...(data1?.Data || data2?.Data || {}),
+    OrdenCompras: orders
+  }
+};
+
+
+console.log("🟨🟨 Respuesta de la base de datos: ", data);
+
 
     return data;
 
   } catch (error) {
-    console.error("🔥 ERROR:", error.message);
-    return null;
+    console.error(
+      "🔥 ERROR fetchPurchaseOrdersTest:",
+      error.message
+    );
+
+    throw error;
   }
 }
 
@@ -308,7 +405,7 @@ function formatLocalDate(date) {
 }
 
 
-async function syncPurchaseOrder(order) {
+export async function syncPurchaseOrder(clientDb, order) {
 
   const erpId = order.Id;
 
@@ -318,7 +415,7 @@ async function syncPurchaseOrder(order) {
     return null;
   }
 
-  const result = await db.query(
+  const result = await clientDb.query(
     `SELECT id, status FROM purchase_orders WHERE erp_order_id = $1`,
     [erpId]
   );
@@ -343,7 +440,7 @@ async function syncPurchaseOrder(order) {
       }
     }
 
-    const updateResult = await db.query(
+    const updateResult = await clientDb.query(
       `
       UPDATE purchase_orders
       SET supplier_name = $1,
@@ -365,7 +462,7 @@ async function syncPurchaseOrder(order) {
 
     const poNumber = `PO-${erpId}`;
 
-    const insertResult = await db.query(
+    const insertResult = await clientDb.query(
       `
       INSERT INTO purchase_orders (
         purchase_order_number,
@@ -389,7 +486,7 @@ async function syncPurchaseOrder(order) {
   }
 }
 
-async function syncPurchaseOrderLines(order, purchaseOrderId) {
+export async function syncPurchaseOrderLines(clientDb, order, purchaseOrderId) {
 
   const lines = order.OrdenCompraDetalles || [];
 
@@ -398,21 +495,23 @@ async function syncPurchaseOrderLines(order, purchaseOrderId) {
     return;
   }
 
-  const values = lines.map((line, index) => ({
-  erp_line_id: line.Id,
-  erp_order_id: order.Id,
-  erp_product_id: line.Item?.Id || null, // 🔥 CLAVE
-  qty: parseInt(line.ItemCantidad || 0),
-  line_number: index + 1,
-  description: line.ItemDescripcion || line.Item?.Nombre || null
-}));
+const values = lines
+  .map((line, index) => ({
+    erp_line_id: line.Id,
+    erp_order_id: order.Id,
+    erp_product_id: line.Item?.Id || null,
+    qty: Number(line.ItemCantidad || 0),
+    line_number: index + 1,
+    description: line.ItemDescripcion || line.Item?.Nombre || null
+  }))
+  .filter((line) => line.qty > 0);
 
 
  
 
 
   // 🔥 QUERY MASIVA
-  await db.query(
+  await clientDb.query(
   `
   INSERT INTO purchase_order_lines (
     purchase_order_id,

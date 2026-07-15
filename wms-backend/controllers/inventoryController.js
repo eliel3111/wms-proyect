@@ -3,7 +3,7 @@ import { saveInventoryByCount } from "../services/inventoryService.js";
 import { getInventorySessionStatusService } from "../services/inventory.count.js";
 import { emitInventorySummary } from "../services/inventory.count.js";
 import { buscarTodasLasExistenciasAlmacen } from "../integrations/citrus/citrus.erpStockSync.js";
-import { getInventoryFinalReportExcelService } from "../services/inventoryFinalReportExcel.service.js";
+import { getInventoryFinalReportExcelService, getInventoryLocationReportExcelService } from "../services/inventoryFinalReportExcel.service.js";
 
 
 export async function inventoryScan(req, res) {
@@ -1917,5 +1917,291 @@ export async function getInventoryFinalReport(req, res) {
     });
   } finally {
     client.release();
+  }
+}
+
+
+
+
+
+//Obener el reporte de inventario por ubicaciones
+// Obtener el reporte de inventario por ubicaciones
+export async function getInventoryLocationsReport(req, res) {
+  let client = null;
+  let transactionStarted = false;
+
+  /**
+   * Ejecuta ROLLBACK solamente si existe una transacción activa.
+   */
+  const rollbackTransaction = async () => {
+    if (!client || !transactionStarted) {
+      return;
+    }
+
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error(
+        "❌ ERROR EJECUTANDO ROLLBACK:",
+        rollbackError
+      );
+    } finally {
+      transactionStarted = false;
+    }
+  };
+
+  try {
+    console.log("🟦🟦🟦 ================================");
+    console.log("📄 CREANDO REPORTE DE INVENTARIO FÍSICO");
+    console.log("📌 INCLUYENDO UBICACIONES");
+    console.log("🟦🟦🟦 ================================");
+
+    // 1. Obtener una conexión del pool
+    client = await db.connect();
+
+    // 2. Iniciar transacción
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    // 3. Buscar sesiones activas
+    const sessionResult = await client.query(`
+      SELECT
+        id,
+        code,
+        status,
+        user_id,
+        start_date,
+        end_date,
+        created_at,
+        updated_at
+      FROM inventory_sessions
+      WHERE status IN ('draft', 'in-progress', 'review')
+      ORDER BY updated_at DESC
+    `);
+
+    console.log(
+      "📋 TOTAL DE SESIONES ACTIVAS ENCONTRADAS:",
+      sessionResult.rows.length
+    );
+
+    // 4. Validar que exista una sesión activa
+    if (sessionResult.rows.length === 0) {
+      await rollbackTransaction();
+
+      return res.status(200).json({
+        success: false,
+        title: "No hay sesión de inventario",
+        message:
+          "No existe una sesión de inventario activa para generar el reporte.",
+      });
+    }
+
+    const activeSession = sessionResult.rows[0];
+
+    console.log("📌 SESIÓN ACTIVA MÁS RECIENTE:", {
+      id: activeSession.id,
+      code: activeSession.code,
+      status: activeSession.status,
+      updated_at: activeSession.updated_at,
+    });
+
+    // 5. La sesión más reciente debe estar en review
+    if (activeSession.status !== "review") {
+      await rollbackTransaction();
+
+      return res.status(200).json({
+        success: false,
+        title: "Sesión no está en revisión",
+        message:
+          `La sesión activa ${activeSession.code} está en estado ` +
+          `"${activeSession.status}". Para generar el reporte debe estar en estado "review".`,
+      });
+    }
+
+    const sessionId = Number(activeSession.id);
+
+    console.log("✅ SESIÓN REVIEW SELECCIONADA:", {
+      sessionId,
+      code: activeSession.code,
+      status: activeSession.status,
+    });
+
+    // 6. Consultar las líneas contadas
+    let inventoryResult;
+
+    try {
+      inventoryResult = await client.query(`
+        SELECT
+          ibl.id,
+          ibl.location_id,
+          ibl.product_sku,
+          ibl.qty_on_hand,
+          ibl.inventory_quantity,
+
+          p.erp_id,
+          p.erp_name,
+          p.erp_sku,
+          p.description,
+
+          l.code AS location_code
+
+        FROM inventory_by_location AS ibl
+
+        LEFT JOIN products AS p
+          ON p.sku = ibl.product_sku
+
+        LEFT JOIN locations AS l
+          ON l.id = ibl.location_id
+          AND l.is_active IS TRUE
+
+        WHERE ibl.counted_by IS NOT NULL
+          AND ibl.counted_at IS NOT NULL
+
+        ORDER BY
+          l.code ASC,
+          ibl.product_sku ASC,
+          ibl.id ASC
+      `);
+    } catch (queryError) {
+      await rollbackTransaction();
+
+      const queryMessage =
+        queryError instanceof Error
+          ? queryError.message
+          : String(queryError);
+
+      console.error(
+        "❌ ERROR CONSULTANDO LAS LÍNEAS DEL INVENTARIO:",
+        queryError
+      );
+
+      return res.status(500).json({
+        success: false,
+        title: "Error consultando el inventario físico",
+        message: queryMessage,
+      });
+    }
+
+    // 7. Validar que el query haya encontrado líneas
+    if (inventoryResult.rows.length === 0) {
+      await rollbackTransaction();
+
+      console.log(
+        "⚠️ El query funcionó, pero no encontró líneas contadas."
+      );
+
+      return res.status(200).json({
+        success: false,
+        title: "No hay líneas contadas",
+        message:
+          "No existen líneas de inventario con un conteo físico registrado.",
+      });
+    }
+
+    console.log(
+      "📊 TOTAL DE LÍNEAS DEL REPORTE:",
+      inventoryResult.rows.length
+    );
+
+    // 8. Crear el mismo objeto DATA que recibe el servicio
+    const reportData = {
+      success: true,
+      title: "Reporte de inventario generado",
+      message:
+        "Las líneas contadas fueron obtenidas correctamente.",
+
+      session: {
+        id: sessionId,
+        code: activeSession.code,
+        status: activeSession.status,
+        user_id: activeSession.user_id,
+        start_date: activeSession.start_date,
+        end_date: activeSession.end_date,
+        created_at: activeSession.created_at,
+        updated_at: activeSession.updated_at,
+      },
+
+      totalLines: inventoryResult.rows.length,
+      data: inventoryResult.rows,
+    };
+
+    console.log("📄 ENVIANDO DATA AL SERVICIO DE EXCEL");
+
+    // 9. Generar el archivo Excel
+    const excelResult =
+      await getInventoryLocationReportExcelService(
+        reportData
+      );
+
+    // 10. Validar el resultado del servicio
+    if (!excelResult.success) {
+      await rollbackTransaction();
+
+      return res.status(200).json({
+        success: false,
+        title:
+          excelResult.title ||
+          "No se pudo generar el Excel",
+        message:
+          excelResult.message ||
+          "Ocurrió un error generando el reporte.",
+      });
+    }
+
+    // 11. Confirmar la transacción
+    await client.query("COMMIT");
+    transactionStarted = false;
+
+    console.log("✅ EXCEL GENERADO CORRECTAMENTE");
+    console.log("📄 ARCHIVO:", excelResult.fileName);
+    console.log(
+      "📊 TOTAL DE LÍNEAS:",
+      excelResult.totalLines
+    );
+    console.log("🟦🟦🟦 ================================");
+
+    // 12. Configurar la respuesta como archivo Excel
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${excelResult.fileName}"`
+    );
+
+    res.setHeader(
+      "Content-Length",
+      excelResult.buffer.length
+    );
+
+    // 13. Enviar el Excel al frontend
+    return res.status(200).send(excelResult.buffer);
+  } catch (error) {
+    await rollbackTransaction();
+
+    console.error(
+      "❌ ERROR GENERAL GENERANDO REPORTE DE INVENTARIO:",
+      error
+    );
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    return res.status(500).json({
+      success: false,
+      title: "No se pudo generar el reporte",
+      message:
+        errorMessage ||
+        "Ocurrió un error inesperado.",
+    });
+  } finally {
+    if (client) {
+      client.release();
+      console.log("🔌 CONEXIÓN A POSTGRESQL LIBERADA");
+    }
   }
 }

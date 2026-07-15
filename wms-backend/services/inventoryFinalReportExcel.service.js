@@ -279,3 +279,425 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
     },
   };
 }
+
+
+
+function formatDate2(date) {
+  if (!date) return "";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("es-DO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Santo_Domingo",
+  }).format(parsedDate);
+}
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+/**
+ * Recibe este formato:
+ *
+ * {
+ *   success: true,
+ *   session: {...},
+ *   totalLines: 18,
+ *   data: [...]
+ * }
+ */
+
+//REPORTE DE EXCELL DE INVENTARIO POR UBICACIONES
+export async function getInventoryLocationReportExcelService(reportData) {
+  try {
+    if (!reportData) {
+      return {
+        success: false,
+        title: "Información no recibida",
+        message: "No se recibió la información del reporte de inventario.",
+      };
+    }
+
+    if (!reportData.session) {
+      return {
+        success: false,
+        title: "Sesión no encontrada",
+        message: "El reporte no contiene información de la sesión.",
+      };
+    }
+
+    if (!Array.isArray(reportData.data)) {
+      return {
+        success: false,
+        title: "Formato incorrecto",
+        message: "La propiedad data del reporte debe ser un arreglo.",
+      };
+    }
+
+    if (reportData.data.length === 0) {
+      return {
+        success: false,
+        title: "Reporte vacío",
+        message: "No existen líneas contadas para generar el reporte.",
+      };
+    }
+
+    const session = reportData.session;
+    const inventoryLines = reportData.data;
+
+    // Como las líneas no tienen counted_at,
+    // se usa la fecha final de la sesión o, en su defecto, la inicial.
+    const inventoryDate = formatDate2(
+      session.end_date || session.start_date
+    );
+
+    const workbook = new ExcelJS.Workbook();
+
+    workbook.creator = "Garlas Control";
+    workbook.lastModifiedBy = "Garlas Control";
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    const sheet = workbook.addWorksheet("Inventario con ubicación", {
+      properties: {
+        defaultRowHeight: 20,
+      },
+      pageSetup: {
+        orientation: "landscape",
+        paperSize: 9,
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        horizontalCentered: true,
+        verticalCentered: false,
+        margins: {
+          left: 0.3,
+          right: 0.3,
+          top: 0.5,
+          bottom: 0.5,
+          header: 0.2,
+          footer: 0.2,
+        },
+      },
+    });
+
+    sheet.views = [
+      {
+        showGridLines: false,
+        state: "frozen",
+        ySplit: 8,
+      },
+    ];
+
+    // =====================================================
+    // COLUMNAS
+    // =====================================================
+
+    sheet.columns = [
+      {
+        key: "inventory_date",
+        width: 22,
+      },
+      {
+        key: "product_code",
+        width: 23,
+      },
+      {
+        key: "description",
+        width: 48,
+      },
+      {
+        key: "reference",
+        width: 24,
+      },
+      {
+        key: "physical_inventory",
+        width: 20,
+      },
+      {
+        key: "location",
+        width: 24,
+      },
+    ];
+
+    // =====================================================
+    // TÍTULO PRINCIPAL
+    // =====================================================
+
+    sheet.mergeCells("A1:F1");
+
+    const mainTitle = sheet.getCell("A1");
+
+    mainTitle.value = "INVENTARIO FISICO / CICLO DE CONTEOS";
+
+    mainTitle.font = {
+      name: "Arial",
+      size: 18,
+      bold: true,
+      color: {
+        argb: "000000",
+      },
+    };
+
+    mainTitle.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+    };
+
+    sheet.getRow(1).height = 32;
+
+    // Espacio en blanco como en la imagen
+    sheet.getRow(2).height = 25;
+    sheet.getRow(3).height = 25;
+    sheet.getRow(4).height = 25;
+
+    // =====================================================
+    // SUBTÍTULO
+    // =====================================================
+
+    sheet.mergeCells("A5:F5");
+
+    const subtitle = sheet.getCell("A5");
+
+    subtitle.value =
+      "REPORTE DEL INVENTARIO FISICO CON UBICACION";
+
+    subtitle.font = {
+      name: "Arial",
+      size: 16,
+      bold: false,
+      color: {
+        argb: "000000",
+      },
+    };
+
+    subtitle.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+    };
+
+    sheet.getRow(5).height = 30;
+    sheet.getRow(6).height = 25;
+    sheet.getRow(7).height = 15;
+
+    // =====================================================
+    // ENCABEZADOS
+    // =====================================================
+
+    const headerRowNumber = 8;
+    const headerRow = sheet.getRow(headerRowNumber);
+
+    headerRow.values = [
+      "Fecha del inventario\nfísico",
+      "Código del producto",
+      "Descripción",
+      "referencia",
+      "Inventario físico",
+      "Ubicación",
+    ];
+
+    headerRow.height = 48;
+
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: {
+          argb: "4472C4",
+        },
+      };
+
+      cell.font = {
+        name: "Arial",
+        size: 11,
+        bold: true,
+        color: {
+          argb: "FFFFFF",
+        },
+      };
+
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+
+      cell.border = {
+        top: {
+          style: "thin",
+          color: { argb: "FFFFFF" },
+        },
+        left: {
+          style: "thin",
+          color: { argb: "FFFFFF" },
+        },
+        bottom: {
+          style: "thin",
+          color: { argb: "FFFFFF" },
+        },
+        right: {
+          style: "thin",
+          color: { argb: "FFFFFF" },
+        },
+      };
+    });
+
+    // =====================================================
+    // LÍNEAS DEL INVENTARIO
+    // =====================================================
+
+    inventoryLines.forEach((item, index) => {
+      const row = sheet.addRow({
+        inventory_date: inventoryDate,
+
+        // Código interno del WMS
+        product_code:
+          item.product_sku ||
+          item.erp_name ||
+          item.erp_id ||
+          "",
+
+        description:
+          item.description ||
+          item.erp_name ||
+          "SIN DESCRIPCIÓN",
+
+        // Referencia Citrus
+        reference:
+          item.erp_sku ||
+          "",
+
+        physical_inventory: toNumber(
+          item.inventory_quantity
+        ),
+
+        location:
+          item.location_code ||
+          "",
+      });
+
+      const backgroundColor =
+        index % 2 === 0 ? "D3DAEC" : "E5E9F3";
+
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: {
+            argb: backgroundColor,
+          },
+        };
+
+        cell.font = {
+          name: "Arial",
+          size: 10,
+          color: {
+            argb: "000000",
+          },
+        };
+
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
+        };
+
+        cell.border = {
+          top: {
+            style: "thin",
+            color: { argb: "FFFFFF" },
+          },
+          left: {
+            style: "thin",
+            color: { argb: "FFFFFF" },
+          },
+          bottom: {
+            style: "thin",
+            color: { argb: "FFFFFF" },
+          },
+          right: {
+            style: "thin",
+            color: { argb: "FFFFFF" },
+          },
+        };
+      });
+
+      // La descripción queda alineada a la izquierda.
+      row.getCell("description").alignment = {
+        horizontal: "left",
+        vertical: "middle",
+        wrapText: true,
+      };
+
+      row.getCell("physical_inventory").numFmt = "#,##0.###";
+
+      const descriptionLength = String(
+        item.description || item.erp_name || ""
+      ).length;
+
+      // Ajusta la altura dependiendo del tamaño de la descripción.
+      if (descriptionLength > 220) {
+        row.height = 90;
+      } else if (descriptionLength > 120) {
+        row.height = 65;
+      } else if (descriptionLength > 60) {
+        row.height = 48;
+      } else {
+        row.height = 35;
+      }
+    });
+
+    const lastRowNumber = sheet.lastRow.number;
+
+    sheet.pageSetup.printArea = `A1:F${lastRowNumber}`;
+
+    sheet.autoFilter = {
+      from: {
+        row: headerRowNumber,
+        column: 1,
+      },
+      to: {
+        row: lastRowNumber,
+        column: 6,
+      },
+    };
+
+    const excelBuffer = await workbook.xlsx.writeBuffer();
+
+    const sessionIdentifier =
+      session.code ||
+      session.id ||
+      "inventario";
+
+    return {
+      success: true,
+      title: "Reporte generado",
+      message:
+        "El reporte de inventario físico con ubicación fue generado correctamente.",
+      buffer: Buffer.from(excelBuffer),
+      fileName: `inventario-fisico-ubicaciones-${sessionIdentifier}.xlsx`,
+      totalLines: inventoryLines.length,
+    };
+  } catch (error) {
+    console.error(
+      "🟥 ERROR GENERANDO EXCEL DE INVENTARIO CON UBICACIÓN:",
+      error
+    );
+
+    return {
+      success: false,
+      title: "Error generando Excel",
+      message:
+        "No se pudo generar el reporte de inventario físico con ubicación.",
+      error: error.message,
+    };
+  }
+}

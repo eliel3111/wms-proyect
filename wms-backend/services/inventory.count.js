@@ -25,15 +25,23 @@ export async function emitInventorySummary(client) {
   // ==============================
   // TOTAL DE PRODUCTOS A CONTAR
   // ==============================
-  const totalProductsResult = await client.query(`
-    SELECT COUNT(*)::int AS total_products
-FROM inventory_by_location
-WHERE qty_on_hand > 0
-  `);
+const totalProductsResult = await client.query(`
+  SELECT COUNT(*)::int AS total_products
+  FROM erp_inventory_snapshot
+  WHERE session_inventory_id = (
+    SELECT id
+    FROM inventory_sessions
+    WHERE status IN ('draft', 'in-progress', 'review')
+    ORDER BY updated_at DESC, id DESC
+    LIMIT 1
+  )
+`);
 
   const totalProducts = Number(
     totalProductsResult.rows[0]?.total_products || 0
   );
+
+  console.log("TOTAL DE LÍNEAS DEL SNAPSHOT:", totalProducts);
 
   // ==============================
   // SI NO HAY CONTEOS
