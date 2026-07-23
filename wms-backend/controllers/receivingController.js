@@ -329,6 +329,66 @@ WHERE r.id = $1;
         restante
       });
     }
+
+
+
+
+
+
+
+
+    //------------------------------------------------------
+// CREAR LÍNEAS DEL PDF SOLO CON LO RECIBIDO
+// EN ESTA RECEPCIÓN
+//------------------------------------------------------
+
+const receiptPdfLines = stockLinesAdjusted.map(
+  (line, index) => ({
+    line_no: index + 1,
+
+    id: line.id,
+    sku: line.sku,
+
+    description:
+      line.description || "SIN DESCRIPCIÓN",
+
+    erp_name:
+      line.erp_name || null,
+
+    erp_sku:
+      line.erp_sku || null,
+
+    erp_id:
+      line.erp_id || null,
+
+    // Cantidad total ordenada en la PO
+    ordered_qty:
+      Number(line.ordered_qty || 0),
+
+    // Cantidad recibida SOLAMENTE en esta recepción
+    received_qty:
+      Number(line.restante || 0),
+
+    // Diferencia de esta recepción contra lo ordenado
+    difference_qty:
+      Number(line.restante || 0) -
+      Number(line.ordered_qty || 0),
+  })
+);
+
+console.log("====================================");
+console.log("📄 LÍNEAS DE ESTA RECEPCIÓN PARA PDF");
+console.log("====================================");
+console.log(
+  JSON.stringify(receiptPdfLines, null, 2)
+);
+
+
+
+
+
+
+
     //----------------------------------------------------
     //PONER LA CANTIDAD POR UBICACION POR CADA PRODUCTO
     console.log("====================================");
@@ -461,7 +521,10 @@ WHERE r.id = $1;
     //--------------------------------------------------
     // CREAR EL PDF CON LA INFORMACION
 
-    const html = buildReceiptHtml(headerPDF, enrichedLines);
+    const html = buildReceiptHtml(
+  headerPDF,
+  receiptPdfLines
+);
     let pdf = null;
 
     try {

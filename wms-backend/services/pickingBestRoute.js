@@ -45,19 +45,23 @@ export async function getPickingProductsWithLocationsService(client, pickingId) 
   // ==============================
   // 4️⃣ INVENTARIO + LOCATIONS
   // ==============================
-  const inventoryResult = await client.query(`
-    SELECT
-      ibl.product_sku,
-      ibl.location_id,
-      ibl.warehouse_id,
-      ibl.qty_available,
-      l.tramo,
-      l.nivel
-    FROM inventory_by_location ibl
-    JOIN locations l ON l.id = ibl.location_id
-    WHERE ibl.product_sku = ANY($1::text[])
-      AND l.location_type = 'STORAGE'
-  `, [skuList]);
+  const inventoryResult = await client.query(
+  `
+  SELECT
+    ibl.product_sku,
+    ibl.location_id,
+    ibl.warehouse_id,
+    ibl.qty_available,
+    l.tramo,
+    l.nivel
+  FROM inventory_by_location ibl
+  JOIN locations l
+    ON l.id = ibl.location_id
+  WHERE ibl.product_sku = ANY($1::text[])
+    AND l.location_type IS DISTINCT FROM 'SHIPPING'
+  `,
+  [skuList]
+);
 
   console.log("📦 INVENTORY RESULT:", inventoryResult.rows);
 

@@ -699,7 +699,7 @@ export async function getPickingDifferences(req, res) {
 
 export async function confirmPickingLine(req, res) {
   const client = await db.connect();
-
+  console.log("🟨🟨 CONFIRMING LINE");
   try {
     const { id, locationId, productId, qty } = req.body;
 
@@ -1035,6 +1035,23 @@ export async function getPickingProductsWithLocations(req, res) {
 
     await client.query("BEGIN");
 
+    //Se elimina las lineas del picking o de la recogida del usuario
+    //para que cada vez que entra se ejecute la logica de nuevo
+
+    const deleteMoveLinesResult = await client.query(
+      `
+  DELETE FROM stock_move_line
+  WHERE picking_id = $1
+  RETURNING id
+  `,
+      [pickingId]
+    );
+
+    console.log(
+      `🗑️ Líneas eliminadas de stock_move_line: ${deleteMoveLinesResult.rowCount}`
+    );
+
+
     const result = await getPickingProductsWithLocationsService(
       client,
       pickingId
@@ -1087,9 +1104,9 @@ export async function getPickingProductsWithLocations(req, res) {
     console.log("enricheddata ", enrichedData);
 
 
-  
+
     let totalReserved = 0;
-let hasPickingChanges = false;
+    let hasPickingChanges = false;
     let results = [];
 
     /* ==============================
@@ -1133,44 +1150,44 @@ let hasPickingChanges = false;
       //🟨🟨🟨🟨🟨🟨🟨
       // 🚫 2. Validación para NO ejecutar reserva
       if (totalQty > 0) {
-  console.log("🟡 Ya existen líneas, revisando si falta reservar diferencia...");
+        console.log("🟡 Ya existen líneas, revisando si falta reservar diferencia...");
 
-  const resultExisting = await reserveMissingQtyForExistingMoveLines(
-    client,
-    move
-  );
+        const resultExisting = await reserveMissingQtyForExistingMoveLines(
+          client,
+          move
+        );
 
-  console.log("🟢 Resultado reserva con líneas existentes:", resultExisting);
+        console.log("🟢 Resultado reserva con líneas existentes:", resultExisting);
 
-  const reservedQty = Number(resultExisting?.reserved || 0);
-  const createdQty = Number(resultExisting?.createdQty || 0);
-  const releasedQty = Number(resultExisting?.released || 0);
+        const reservedQty = Number(resultExisting?.reserved || 0);
+        const createdQty = Number(resultExisting?.createdQty || 0);
+        const releasedQty = Number(resultExisting?.released || 0);
 
-  totalReserved += reservedQty;
+        totalReserved += reservedQty;
 
-  // ✅ Importante:
-  // Aunque reserved sea 0, puede haber cambios reales en stock_move_line.
-  if (
-    resultExisting?.changed === true ||
-    resultExisting?.case === "ORDER_INCREASED" ||
-    resultExisting?.case === "ORDER_DECREASED"
-  ) {
-    hasPickingChanges = true;
-  }
+        // ✅ Importante:
+        // Aunque reserved sea 0, puede haber cambios reales en stock_move_line.
+        if (
+          resultExisting?.changed === true ||
+          resultExisting?.case === "ORDER_INCREASED" ||
+          resultExisting?.case === "ORDER_DECREASED"
+        ) {
+          hasPickingChanges = true;
+        }
 
-  results.push({
-    product_id: productId,
-    reserved: reservedQty,
-    createdQty,
-    released: releasedQty,
-    changed: resultExisting?.changed || false,
-    case: resultExisting?.case || null,
-    skipped: resultExisting?.skipped || false,
-    message: resultExisting?.message || "",
-  });
+        results.push({
+          product_id: productId,
+          reserved: reservedQty,
+          createdQty,
+          released: releasedQty,
+          changed: resultExisting?.changed || false,
+          case: resultExisting?.case || null,
+          skipped: resultExisting?.skipped || false,
+          message: resultExisting?.message || "",
+        });
 
-  continue;
-}
+        continue;
+      }
       //🟨🟨🟨🟨🟨🟨🟨
 
       console.log("RESERVAR MOVE: ", move);
@@ -1198,20 +1215,20 @@ let hasPickingChanges = false;
     const config = await getPickingConfig(client);
 
     if (
-  !config.allow_picking_without_locations &&
-  totalReserved === 0 &&
-  !hasPickingChanges
-) {
-  console.log("⚠️ No se reservó nada y no hubo cambios en stock_move_line");
+      !config.allow_picking_without_locations &&
+      totalReserved === 0 &&
+      !hasPickingChanges
+    ) {
+      console.log("⚠️ No se reservó nada y no hubo cambios en stock_move_line");
 
-  await client.query("ROLLBACK");
+      await client.query("ROLLBACK");
 
-  return res.status(200).json({
-    success: true,
-    message: "No se pudo reservar inventario",
-    data: finalResult,
-  });
-}
+      return res.status(200).json({
+        success: true,
+        message: "No se pudo reservar inventario",
+        data: finalResult,
+      });
+    }
 
 
 

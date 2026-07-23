@@ -42,14 +42,17 @@ export async function getActiveStorageLocationByCode(client, code) {
 
   console.log("INICIANDO BUSQUEDA DE LOCATION:", code);
 
-  const result = await client.query(`
-    SELECT id, code
-    FROM locations
-    WHERE code = $1
-      AND location_type = 'STORAGE'
-      AND is_active = true
-    LIMIT 1
-  `, [code]);
+ const result = await client.query(
+  `
+  SELECT id, code
+  FROM locations
+  WHERE code = $1
+    AND location_type <> 'SHIPPING'
+    AND is_active = true
+  LIMIT 1
+  `,
+  [code]
+);
 
   console.log("📍 LOCATION ROWCOUNT:", result.rowCount);
   console.log("📍 LOCATION ROWS:", result.rows);

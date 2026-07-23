@@ -122,6 +122,8 @@ export async function syncAllPurchaseOrders() {
                     order.Estatus
                 );
 
+       
+
                 // Si está cancelada/cerrada,
                 // actualiza encabezado pero no las líneas.
                 if (order.Estatus !== "C") {

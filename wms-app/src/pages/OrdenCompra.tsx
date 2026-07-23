@@ -242,22 +242,79 @@ export default function OrdenCompra() {
         };
     }, [isScannerMode]);
 
+
+
+    // ===============================================
+    // CANTIDADES VISIBLES DE LA RECEPCIÓN ACTUAL
+    // ===============================================
+
+    function getPreviousReceived(
+        product: Product
+    ): number {
+        return Math.max(
+            Number(product.min_received_qty ?? 0),
+            0
+        );
+    }
+
+    function getDisplayReceived(
+        product: Product
+    ): number {
+        return Math.max(
+            Number(product.received_qty ?? 0) -
+            getPreviousReceived(product),
+            0
+        );
+    }
+
+    function getDisplayOrdered(
+        product: Product
+    ): number {
+        return Math.max(
+            Number(product.ordered_qty ?? 0) -
+            getPreviousReceived(product),
+            0
+        );
+    }
+
+
     // AFTER INDEX OBTAINED, SAVE SELECTED PRODUCT
     /* ---------- DERIVED VALUE (AQUÍ) ---------- */
     const selectedProduct =
         selectedIndex !== null ? products[selectedIndex] : null;
+    const selectedDisplayReceived =
+        selectedProduct
+            ? getDisplayReceived(selectedProduct)
+            : 0;
 
+    const selectedDisplayOrdered =
+        selectedProduct
+            ? getDisplayOrdered(selectedProduct)
+            : 0;
     const EPS = 0.000001; // tolerancia para “casi cero”
 
-    const filteredProducts = products.filter((p) => {
-        const qty = Number(p.received_qty); // convierte 0.000 o "0.000" a 0
+    const filteredProducts = products.filter(
+        (product) => {
+            const currentReceptionQty =
+                getDisplayReceived(product);
 
-        if (Number.isNaN(qty)) return filter === "all"; // o decide qué hacer si es inválido
+            if (
+                filter === "read"
+            ) {
+                return currentReceptionQty > EPS;
+            }
 
-        if (filter === "read") return qty > EPS;        // > 0 real
-        if (filter === "unread") return Math.abs(qty) <= EPS; // 0, 0.000, etc.
-        return true;
-    });
+            if (
+                filter === "unread"
+            ) {
+                return (
+                    Math.abs(currentReceptionQty) <= EPS
+                );
+            }
+
+            return true;
+        }
+    );
     // FUNCION PARA CERRAR MODAL
     function closeModal() {
         //Hacer que no se cierre si es menor a cero
@@ -351,68 +408,154 @@ export default function OrdenCompra() {
         return [...missing, ...existing];
     }
 
-    function handleReceivedQtyChange(e: React.ChangeEvent<HTMLInputElement>) {
+    function handleReceivedQtyChange(
+        e: React.ChangeEvent<HTMLInputElement>
+    ) {
         if (selectedIndex === null) return;
 
         const value = e.target.value;
 
-        if (value !== "" && !/^\d+$/.test(value)) return;
+        // Permitir solamente números enteros positivos
+        if (
+            value !== "" &&
+            !/^\d+$/.test(value)
+        ) {
+            return;
+        }
 
-        setProducts(prev => {
+        setProducts((previousProducts) => {
             setQuantityError(false);
-            const currentProduct = prev[selectedIndex];
 
-            const numericValue =
+            const currentProduct =
+                previousProducts[selectedIndex];
+
+            if (!currentProduct) {
+                return previousProducts;
+            }
+
+            // Cantidad recibida antes de esta recepción
+            const previousReceived =
+                getPreviousReceived(currentProduct);
+
+            // Cantidad total pendiente al comenzar
+            // esta recepción
+            const displayOrdered =
+                getDisplayOrdered(currentProduct);
+
+            // Cantidad escrita por el usuario para
+            // ESTA recepción
+            const enteredDisplayQty =
                 value === ""
                     ? 0
-                    : Math.min(Number(value), currentProduct.ordered_qty);
+                    : Number(value);
 
-            const updated = [...prev];
+            // No permitir que exceda lo pendiente
+            const safeDisplayQty = Math.min(
+                enteredDisplayQty,
+                displayOrdered
+            );
 
-            if (Number(value) > currentProduct.ordered_qty) {
+            /*
+             * Convertir la cantidad visible
+             * a cantidad acumulada real.
+             *
+             * Ejemplo:
+             * anterior = 10
+             * usuario escribe = 5
+             * acumulado = 15
+             */
+            const accumulatedReceivedQty =
+                previousReceived + safeDisplayQty;
+
+            if (
+                enteredDisplayQty > displayOrdered
+            ) {
                 setQuantityError(true);
-                setShakeKey(prev => prev + 1); // 🔥 fuerza re-render
+                setShakeKey(
+                    (previousKey) => previousKey + 1
+                );
             } else {
                 setQuantityError(false);
             }
 
             const updatedProduct = {
                 ...currentProduct,
-                received_qty: numericValue,
+
+                // Se guarda el acumulado real
+                received_qty:
+                    accumulatedReceivedQty,
             };
 
-            updated.splice(selectedIndex, 1);
-            updated.unshift(updatedProduct);
+            const updatedProducts = [
+                ...previousProducts,
+            ];
 
-            return updated;
+            /*
+             * Mantener el producto editado al inicio,
+             * como ya hacía tu código.
+             */
+            updatedProducts.splice(
+                selectedIndex,
+                1
+            );
+
+            updatedProducts.unshift(
+                updatedProduct
+            );
+
+            return updatedProducts;
         });
 
         setSelectedIndex(0);
+        selectedIndexRef.current = 0;
     }
-
     function handleReceivedQtyBlur() {
         if (selectedIndex === null) return;
 
-        setProducts(prev => {
-            const updated = [...prev];
-            const current = updated[selectedIndex];
+        setProducts((previousProducts) => {
+            const updatedProducts = [
+                ...previousProducts,
+            ];
 
-            let finalQty = Number(current.received_qty) || 0;
+            const currentProduct =
+                updatedProducts[selectedIndex];
 
-            if (finalQty < current.min_received_qty) {
-                finalQty = current.min_received_qty;
+            if (!currentProduct) {
+                return previousProducts;
             }
 
-            if (finalQty > current.ordered_qty) {
-                finalQty = current.ordered_qty;
+            const previousReceived =
+                getPreviousReceived(currentProduct);
+
+            const orderedQty = Number(
+                currentProduct.ordered_qty ?? 0
+            );
+
+            let finalQty = Number(
+                currentProduct.received_qty ?? 0
+            );
+
+            /*
+             * Nunca puede quedar por debajo
+             * de lo recibido anteriormente.
+             */
+            if (finalQty < previousReceived) {
+                finalQty = previousReceived;
             }
 
-            updated[selectedIndex] = {
-                ...current,
-                received_qty: finalQty
+            /*
+             * Nunca puede superar lo ordenado.
+             */
+            if (finalQty > orderedQty) {
+                finalQty = orderedQty;
+            }
+
+            updatedProducts[selectedIndex] = {
+                ...currentProduct,
+                received_qty: finalQty,
             };
 
-            return updated;
+            return updatedProducts;
         });
     }
 
@@ -420,37 +563,69 @@ export default function OrdenCompra() {
     // FUNCTION TO ADD +1 TO THE PRODUCT USING SCANNER
     function incrementReceivedQty() {
         const index = selectedIndexRef.current;
+
         if (index === null) return;
 
-        setProducts(prev => {
+        setProducts((previousProducts) => {
             setQuantityError(false);
-            const updated = [...prev];
-            const current = updated[index];
 
-            const nextQty = current.received_qty + 1;
-            const safeQty = Math.min(nextQty, current.ordered_qty);
+            const updatedProducts = [
+                ...previousProducts,
+            ];
+
+            const currentProduct =
+                updatedProducts[index];
+
+            if (!currentProduct) {
+                return previousProducts;
+            }
+
+            const currentReceived = Number(
+                currentProduct.received_qty ?? 0
+            );
+
+            const orderedQty = Number(
+                currentProduct.ordered_qty ?? 0
+            );
+
+            /*
+             * Incrementa el acumulado real.
+             *
+             * Si anteriormente había 10:
+             * primer incremento -> 11
+             * pantalla -> 1
+             */
+            const nextQty =
+                currentReceived + 1;
+
+            const safeQty = Math.min(
+                nextQty,
+                orderedQty
+            );
 
             const updatedProduct = {
-                ...current,
+                ...currentProduct,
                 received_qty: safeQty,
             };
-            console.log("NEXTQTY ", nextQty);
-            console.log("ORDERED ", current.ordered_qty);
-            if (nextQty > current.ordered_qty) {
+
+            if (nextQty > orderedQty) {
                 setQuantityError(true);
-                setShakeKey(prev => prev + 1); // 🔥 fuerza re-render
+
+                setShakeKey(
+                    (previousKey) => previousKey + 1
+                );
             } else {
                 setQuantityError(false);
             }
 
+            updatedProducts.splice(index, 1);
+            updatedProducts.unshift(
+                updatedProduct
+            );
 
-            updated.splice(index, 1);
-            updated.unshift(updatedProduct);
-
-            return updated;
+            return updatedProducts;
         });
 
-        // actualizar ambos
         setSelectedIndex(0);
         selectedIndexRef.current = 0;
     }
@@ -609,10 +784,16 @@ export default function OrdenCompra() {
             >
                 {selectedProduct ? (
                     <div className="modal-container">
-                        <div className={`modal-sku ${selectedProduct.received_qty === selectedProduct.ordered_qty
-                            ? "confirmed"
-                            : ""
-                            }`}>{selectedProduct.erp_name}</div>
+                        <div
+                            className={`modal-sku ${selectedDisplayOrdered > 0 &&
+                                    selectedDisplayReceived >=
+                                    selectedDisplayOrdered
+                                    ? "confirmed"
+                                    : ""
+                                }`}
+                        >
+                            {selectedProduct.erp_name}
+                        </div>
 
                         <div className="modal-description">{selectedProduct.description} / PN: {selectedProduct.erp_sku} / ID: {selectedProduct.erp_id} / {selectedProduct.sku}</div>
 
@@ -622,27 +803,28 @@ export default function OrdenCompra() {
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                value={selectedProduct.received_qty}
+
+                                // Cantidad de esta recepción
+                                value={selectedDisplayReceived}
+
                                 onChange={handleReceivedQtyChange}
                                 onBlur={handleReceivedQtyBlur}
                                 className="quantity-input"
                                 onFocus={() => {
                                     requestAnimationFrame(() => {
                                         const input = qtyInputRef.current;
+
                                         if (!input) return;
+
                                         input.select();
                                     });
                                 }}
-
-
-
-
                             />
 
                             <span className="qty-separator">|</span>
 
                             <div className="ordered-qty">
-                                {selectedProduct.ordered_qty}
+                                {selectedDisplayOrdered}
                             </div>
                         </div>
                         {quantityError && (

@@ -519,18 +519,32 @@ async function syncSalesOrderLines(clientDb, order, pickingId) {
       );
 
       const deleteResult = await clientDb.query(
-        `
-  DELETE FROM stock_move
-  WHERE picking_id = $1
-  AND erp_product_id IS NOT NULL
-  AND erp_product_id != ALL($2::bigint[])
-  RETURNING id, erp_product_id, product_id
+  `
+  DELETE FROM stock_move AS sm
+  WHERE sm.picking_id = $1
+    AND sm.erp_product_id IS NOT NULL
+    AND NOT (sm.erp_product_id = ANY($2::bigint[]))
+
+    -- No eliminar si alguna línea ya tiene cantidad procesada
+    AND NOT EXISTS (
+      SELECT 1
+      FROM stock_move_line AS sml
+      WHERE sml.move_id = sm.id
+        AND COALESCE(sml.qty_done, 0) > 0
+    )
+
+  RETURNING
+    sm.id,
+    sm.erp_product_id,
+    sm.product_id
   `,
-        [
-          pickingId,
-          currentERPProducts
-        ]
-      );
+  [
+    pickingId,
+    currentERPProducts
+  ]
+);
+
+console.log("🗑️ Movimientos eliminados:", deleteResult.rows);
 
       if (deleteResult.rows.length > 0) {
 
