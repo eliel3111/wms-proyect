@@ -6,6 +6,31 @@ import { buscarTodasLasExistenciasAlmacen } from "../integrations/citrus/citrus.
 import { getInventoryFinalReportExcelService, getInventoryLocationReportExcelService } from "../services/inventoryFinalReportExcel.service.js";
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export async function inventoryScan(req, res) {
   try {
     const { productScanned, locationScanned } = req.body;
@@ -630,6 +655,19 @@ export async function createInventorySession(req, res) {
       });
     }
 
+    const erpWarehouseId = Number(req.body?.erpWarehouseId);
+
+    console.log("🏬 ERP WAREHOUSE ID:", erpWarehouseId);
+
+    if (!erpWarehouseId) {
+      return res.status(200).json({
+        success: false,
+        title: "Almacén inválido",
+        message:
+          "No se recibió un almacén válido para crear la sesión de inventario."
+      });
+    }
+
     await client.query("BEGIN");
 
     // =====================================
@@ -728,24 +766,31 @@ export async function createInventorySession(req, res) {
 
     const sessionResult = await client.query(
       `
-      INSERT INTO inventory_sessions
-      (
-        user_id
-      )
-      VALUES
-      (
-        $1
-      )
-      RETURNING *
-      `,
-      [userId]
+  INSERT INTO inventory_sessions
+  (
+    user_id,
+    erp_warehouse_id
+  )
+  VALUES
+  (
+    $1,
+    $2
+  )
+  RETURNING *
+  `,
+      [
+        userId,
+        erpWarehouseId
+      ]
     );
 
     const session = sessionResult.rows[0];
 
     console.log(
       "✅ SESIÓN CREADA:",
-      session.code
+      session.code,
+      "| ERP WAREHOUSE ID:",
+      session.erp_warehouse_id
     );
 
 
@@ -1870,14 +1915,14 @@ export async function getInventoryFinalReport(req, res) {
 
     console.log("🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:", productsMissing.length);
 
-    
-
-    
 
 
 
 
-        const result = await getInventoryFinalReportExcelService(client, sessionId);
+
+
+
+    const result = await getInventoryFinalReportExcelService(client, sessionId);
 
     if (!result.success) {
       await client.query("ROLLBACK");
@@ -2202,6 +2247,96 @@ export async function getInventoryLocationsReport(req, res) {
     if (client) {
       client.release();
       console.log("🔌 CONEXIÓN A POSTGRESQL LIBERADA");
+    }
+  }
+}
+
+
+
+
+
+
+
+// ==========================================================
+// OBTENER ALMACENES ACTIVOS
+// ==========================================================
+
+export async function getActiveWarehouses(req, res) {
+  let client = null;
+
+  try {
+    console.log("🟦🟦🟦 ========================================");
+    console.log("🏬 BUSCANDO ALMACENES ACTIVOS");
+    console.log("🕒 Fecha:", new Date().toISOString());
+    console.log("========================================");
+
+    client = await db.connect();
+
+    console.log("✅ Conexión PostgreSQL obtenida");
+
+    const warehouseResult = await client.query(`
+      SELECT
+        id,
+        code,
+        name,
+        erp_warehouse_id
+      FROM warehouses
+      WHERE status = 'ACTIVE'
+      ORDER BY
+        is_default DESC,
+        name ASC
+    `);
+
+    console.log(
+      "📦 TOTAL ALMACENES ACTIVOS:",
+      warehouseResult.rowCount
+    );
+
+    if (warehouseResult.rowCount === 0) {
+      console.log("⚠️ No se encontraron almacenes activos");
+
+      return res.status(200).json({
+        success: false,
+        title: "No encontramos almacenes",
+        message:
+          "Asegúrese de crear o sincronizar almacenes activos antes de iniciar una sesión de inventario.",
+        warehouses: []
+      });
+    }
+
+    console.log(
+      "✅ ALMACENES ACTIVOS:",
+      warehouseResult.rows
+    );
+
+    return res.status(200).json({
+      success: true,
+      title: "Almacenes encontrados",
+      message: "Los almacenes fueron obtenidos correctamente.",
+      warehouses: warehouseResult.rows
+    });
+
+  } catch (error) {
+    console.error(
+      "❌ ERROR OBTENIENDO ALMACENES:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      title: "Error obteniendo almacenes",
+      message:
+        "Ocurrió un error buscando los almacenes disponibles.",
+      warehouses: []
+    });
+
+  } finally {
+    if (client) {
+      client.release();
+
+      console.log(
+        "🔌 Conexión PostgreSQL liberada"
+      );
     }
   }
 }

@@ -36,6 +36,35 @@ export async function buscarTodasLasExistenciasAlmacen(client, sessionId) {
     throw new Error("sessionId es requerido en buscarTodasLasExistenciasAlmacen");
   } 
 
+    const sessionResult = await client.query(
+    `
+    SELECT
+      erp_warehouse_id
+    FROM inventory_sessions
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [sessionId]
+  );
+
+  if (sessionResult.rows.length === 0) {
+    throw new Error(
+      `No se encontró una sesión de inventario con ID ${sessionId}`
+    );
+  }
+
+  const erpWarehouseId = Number(
+    sessionResult.rows[0].erp_warehouse_id
+  );
+
+  if (!erpWarehouseId) {
+    throw new Error(
+      `La sesión ${sessionId} no tiene un erp_warehouse_id válido`
+    );
+  }
+
+  console.log("🏭 ERP WAREHOUSE ID:", erpWarehouseId);
+  
   const cantidadPorPagina = 3000;
   let pagina = 0;
   let todasLasExistencias = [];
@@ -48,7 +77,7 @@ export async function buscarTodasLasExistenciasAlmacen(client, sessionId) {
     const xml = buildBuscarExistenciaAlmacenXML({
       pagina,
       cantidadPorPagina,
-      almacenId: 1,
+      almacenId: erpWarehouseId,
       estatus: "A",
       excluirSinExistencia: false,
     });

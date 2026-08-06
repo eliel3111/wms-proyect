@@ -258,7 +258,7 @@ const xml = `
       <tem:BuscarOrdenesCompras>
          <!--Optional:-->
          <tem:ordenCompraWhere>
-            <bas:CantidadPorPagina>100</bas:CantidadPorPagina>
+            <bas:CantidadPorPagina>1000</bas:CantidadPorPagina>
             <tem:EsFecha>true</tem:EsFecha>
             <tem:FechaInicio>${fechaInicioFormattedNewPO}</tem:FechaInicio>
             <tem:FechaFin>${fechaFinFormatted}</tem:FechaFin>
@@ -421,7 +421,13 @@ export async function syncPurchaseOrder(clientDb, order) {
   );
 
   // 🔥 status desde ERP
-  let newStatus = order.Estatus === "A" ? "open" : "closed";
+  const erpStatus = String(order.Estatus ?? "")
+  .trim()
+  .toUpperCase();
+
+const newStatus = ["A", "F"].includes(erpStatus)
+  ? "open"
+  : "closed";
 
   if (result.rowCount > 0) {
 

@@ -77,16 +77,16 @@ export default function OrderLineCard({
   return (
     <div className={`order-line ${statusClass}`}>
       <div className="line-sku">
-        {line.erp_name}
+        {line.erp_sku}
       </div>
 
       <div className="line-desc">
-        {line.description}
+        {line.erp_name} - {line.description}
 
         <br />
 
         <strong>PN:</strong>{" "}
-        {line.erp_sku ?? "N/A"}
+        {line.erp_sku  ?? "N/A"}
 
         {" | "}
 

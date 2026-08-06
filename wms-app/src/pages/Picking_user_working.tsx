@@ -795,7 +795,7 @@ closeModal();
                         pickings.map((line) => (
                             <OrderLineCard
                                 key={line.id}
-                                editable={canEdit}
+                                editable={true}
                                 onEdit={() => handleEditLine(line.id)}
                                 line={{
                                     id: Number(line.product_id),
@@ -931,11 +931,14 @@ closeModal();
                                 Salir
                             </button>
 
-                            {Number(qty) > 0 && (
-                                <button className="btn btn-save pop-in" onClick={sendModal}>
-                                    Siguiente
-                                </button>
-                            )}
+                            {qty !== "" && Number(qty) >= 0 && (
+  <button
+    className="btn btn-save pop-in"
+    onClick={sendModal}
+  >
+    Siguiente
+  </button>
+)}
                         </section>
                     </div>
                 </div>

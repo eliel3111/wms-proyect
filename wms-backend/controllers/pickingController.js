@@ -135,12 +135,14 @@ export async function closePicking(req, res) {
 
     // 4️⃣ ACTUALIZAR stock_move_line
     await client.query(`
-       UPDATE stock_move_line
-       SET state = 'done',
-           user_id = $1
-       WHERE picking_id = $2
-         AND state NOT IN ('cancel', 'done')
-     `, [userId, pickingId]);
+  UPDATE stock_move_line
+  SET
+    state = 'done',
+    user_id = $1
+  WHERE picking_id = $2
+    AND state NOT IN ('cancel', 'done')
+    AND COALESCE(qty_done, 0) > 0
+`, [userId, pickingId]);
 
     console.log("✅ stock_move_line actualizado a done");
     const completedMoveIds = [];
@@ -735,7 +737,7 @@ export async function confirmPickingLine(req, res) {
     const line = result.rows[0];
 
     // 🔴 VALIDAR QTY
-    if (Number(qty) <= 0) {
+    if (Number(qty) < 0) {
       return res.json({
         success: false,
         title: "Cantidad inválida",

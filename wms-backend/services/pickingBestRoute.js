@@ -626,38 +626,92 @@ export async function getPickingConfig(client) {
 
 
 // SERVICIO PARA LOCATION DEFAULT SI NO HAY OTROS
-export async function getOrCreateDefaultLocation(client, warehouseId) {
-  const DEFAULT_CODE = "GENERAL";
-  const DEFAULT_TRAMO = 999;
-  const DEFAULT_NIVEL = 999;
-
+export async function getOrCreateDefaultLocation(
+  client,
+  warehouseId
+) {
   try {
-    const result = await client.query(`
-      INSERT INTO locations (
-        warehouse_id,
+    console.log(
+      "🔎 Buscando ubicación GENERAL para warehouse:",
+      warehouseId
+    );
+
+    const existingResult = await client.query(
+      `
+      SELECT
+        id,
         code,
-        description,
+        warehouse_id,
         location_type,
         tramo,
-        nivel,
-        is_active
-      )
-      VALUES ($1, $2, $3, 'STORAGE', $4, $5, true)
-      ON CONFLICT (warehouse_id, code)
-      DO UPDATE SET code = EXCLUDED.code
-      RETURNING id, warehouse_id, code, tramo, nivel
-    `, [
-      warehouseId,
-      DEFAULT_CODE,
-      'Ubicación GENERAL / fallback',
-      DEFAULT_TRAMO,
-      DEFAULT_NIVEL
-    ]);
+        nivel
+      FROM locations
+      WHERE warehouse_id = $1
+        AND location_type = 'STORAGE'
+        AND tramo = 999
+        AND nivel = 999
+      LIMIT 1
+      `,
+      [warehouseId]
+    );
 
-    return result.rows[0];
+    if (existingResult.rowCount > 0) {
+      console.log(
+        "✅ Ubicación GENERAL encontrada:",
+        existingResult.rows[0]
+      );
+
+      return existingResult.rows[0];
+    }
+
+    console.log(
+      "⚠️ No existe GENERAL para warehouse:",
+      warehouseId
+    );
+
+    const insertResult = await client.query(
+      `
+      INSERT INTO locations (
+        code,
+        warehouse_id,
+        location_type,
+        tramo,
+        nivel
+      )
+      VALUES (
+        $1,
+        $2,
+        'STORAGE',
+        999,
+        999
+      )
+      RETURNING
+        id,
+        code,
+        warehouse_id,
+        location_type,
+        tramo,
+        nivel
+      `,
+      [
+        `GENERAL-${warehouseId}`,
+        warehouseId
+      ]
+    );
+
+    console.log(
+      "✅ Ubicación GENERAL creada:",
+      insertResult.rows[0]
+    );
+
+    return insertResult.rows[0];
 
   } catch (error) {
-    console.error("❌ Error getOrCreateDefaultLocation:", error.message);
+    console.error(
+      "❌ Error getOrCreateDefaultLocation:",
+      error
+    );
+
     throw error;
   }
 }

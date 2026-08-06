@@ -7,10 +7,37 @@ import { sendReceiptEmail } from "../services/sendReceiptEmail.js";
 import { runFullSync } from "../cron/cronJobs.js";
 import { buildWarehouseEntry, createWarehouseEntry } from "../integrations/citrus/citrus.warehouseEntry.js"
 import { syncAllItems, syncAllPurchaseOrders } from "../integrations/citrus/citrus.sync.js";
+import {
+  alegraPurchaseOrdersService
+} from "../integrations/alegra/alegraItemService.js";
+import { syncAlegraPurchaseOrderLines } from "../integrations/alegra/alegra.purcharseOrderLines.js"
 
 
+/*
+function normalizeTaxes(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
 
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
 
+      return Array.isArray(parsed)
+        ? parsed
+        : [];
+    } catch (error) {
+      console.warn(
+        "⚠️ No se pudieron interpretar los impuestos:",
+        value
+      );
+
+      return [];
+    }
+  }
+
+  return [];
+}*/
 
 
 export async function CloseReception(req, res) {
@@ -74,29 +101,133 @@ export async function CloseReception(req, res) {
     //------------------------------------------------------
     // 5️⃣ Obtener líneas de la orden de compra
     const poLinesResult = await client.query(
-      `
-      SELECT
-        id,
-        sku,
-        ordered_qty,
-        received_qty
-      FROM purchase_order_lines
-      WHERE purchase_order_id = $1
-      `,
-      [purchaseOrderId]
-    );
+  `
+  SELECT
+    id,
+    purchase_order_id,
+    line_number,
+    erp_order_id,
+    erp_product_id,
+    erp_line_key,
+    sku,
+    description,
+    ordered_qty,
+    received_qty,
+    unit_price,
+    discount,
+    taxes,
+    product_exists,
+    deleted_erp
+  FROM purchase_order_lines
+  WHERE purchase_order_id = $1
+    AND COALESCE(
+      deleted_erp,
+      false
+    ) = false
+  ORDER BY
+    CASE
+      WHEN line_number ~ '^[0-9]+$'
+      THEN line_number::integer
+      ELSE 999999999
+    END,
+    id
+  FOR UPDATE
+  `,
+  [purchaseOrderId]
+);
 
     if (poLinesResult.rowCount === 0) {
       throw new Error("PO_LINES_NO_EXISTE");
     }
 
-    const lines = poLinesResult.rows;
-    const skus = lines.map(l => l.sku);
-    console.log(lines);
+    const lines = poLinesResult.rows.map(
+  (line) => ({
+    ...line,
+
+    id:
+      Number(line.id),
+
+    purchase_order_id:
+      Number(
+        line.purchase_order_id
+      ),
+
+    line_number:
+      String(
+        line.line_number
+      ),
+
+    erp_order_id:
+      line.erp_order_id !== null
+        ? Number(
+            line.erp_order_id
+          )
+        : null,
+
+    erp_product_id:
+      line.erp_product_id !== null
+        ? Number(
+            line.erp_product_id
+          )
+        : null,
+
+    erp_line_key:
+      line.erp_line_key || null,
+
+    ordered_qty:
+      Number(
+        line.ordered_qty || 0
+      ),
+
+    received_qty:
+      Number(
+        line.received_qty || 0
+      ),
+
+    unit_price:
+      Number(
+        line.unit_price || 0
+      ),
+
+    discount:
+      Number(
+        line.discount || 0
+      ),
+
+    taxes:
+      normalizeTaxes(
+        line.taxes
+      ),
+
+    product_exists:
+      line.product_exists === true,
+
+    deleted_erp:
+      line.deleted_erp === true
+  })
+);
+
+
+    const skus = [
+  ...new Set(
+    lines
+      .map((line) => line.sku)
+      .filter(Boolean)
+  )
+];
+    console.log("");
+console.log(
+  "📦 LÍNEAS ACTIVAS DE LA ORDEN:"
+);
+
+console.dir(lines, {
+  depth: null,
+  colors: true
+});
     //-----------------------------------------------------
     // BUSCAR LA DESCRIPCION DE LOS PRODUCTOS DE LA ORDEN
     const productsResult = await client.query(
-      `
+  `
   SELECT
     sku,
     description,
@@ -104,20 +235,29 @@ export async function CloseReception(req, res) {
     erp_sku,
     erp_id
   FROM products
-  WHERE sku = ANY($1)
+  WHERE sku = ANY($1::varchar[])
   `,
-      [skus]
-    );
-    const productMap = {};
+  [skus]
+);
+   const productMap = {};
 
-    for (const p of productsResult.rows) {
-      productMap[p.sku] = {
-        description: p.description,
-        erp_name: p.erp_name,
-        erp_sku: p.erp_sku,
-        erp_id: p.erp_id,
-      };
-    }
+for (const product of productsResult.rows) {
+  productMap[product.sku] = {
+    description:
+      product.description || null,
+
+    erp_name:
+      product.erp_name || null,
+
+    erp_sku:
+      product.erp_sku || null,
+
+    erp_id:
+      product.erp_id !== null
+        ? Number(product.erp_id)
+        : null
+  };
+}
 
     //------------------------------------------------
     // 1️⃣ Traer encabezado completo
@@ -197,31 +337,104 @@ WHERE r.id = $1;
     console.log("🏬 Warehouse ID:", warehouseId);
 
     // AGREGAR TODAS LAS DESCRIPCIONES PARA LAS LINES PDF
-    const enrichedLines = lines.map((line, index) => {
-      const difference_qty = line.received_qty - line.ordered_qty;
-      const productInfo = productMap[line.sku] || {};
+   const enrichedLines = lines.map(
+  (line, index) => {
+    const productInfo =
+      productMap[line.sku] || {};
 
-      return {
-        line_no: index + 1,
-        id: line.id,                // 🔢 1,2,3...
-        sku: line.sku,
-        description: productMap[line.sku] || "SIN DESCRIPCIÓN",
-        erp_name:
-          productInfo.erp_name || null,
+    const orderedQty =
+      Number(line.ordered_qty || 0);
 
-        erp_sku:
-          productInfo.erp_sku || null,
+    const receivedQty =
+      Number(line.received_qty || 0);
 
-        erp_id:
-          productInfo.erp_id || null,
+    const differenceQty =
+      receivedQty - orderedQty;
 
-        ordered_qty: line.ordered_qty,
-        ordered_qty: line.ordered_qty,
-        received_qty: line.received_qty,
-        difference_qty,                    // ➖ calculado
-      };
-    });
+    return {
+      /*
+       * Posición visual para el PDF.
+       */
+      line_no:
+        index + 1,
 
+      /*
+       * ID interno de purchase_order_lines.
+       */
+      id:
+        line.id,
+
+      purchase_order_id:
+        line.purchase_order_id,
+
+      line_number:
+        line.line_number,
+
+      /*
+       * Identificadores de Alegra.
+       */
+      erp_order_id:
+        line.erp_order_id,
+
+      erp_product_id:
+        line.erp_product_id ||
+        productInfo.erp_id ||
+        null,
+
+      erp_line_key:
+        line.erp_line_key ||
+        null,
+
+      /*
+       * Información del producto.
+       */
+      sku:
+        line.sku,
+
+      description:
+        line.description ||
+        productInfo.description ||
+        "SIN DESCRIPCIÓN",
+
+      erp_name:
+        productInfo.erp_name ||
+        null,
+
+      erp_sku:
+        productInfo.erp_sku ||
+        null,
+
+      erp_id:
+        line.erp_product_id ||
+        productInfo.erp_id ||
+        null,
+
+      /*
+       * Información comercial de Alegra.
+       */
+      unit_price:
+        Number(line.unit_price || 0),
+
+      discount:
+        Number(line.discount || 0),
+
+      taxes:
+        normalizeTaxes(line.taxes),
+
+      /*
+       * Cantidades.
+       */
+      ordered_qty:
+        orderedQty,
+
+      received_qty:
+        receivedQty,
+
+      difference_qty:
+        differenceQty
+    };
+  }
+);
     //console.log("LINES FINAL", enrichedLines);
 
     //CREAR STOCKLINES
@@ -332,56 +545,143 @@ WHERE r.id = $1;
 
 
 
+    // ==========================================================
+// AGRUPAR CANTIDADES POR SKU SOLAMENTE PARA INVENTARIO
+// ==========================================================
+
+const inventoryBySkuMap = new Map();
+
+for (const line of stockLinesAdjusted) {
+  const sku = String(
+    line.sku || ""
+  ).trim();
+
+  const qty = Number(
+    line.restante || 0
+  );
+
+  if (!sku) {
+    throw new Error(
+      `SKU_MISSING_FOR_PURCHASE_ORDER_LINE_${line.id}`
+    );
+  }
+
+  if (!Number.isFinite(qty)) {
+    throw new Error(
+      `INVALID_RECEIVED_QTY_FOR_SKU_${sku}`
+    );
+  }
+
+  if (qty <= 0) {
+    console.log(
+      `⚠️ SKU ${sku} omitido porque la cantidad es ${qty}`
+    );
+
+    continue;
+  }
+
+  /*
+   * Si todavía no existe el SKU en el mapa,
+   * creamos su registro agrupado.
+   */
+  if (!inventoryBySkuMap.has(sku)) {
+    inventoryBySkuMap.set(sku, {
+      sku,
+      restante: 0,
+
+      /*
+       * Solo para auditoría y logs.
+       */
+      purchase_order_line_ids: []
+    });
+  }
+
+  const groupedLine =
+    inventoryBySkuMap.get(sku);
+
+  /*
+   * Acumular las cantidades de todas las líneas
+   * que tengan el mismo SKU.
+   */
+  groupedLine.restante += qty;
+
+  groupedLine.purchase_order_line_ids.push(
+    line.id
+  );
+}
+
+const inventoryLinesGrouped = [
+  ...inventoryBySkuMap.values()
+];
+
+console.log("");
+console.log(
+  "📦 LÍNEAS INDIVIDUALES DE LA RECEPCIÓN:"
+);
+
+console.dir(stockLinesAdjusted, {
+  depth: null
+});
+
+console.log("");
+console.log(
+  "📦 INVENTARIO AGRUPADO POR SKU:"
+);
+
+console.dir(inventoryLinesGrouped, {
+  depth: null
+});
+
 
 
 
 
 
     //------------------------------------------------------
-// CREAR LÍNEAS DEL PDF SOLO CON LO RECIBIDO
-// EN ESTA RECEPCIÓN
-//------------------------------------------------------
+    // CREAR LÍNEAS DEL PDF SOLO CON LO RECIBIDO
+    // EN ESTA RECEPCIÓN
+    //------------------------------------------------------
 
-const receiptPdfLines = stockLinesAdjusted.map(
-  (line, index) => ({
-    line_no: index + 1,
+    const receiptPdfLines = stockLinesAdjusted.map(
+      (line, index) => ({
+        line_no: index + 1,
 
-    id: line.id,
-    sku: line.sku,
+        id: line.id,
+        sku: line.sku,
 
-    description:
-      line.description || "SIN DESCRIPCIÓN",
+        description:
+          line.description || "SIN DESCRIPCIÓN",
 
-    erp_name:
-      line.erp_name || null,
+        erp_name:
+          line.erp_name || null,
 
-    erp_sku:
-      line.erp_sku || null,
+        erp_sku:
+          line.erp_sku || null,
 
-    erp_id:
-      line.erp_id || null,
+        erp_id:
+          line.erp_id || null,
 
-    // Cantidad total ordenada en la PO
-    ordered_qty:
-      Number(line.ordered_qty || 0),
+        // Cantidad total ordenada en la PO
+        ordered_qty:
+          Number(line.ordered_qty || 0),
 
-    // Cantidad recibida SOLAMENTE en esta recepción
-    received_qty:
-      Number(line.restante || 0),
+        // Cantidad recibida SOLAMENTE en esta recepción
+        received_qty:
+          Number(line.restante || 0),
 
-    // Diferencia de esta recepción contra lo ordenado
-    difference_qty:
-      Number(line.restante || 0) -
-      Number(line.ordered_qty || 0),
-  })
-);
+        // Diferencia de esta recepción contra lo ordenado
+        difference_qty:
+          Number(line.restante || 0) -
+          Number(line.ordered_qty || 0),
+      })
+    );
 
-console.log("====================================");
-console.log("📄 LÍNEAS DE ESTA RECEPCIÓN PARA PDF");
-console.log("====================================");
-console.log(
-  JSON.stringify(receiptPdfLines, null, 2)
-);
+    console.log("====================================");
+    console.log("📄 LÍNEAS DE ESTA RECEPCIÓN PARA PDF");
+    console.log("====================================");
+    console.log(
+      JSON.stringify(receiptPdfLines, null, 2)
+    );
 
 
 
@@ -522,9 +822,9 @@ console.log(
     // CREAR EL PDF CON LA INFORMACION
 
     const html = buildReceiptHtml(
-  headerPDF,
-  receiptPdfLines
-);
+      headerPDF,
+      receiptPdfLines
+    );
     let pdf = null;
 
     try {
@@ -571,17 +871,17 @@ console.log(
     //MANDAR PDF POR CORREO
 
     // después de generar el PDF
-await sendReceiptEmail({
-  to: [
-    "Cmerino@garlascontrol.com",
-    "Jdaniel@garlascontrol.com",
-    "Bdeaza@garlascontrol.com",
-    "eliel3111@gmail.com"
-  ],
-  pdfBuffer: pdf,
-  receiptCode: header.receipt_code,
-  companyName: header.company_slug,
-});
+    await sendReceiptEmail({
+      to: [
+        "Cmerino@garlascontrol.com",
+        "Jdaniel@garlascontrol.com",
+        "Bdeaza@garlascontrol.com",
+        "eliel3111@gmail.com"
+      ],
+      pdfBuffer: pdf,
+      receiptCode: header.receipt_code,
+      companyName: header.company_slug,
+    });
 
 
     return res.status(200).json({
@@ -1183,7 +1483,7 @@ export async function confirmingIdOrder(req, res) {
     if (fields.length === 0) {
       const selectResult = await db.query(
         `
-        SELECT id, purchase_order_number, supplier_name
+        SELECT id, purchase_order_number, supplier_name, erp_order_id
         FROM purchase_orders
         WHERE purchase_order_number = TRIM($1)
         `,
@@ -1198,6 +1498,51 @@ export async function confirmingIdOrder(req, res) {
       }
 
       purchaseOrderId = selectResult.rows[0].id;
+      const erpPurchaseOrderId = selectResult.rows[0].erp_order_id;
+
+      // ALEGRA ONLY 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
+      /* ✅ BUSCAR LA ORDEN DIRECTAMENTE EN ALEGRA */
+      if (!erpPurchaseOrderId) {
+        return res.status(400).json({
+          success: false,
+          message: "ERP_ORDER_ID_NOT_FOUND",
+        });
+      }
+
+      const alegraPurchaseOrder =
+        await alegraPurchaseOrdersService.getPurchaseOrderById(
+          erpPurchaseOrderId
+        );
+
+      console.log("");
+      console.log("✅ ORDEN OBTENIDA DESDE ALEGRA");
+      console.dir(alegraPurchaseOrder, {
+        depth: null,
+        colors: true,
+      });
+
+
+      const clientDb = await db.connect();
+
+      try {
+        const linesSyncResult =
+          await syncAlegraPurchaseOrderLines(
+            clientDb,
+            alegraPurchaseOrder,
+            purchaseOrderId
+          );
+
+        console.log("✅ RESULTADO DE LÍNEAS:");
+
+        console.dir(linesSyncResult, {
+          depth: null,
+          colors: true,
+        });
+      } finally {
+        clientDb.release();
+      }
+
+      //🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
 
       return res.status(200).json({
         success: true,
@@ -1206,11 +1551,14 @@ export async function confirmingIdOrder(req, res) {
     }
 
     const query = `
-      UPDATE purchase_orders
-      SET ${fields.join(", ")}
-      WHERE purchase_order_number = TRIM($${idx})
-      RETURNING id, purchase_order_number
-    `;
+  UPDATE purchase_orders
+  SET ${fields.join(", ")}
+  WHERE purchase_order_number = TRIM($${idx})
+  RETURNING
+    id,
+    purchase_order_number,
+    erp_order_id
+`;
 
     values.push(poNumber);
 
@@ -1224,6 +1572,60 @@ export async function confirmingIdOrder(req, res) {
     }
 
     purchaseOrderId = result.rows[0].id;
+    const erpPurchaseOrderId =
+      result.rows[0].erp_order_id;
+    // ALEGRA ONLY 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
+    /* ✅ BUSCAR LA ORDEN DIRECTAMENTE EN ALEGRA */
+    if (!erpPurchaseOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: "ERP_ORDER_ID_NOT_FOUND",
+      });
+    }
+
+    const alegraPurchaseOrder =
+      await alegraPurchaseOrdersService.getPurchaseOrderById(
+        erpPurchaseOrderId
+      );
+
+    console.log("");
+    console.log("✅ ORDEN OBTENIDA DESDE ALEGRA");
+    console.log("🌐 ERP ORDER ID:", erpPurchaseOrderId);
+
+    console.dir(alegraPurchaseOrder, {
+      depth: null,
+      colors: true,
+    });
+
+
+    const clientDb =
+      await db.connect();
+
+    try {
+      const linesSyncResult =
+        await syncAlegraPurchaseOrderLines(
+          clientDb,
+          alegraPurchaseOrder,
+          purchaseOrderId
+        );
+
+      console.log(
+        "✅ RESULTADO DE LÍNEAS:"
+      );
+
+      console.dir(
+        linesSyncResult,
+        {
+          depth: null,
+          colors: true
+        }
+      );
+    } finally {
+      clientDb.release();
+    }
+
+
+    // ALEGRA ONLY 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
 
     /* 🔎 Buscar recepción activa */
     let receiptResult = await db.query(

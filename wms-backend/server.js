@@ -36,13 +36,44 @@ import {
 } from "./integrations/alegra/alegraItemService.js";
 import {upsertWarehouses} from "./integrations/alegra/alegra.wharehouse.js";
 import {chunkArray,  processInParallel} from "./integrations/alegra/alegra.item.js";
-
-
+import {
+  ajustarExistenciaAlmacen
+} from "./integrations/citrus/adjustWarehouseInventoryService.js";
+//import "./integrations/alegra/purchaseOrders.cron.js";
 
 
 
 
 const app = express();
+
+
+async function ejecutarAjusteManual() {
+  try {
+    console.log("🚀 EJECUTANDO AJUSTE MANUAL");
+
+
+
+    const resultado =
+  await ajustarExistenciaAlmacen([
+    {
+      itemId: 13465,
+      almacenId: 1,
+      cantidadNueva: 100,
+      cantidadActual: 180
+    }
+  ]);
+
+console.log(resultado);
+
+    console.log("✅ AJUSTE TERMINADO:");
+
+  } catch (error) {
+    console.error("❌ ERROR EN AJUSTE MANUAL:");
+    console.error(error);
+  }
+}
+
+await ejecutarAjusteManual();
 
 //ALEGRA
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
@@ -57,7 +88,7 @@ await upsertWarehouses(warehouses);*/
 
    
 //PRODUCTOS
-/*let allProducts = [];
+let allProducts = [];
   let start = 0;
   const limit = 30;
   let total = 0;
@@ -86,8 +117,8 @@ await upsertWarehouses(warehouses);*/
 
  //console.log("TOTAL DE PRODUCTOS", allProducts);
 
- /*PRUEBA DE 30
- let allProducts = [];
+ //PRUEBA DE 30
+ /*let allProducts = [];
 
 const response = await alegraItemsService.getItems({
   start: 0,
@@ -101,23 +132,23 @@ allProducts = response.data;
 //console.log(allProducts);*/
 
 //-------------------------------------------------
-/*const BATCH_SIZE = 100;
+const BATCH_SIZE = 100;
 const CONCURRENCY = 1;
 const chunks = chunkArray(allProducts, BATCH_SIZE);
 await processInParallel(chunks, CONCURRENCY);
-console.log("🎉 Todos los batches procesados");*/
+console.log("🎉 Todos los batches procesados");
 //-------------------------------------------------
 
 //Busca todas las ordenes de compra
-const orders =
+/*const orders =
   await alegraPurchaseOrdersService.getAllPurchaseOrders();
-
+*/
 //console.log(orders);
 
     res.json({
       success: true,
-      data: orders,
-      //data: allProducts,
+      data: allProducts,
+      //data: orders,
     });
   } catch (error) {
     console.error("❌ Error en /test:", error.message);
@@ -137,7 +168,7 @@ const orders =
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-startCitrusCron();
+//startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {
