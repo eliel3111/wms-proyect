@@ -4,15 +4,1216 @@ import { getInventorySessionStatusService } from "../services/inventory.count.js
 import { emitInventorySummary } from "../services/inventory.count.js";
 import { buscarTodasLasExistenciasAlmacen } from "../integrations/citrus/citrus.erpStockSync.js";
 import { getInventoryFinalReportExcelService, getInventoryLocationReportExcelService } from "../services/inventoryFinalReportExcel.service.js";
+import {
+  startInventoryAdjustmentWorker
+} from "../services/inventoryAdjustment.worker.js";
+
+
+// ============================================================
+// CONTROLLER
+// INICIAR AJUSTE DE INVENTARIO
+// ============================================================
+
+export async function startInventoryAdjustment(
+  req,
+  res
+) {
+
+  const client =
+    await db.connect();
+
+  let transactionStarted = false;
+
+  let committed = false;
+
+  let adjustmentJobId = null;
+
+
+  try {
+
+    console.log("");
+    console.log(
+      "🟥🟥🟥 ========================================"
+    );
+    console.log(
+      "📦 INICIANDO PROCESO DE AJUSTE DE INVENTARIO"
+    );
+    console.log(
+      "🟥🟥🟥 ========================================"
+    );
+
+
+    // ============================================================
+    // NUEVO
+    // OBTENER USER ID
+    // ============================================================
+
+    const userId =
+      Number(
+        req.user?.id ??
+        req.body?.userId
+      );
+
+
+    console.log(
+      "👤 USER ID:",
+      userId
+    );
+
+
+    if (
+      !Number.isInteger(userId) ||
+      userId <= 0
+    ) {
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Debe proporcionar un userId válido."
+      });
+
+    }
+
+
+    // ============================================================
+    // NUEVO
+    // VALIDAR PERMISO DEL USUARIO
+    // ============================================================
+
+    /*
+    🟥 PENDIENTE
+
+    AQUÍ VAMOS A COLOCAR EL CÓDIGO
+    QUE ME DARÁS PARA VALIDAR:
+
+    ¿EL USUARIO TIENE PERMISO
+    PARA AJUSTAR INVENTARIO?
+
+
+    Ejemplo solamente:
+
+    const canAdjustInventory =
+      await validarPermisoAjusteInventario(
+        userId
+      );
+
+
+    if (!canAdjustInventory) {
+
+      return res.status(403).json({
+        success: false,
+        message:
+          "No tiene permiso para ajustar inventario."
+      });
+
+    }
+
+    */
 
 
 
 
+    // ============================================================
+    // DESDE AQUÍ:
+    //
+    // TU CÓDIGO ACTUAL
+    //
+    // NO SE CAMBIA
+    // ============================================================
+
+
+    console.log(
+      "🟦🟦🟦 ================================"
+    );
+
+    console.log(
+      "📄 INVENTORY REPORT"
+    );
+
+    console.log(
+      "📌 GENERANDO REPORTE FINAL"
+    );
+
+    console.log(
+      "🟦🟦🟦 ================================"
+    );
+
+
+    await client.query(
+      "BEGIN"
+    );
+
+    transactionStarted = true;
+
+
+    const sessionResult =
+      await client.query(`
+        SELECT id, code, status, user_id, start_date, end_date, created_at, updated_at
+        FROM inventory_sessions
+        WHERE status IN ('draft', 'in-progress', 'review')
+        ORDER BY updated_at DESC
+      `);
+
+
+    if (
+      sessionResult.rows.length === 0
+    ) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+
+      return res
+        .status(200)
+        .json({
+
+          success: false,
+
+          title:
+            "No hay sesión de inventario",
+
+          message:
+            "No existe una sesión de inventario activa para generar el reporte final."
+
+        });
+
+    }
+
+
+    const reviewSession =
+      sessionResult.rows.find(
+
+        (session) =>
+          session.status === "review"
+
+      );
+
+
+    if (!reviewSession) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+
+      return res
+        .status(200)
+        .json({
+
+          success: false,
+
+          title:
+            "Sesión no está en revisión",
+
+          message:
+            "Para generar el reporte final, la sesión debe estar en estado review."
+
+        });
+
+    }
+
+
+    const sessionId =
+      Number(
+        reviewSession.id
+      );
+
+
+    console.log(
+      "✅ SESIÓN REVIEW:",
+      {
+
+        sessionId,
+
+        code:
+          reviewSession.code,
+
+        status:
+          reviewSession.status
+
+      }
+    );
+
+
+
+    // ============================================================
+    // PRODUCTOS CONTADOS
+    // ============================================================
+
+    const countedProductsResult =
+      await client.query(
+        `
+        WITH counted AS (
+          SELECT
+            ibl.product_sku,
+            SUM(COALESCE(ibl.inventory_quantity, 0))::numeric AS total_inventory_qty
+          FROM inventory_by_location ibl
+          WHERE ibl.counted_by IS NOT NULL
+            AND ibl.counted_at IS NOT NULL
+          GROUP BY ibl.product_sku
+        ),
+        prepared AS (
+          SELECT
+            p.erp_id::bigint AS erp_id,
+            $1::bigint AS session_id,
+            c.product_sku AS sku,
+            p.erp_name,
+            p.erp_sku,
+            p.description,
+            c.total_inventory_qty,
+            COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
+            COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
+            CASE WHEN eis.item_id IS NULL THEN false ELSE true END AS exist_erp,
+            false AS product_no_exist
+          FROM counted c
+          JOIN products p
+            ON p.sku = c.product_sku
+          LEFT JOIN erp_inventory_snapshot eis
+            ON eis.item_id = p.erp_id
+           AND eis.session_inventory_id = $1
+          WHERE p.erp_id IS NOT NULL
+        )
+        INSERT INTO inventory_erp_report (
+          erp_id,
+          session_id,
+          sku,
+          erp_name,
+          erp_sku,
+          description,
+          total_inventory_qty,
+          erp_stock,
+          unit_cost,
+          exist_erp,
+          product_no_exist,
+          updated_at
+        )
+        SELECT
+          erp_id,
+          session_id,
+          sku,
+          erp_name,
+          erp_sku,
+          description,
+          total_inventory_qty,
+          erp_stock,
+          unit_cost,
+          exist_erp,
+          product_no_exist,
+          NOW()
+        FROM prepared
+        ON CONFLICT (erp_id, session_id)
+        DO UPDATE SET
+          sku = EXCLUDED.sku,
+          erp_name = EXCLUDED.erp_name,
+          erp_sku = EXCLUDED.erp_sku,
+          description = EXCLUDED.description,
+          total_inventory_qty = EXCLUDED.total_inventory_qty,
+          erp_stock = EXCLUDED.erp_stock,
+          unit_cost = EXCLUDED.unit_cost,
+          exist_erp = EXCLUDED.exist_erp,
+          product_no_exist = EXCLUDED.product_no_exist,
+          updated_at = NOW()
+        RETURNING
+          erp_id,
+          session_id,
+          sku AS product_sku,
+          erp_name,
+          erp_sku,
+          description,
+          total_inventory_qty,
+          erp_stock,
+          unit_cost,
+          difference,
+          status,
+          exist_erp,
+          product_no_exist
+        `,
+        [sessionId]
+      );
+
+
+    const countedProducts =
+      countedProductsResult.rows;
+
+
+    const wmsIds =
+      countedProducts.map(
+        (item) =>
+          Number(
+            item.erp_id
+          )
+      );
+
+
+    console.log(
+      "📦 TOTAL PRODUCTOS CONTADOS WMS:",
+      countedProducts.length
+    );
+
+
+    console.log(
+      "🆔 TOTAL ERP IDS EN WMS:",
+      wmsIds.length
+    );
+
+
+
+    // ============================================================
+    // PRODUCTOS ERP CON BALANCE NO CONTADOS
+    // ============================================================
+
+    const productsMissingResult =
+      await client.query(
+        `
+        WITH missing AS (
+          SELECT
+            eis.item_id::bigint AS erp_id,
+            $1::bigint AS session_id,
+            p.sku,
+            p.erp_name,
+            p.erp_sku,
+            p.description,
+            0::numeric AS total_inventory_qty,
+            COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
+            COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
+            true AS exist_erp,
+            CASE WHEN p.sku IS NULL THEN true ELSE false END AS product_no_exist
+          FROM erp_inventory_snapshot eis
+          LEFT JOIN LATERAL (
+            SELECT sku, erp_name, erp_sku, description
+            FROM products
+            WHERE erp_id = eis.item_id
+            LIMIT 1
+          ) p ON true
+          WHERE eis.session_inventory_id = $1
+            AND COALESCE(eis.erp_stock, 0) > 0
+            AND NOT (eis.item_id = ANY($2::bigint[]))
+        )
+        INSERT INTO inventory_erp_report (
+          erp_id,
+          session_id,
+          sku,
+          erp_name,
+          erp_sku,
+          description,
+          total_inventory_qty,
+          erp_stock,
+          unit_cost,
+          exist_erp,
+          product_no_exist,
+          updated_at
+        )
+        SELECT
+          erp_id,
+          session_id,
+          sku,
+          erp_name,
+          erp_sku,
+          description,
+          total_inventory_qty,
+          erp_stock,
+          unit_cost,
+          exist_erp,
+          product_no_exist,
+          NOW()
+        FROM missing
+        ON CONFLICT (erp_id, session_id)
+        DO UPDATE SET
+          sku = EXCLUDED.sku,
+          erp_name = EXCLUDED.erp_name,
+          erp_sku = EXCLUDED.erp_sku,
+          description = EXCLUDED.description,
+          total_inventory_qty = EXCLUDED.total_inventory_qty,
+          erp_stock = EXCLUDED.erp_stock,
+          unit_cost = EXCLUDED.unit_cost,
+          exist_erp = EXCLUDED.exist_erp,
+          product_no_exist = EXCLUDED.product_no_exist,
+          updated_at = NOW()
+        RETURNING
+          erp_id AS item_id,
+          session_id,
+          erp_stock,
+          unit_cost,
+          sku,
+          description,
+          erp_name,
+          erp_sku,
+          product_no_exist,
+          difference,
+          status,
+          exist_erp
+        `,
+        [
+          sessionId,
+          wmsIds
+        ]
+      );
+
+
+    const productsMissing =
+      productsMissingResult.rows;
+
+
+    console.log(
+      "🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:",
+      productsMissing.length
+    );
+
+
+    // ============================================================
+    // HASTA AQUÍ ES EL CÓDIGO QUE YA TENÍAS
+    // ============================================================
 
 
 
 
+    // ============================================================
+    // NUEVO
+    // OBTENER TODAS LAS LÍNEAS DE inventory_erp_report
+    // ============================================================
 
+    console.log("");
+    console.log(
+      "🟨 OBTENIENDO PRODUCTOS PARA AJUSTE..."
+    );
+
+
+    const reportLinesResult =
+      await client.query(
+        `
+        SELECT
+          id,
+          erp_id,
+          session_id,
+          sku,
+          erp_name,
+          erp_sku,
+          description,
+          total_inventory_qty,
+          erp_stock,
+          unit_cost,
+          difference,
+          status,
+          exist_erp,
+          product_no_exist,
+          created_at,
+          updated_at
+
+        FROM inventory_erp_report
+
+        WHERE
+          session_id = $1
+
+        ORDER BY
+          id ASC
+        `,
+        [
+          sessionId
+        ]
+      );
+
+
+    const reportLines =
+      reportLinesResult.rows;
+
+
+    console.log(
+      "📦 TOTAL PRODUCTOS QUE IRÁN AL WORKER:",
+      reportLines.length
+    );
+
+
+    if (
+      reportLines.length === 0
+    ) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transactionStarted = false;
+
+
+      return res
+        .status(200)
+        .json({
+
+          success: false,
+
+          message:
+            "No existen productos para realizar el ajuste de inventario."
+
+        });
+
+    }
+
+
+
+    // ============================================================
+    // NUEVO
+    // OBTENER ERP WAREHOUSE DE LA SESIÓN
+    // ============================================================
+    //
+    // NO CAMBIAMOS TU SELECT ORIGINAL.
+    //
+    // Simplemente hacemos otra consulta.
+    // ============================================================
+
+    const warehouseResult =
+      await client.query(
+        `
+        SELECT
+          erp_warehouse_id
+
+        FROM inventory_sessions
+
+        WHERE
+          id = $1
+
+        LIMIT 1
+        `,
+        [
+          sessionId
+        ]
+      );
+
+
+    const erpWarehouseId =
+      Number(
+        warehouseResult
+          .rows[0]
+          ?.erp_warehouse_id
+      );
+
+
+    console.log(
+      "🏬 ERP WAREHOUSE ID:",
+      erpWarehouseId
+    );
+
+
+    if (
+      !Number.isInteger(
+        erpWarehouseId
+      ) ||
+      erpWarehouseId <= 0
+    ) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transactionStarted = false;
+
+
+      return res
+        .status(400)
+        .json({
+
+          success: false,
+
+          message:
+            "La sesión no tiene un almacén ERP válido."
+
+        });
+
+    }
+
+
+
+    // ============================================================
+    // NUEVO
+    // VERIFICAR SI YA EXISTE UN JOB
+    // ============================================================
+    //
+    // Esto evita que el usuario presione el botón
+    // dos veces y se creen 2,700 líneas duplicadas.
+    // ============================================================
+
+    const existingJobResult =
+      await client.query(
+        `
+        SELECT
+          id,
+          status,
+          total_products,
+          processed_products,
+          successful_products,
+          failed_products,
+          current_line_id,
+          error_message
+
+        FROM inventory_adjustment_jobs
+
+        WHERE
+          inventory_session_id = $1
+
+        ORDER BY
+          id DESC
+
+        LIMIT 1
+        `,
+        [
+          sessionId
+        ]
+      );
+
+
+    const existingJob =
+      existingJobResult.rows[0];
+
+
+    if (existingJob) {
+
+      adjustmentJobId =
+        Number(
+          existingJob.id
+        );
+
+
+      console.log(
+        "ℹ️ YA EXISTE JOB:",
+        {
+          jobId:
+            adjustmentJobId,
+
+          status:
+            existingJob.status
+        }
+      );
+
+
+      // Confirmamos cualquier actualización que
+      // se haya hecho en inventory_erp_report.
+
+      await client.query(
+        "COMMIT"
+      );
+
+
+      committed = true;
+
+      transactionStarted = false;
+
+
+      // Si el job todavía puede ejecutarse,
+      // llamamos al worker.
+      //
+      // El worker posteriormente tendrá su propia
+      // protección para evitar ejecutarse dos veces.
+
+      if (
+        [
+          "pending",
+          "processing",
+          "waiting_citrus"
+        ].includes(
+          existingJob.status
+        )
+      ) {
+
+        startInventoryAdjustmentWorker(
+          adjustmentJobId
+        ).catch(
+          (error) => {
+
+            console.error(
+              "🟥 ERROR WORKER:",
+              error
+            );
+
+          }
+        );
+
+      }
+
+
+      return res
+        .status(200)
+        .json({
+
+          success: true,
+
+          message:
+            "Ya existe un proceso de ajuste para esta sesión.",
+
+          data: {
+
+            jobId:
+              adjustmentJobId,
+
+            status:
+              existingJob.status,
+
+            totalProducts:
+              existingJob.total_products,
+
+            processedProducts:
+              existingJob.processed_products,
+
+            successfulProducts:
+              existingJob.successful_products,
+
+            failedProducts:
+              existingJob.failed_products,
+
+            currentLineId:
+              existingJob.current_line_id,
+
+            errorMessage:
+              existingJob.error_message
+
+          }
+
+        });
+
+    }
+
+
+
+    // ============================================================
+    // NUEVO
+    // CREAR JOB
+    // ============================================================
+
+    console.log("");
+    console.log(
+      "🟨 CREANDO INVENTORY ADJUSTMENT JOB"
+    );
+
+
+    const jobResult =
+      await client.query(
+        `
+        INSERT INTO inventory_adjustment_jobs
+        (
+          inventory_session_id,
+
+          erp_warehouse_id,
+
+          status,
+
+          total_products,
+
+          processed_products,
+
+          successful_products,
+
+          failed_products,
+
+          current_line_id,
+
+          error_message,
+
+          email_sent,
+
+          started_at,
+
+          completed_at,
+
+          created_at,
+
+          updated_at
+        )
+
+        VALUES
+        (
+          $1,
+
+          $2,
+
+          'pending',
+
+          $3,
+
+          0,
+
+          0,
+
+          0,
+
+          NULL,
+
+          NULL,
+
+          false,
+
+          NULL,
+
+          NULL,
+
+          NOW(),
+
+          NOW()
+        )
+
+        RETURNING *
+        `,
+        [
+          sessionId,
+
+          erpWarehouseId,
+
+          reportLines.length
+        ]
+      );
+
+
+    const adjustmentJob =
+      jobResult.rows[0];
+
+
+    adjustmentJobId =
+      Number(
+        adjustmentJob.id
+      );
+
+
+    console.log(
+      "✅ JOB CREADO:",
+      {
+        jobId:
+          adjustmentJobId,
+
+        sessionId,
+
+        totalProducts:
+          reportLines.length
+      }
+    );
+
+
+
+    // ============================================================
+    // NUEVO
+    // COPIAR TODOS LOS PRODUCTOS A
+    // inventory_adjustment_job_lines
+    // ============================================================
+    //
+    // NO HACEMOS:
+    //
+    // for (...) INSERT
+    //
+    // PostgreSQL copiará las ~2,700 líneas
+    // directamente mediante INSERT ... SELECT.
+    //
+    // ============================================================
+
+    console.log("");
+    console.log(
+      "📦 COPIANDO PRODUCTOS AL JOB..."
+    );
+
+
+    const insertJobLinesResult =
+      await client.query(
+        `
+        INSERT INTO inventory_adjustment_job_lines
+        (
+          job_id,
+
+          report_line_id,
+
+          erp_product_id,
+
+          erp_warehouse_id,
+
+          desired_qty,
+
+          citrus_qty_before,
+
+          status,
+
+          adjustment_attempts,
+
+          verification_attempts,
+
+          citrus_message,
+
+          citrus_response,
+
+          started_at,
+
+          processed_at,
+
+          next_retry_at,
+
+          created_at,
+
+          updated_at
+        )
+
+
+        SELECT
+
+          $1::bigint,
+
+          ier.id,
+
+          ier.erp_id,
+
+          $2::bigint,
+
+          COALESCE(
+            ier.total_inventory_qty,
+            0
+          )::numeric,
+
+          COALESCE(
+            ier.erp_stock,
+            0
+          )::numeric,
+
+          'pending',
+
+          0,
+
+          0,
+
+          NULL,
+
+          NULL,
+
+          NULL,
+
+          NULL,
+
+          NULL,
+
+          NOW(),
+
+          NOW()
+
+
+        FROM
+          inventory_erp_report ier
+
+
+        WHERE
+          ier.session_id = $3
+
+
+        ORDER BY
+          ier.id ASC
+
+
+        RETURNING
+          id,
+          report_line_id,
+          erp_product_id,
+          desired_qty,
+          citrus_qty_before,
+          status
+        `,
+        [
+          adjustmentJobId,
+
+          erpWarehouseId,
+
+          sessionId
+        ]
+      );
+
+
+    const insertedLines =
+      insertJobLinesResult.rows;
+
+
+    console.log(
+      "✅ TOTAL LÍNEAS CREADAS:",
+      insertedLines.length
+    );
+
+
+
+    // ============================================================
+    // VALIDACIÓN IMPORTANTE
+    // ============================================================
+
+    if (
+      insertedLines.length !==
+      reportLines.length
+    ) {
+
+      throw new Error(
+        `Se esperaban ${reportLines.length} líneas ` +
+        `pero solamente se insertaron ${insertedLines.length}.`
+      );
+
+    }
+
+
+
+    // ============================================================
+    // COMMIT
+    // ============================================================
+    //
+    // El worker solamente empieza después de
+    // confirmar que TODO quedó guardado.
+    // ============================================================
+
+    await client.query(
+      "COMMIT"
+    );
+
+
+    committed = true;
+
+    transactionStarted = false;
+
+
+    console.log("");
+    console.log(
+      "✅ JOB Y LÍNEAS GUARDADOS CORRECTAMENTE"
+    );
+
+
+
+    // ============================================================
+    // INICIAR WORKER
+    // ============================================================
+    //
+    // IMPORTANTE:
+    //
+    // NO SE HACE:
+    //
+    // await startInventoryAdjustmentWorker()
+    //
+    // porque no queremos que la petición HTTP
+    // espere los 2,700 productos.
+    //
+    // ============================================================
+
+    console.log("");
+    console.log(
+      "🚀 INICIANDO INVENTORY ADJUSTMENT WORKER"
+    );
+
+
+    startInventoryAdjustmentWorker(
+      adjustmentJobId
+    )
+      .catch(
+        (error) => {
+
+          console.error("");
+          console.error(
+            "🟥 ERROR NO CONTROLADO EN WORKER"
+          );
+
+          console.error(
+            error
+          );
+
+        }
+      );
+
+
+
+    // ============================================================
+    // RESPUESTA DEL CONTROLLER
+    // ============================================================
+
+    return res
+      .status(200)
+      .json({
+
+        success: true,
+
+        message:
+          "El proceso de ajuste de inventario fue iniciado correctamente.",
+
+        data: {
+
+          jobId:
+            adjustmentJobId,
+
+          sessionId,
+
+          erpWarehouseId,
+
+          totalProducts:
+            insertedLines.length,
+
+          status:
+            "pending"
+
+        }
+
+      });
+
+
+  } catch (error) {
+
+    // ============================================================
+    // ERROR
+    // ============================================================
+
+    if (
+      transactionStarted &&
+      !committed
+    ) {
+
+      try {
+
+        await client.query(
+          "ROLLBACK"
+        );
+
+      } catch (
+        rollbackError
+      ) {
+
+        console.error(
+          "🟥 ERROR HACIENDO ROLLBACK:",
+          rollbackError
+        );
+
+      }
+
+    }
+
+
+    console.log("");
+    console.log(
+      "🟥🟥🟥 ========================================"
+    );
+    console.log(
+      "❌ ERROR INICIANDO AJUSTE DE INVENTARIO"
+    );
+    console.log(
+      "🟥🟥🟥 ========================================"
+    );
+
+
+    console.error(
+      error
+    );
+
+
+    return res
+      .status(500)
+      .json({
+
+        success: false,
+
+        message:
+          "ERROR INICIANDO EL AJUSTE DE INVENTARIO",
+
+        error:
+          error.message
+
+      });
+
+
+  } finally {
+
+    client.release();
+
+  }
+
+}
 
 
 

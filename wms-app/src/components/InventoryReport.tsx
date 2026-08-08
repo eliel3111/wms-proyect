@@ -162,6 +162,55 @@ export default function InventoryReport() {
         }
     }
 
+    //APLICAR AJUSTE DE INVENTARIO
+    async function handleApplyInventory() {
+        console.log("📦 Ejecutando ajuste de inventario");
+
+        try {
+            const response = await apiClient.post(
+                "/inventory/start-adjustment"
+            );
+
+            const data = response.data;
+
+            if (!data.success) {
+                openModal({
+                    title: data.title || "Error",
+                    message:
+                        data.message ||
+                        "No se pudo iniciar el ajuste de inventario.",
+                });
+
+                return;
+            }
+
+            console.log(
+                "✅ Ajuste de inventario iniciado:",
+                data
+            );
+
+            openModal({
+                title: "Ajuste iniciado",
+                message:
+                    data.message ||
+                    "El ajuste de inventario fue iniciado correctamente.",
+            });
+
+        } catch (error: any) {
+            console.error(
+                "❌ Error iniciando ajuste de inventario:",
+                error
+            );
+
+            openModal({
+                title: "Error aplicando inventario",
+                message:
+                    error?.response?.data?.message ||
+                    "No se pudo iniciar el ajuste de inventario.",
+            });
+        }
+    }
+
     function handleReporteAuditoria() {
         console.log("🧾 Ejecutando Reporte de Auditoría");
 
@@ -245,7 +294,10 @@ export default function InventoryReport() {
 
             {/* 3. BUTTON */}
             <div className="inventory-report-button">
-                <div className="inventory-report-button-action">
+                <div
+                    className="inventory-report-button-action"
+                    onClick={handleApplyInventory}
+                >
                     <CheckSquare size={24} />
                     <span>Aplicar Inventario</span>
                 </div>

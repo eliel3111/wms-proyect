@@ -117,16 +117,15 @@ export async function ajustarExistenciaAlmacen(
         }
 
         if (
-          !Number.isFinite(
-            parsedCantidadActual
-          ) ||
-          parsedCantidadActual < 0
-        ) {
-          throw new Error(
-            `CantidadActual inválida en la posición ${index}. ` +
-            `Valor recibido: ${ajuste.cantidadActual}`
-          );
-        }
+  !Number.isFinite(
+    parsedCantidadActual
+  )
+) {
+  throw new Error(
+    `CantidadActual inválida en la posición ${index}. ` +
+    `Valor recibido: ${ajuste.cantidadActual}`
+  );
+}
 
         return {
           itemId: parsedItemId,
@@ -196,7 +195,7 @@ export async function ajustarExistenciaAlmacen(
         <ItemId>${ajuste.itemId}</ItemId>
         <AlmacenId>${ajuste.almacenId}</AlmacenId>
         <CantidadNueva>${ajuste.cantidadNueva}</CantidadNueva>
-        <CantidadActual>${ajuste.cantidadActual}</CantidadActual>
+        
       </ajuste>`
       )
       .join("");

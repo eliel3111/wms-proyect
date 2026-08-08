@@ -156,12 +156,40 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
   let incorrectProducts = 0;
 
   rows.forEach((item, index) => {
-    const difference = Number(item.difference ?? 0);
-    const unitCost = Number(item.unit_cost ?? 0);
-    const valueDifference = difference * unitCost;
 
-    const positiveValue = valueDifference > 0 ? valueDifference : 0;
-    const negativeValue = valueDifference < 0 ? valueDifference : 0;
+    // Existencia actual registrada en Citrus
+    const erpStock =
+      Number(item.erp_stock ?? 0);
+
+    // Cantidad física contada en el WMS
+    const physicalQty =
+      Number(item.total_inventory_qty ?? 0);
+
+    
+    const difference =
+  erpStock < 0
+    ? erpStock + physicalQty
+    : physicalQty - erpStock;
+
+
+    const unitCost =
+      Number(item.unit_cost ?? 0);
+
+
+    const valueDifference =
+      difference * unitCost;
+
+
+    const positiveValue =
+      valueDifference > 0
+        ? valueDifference
+        : 0;
+
+
+    const negativeValue =
+      valueDifference < 0
+        ? valueDifference
+        : 0;
 
     totalPositive += positiveValue;
     totalNegative += negativeValue;
@@ -178,8 +206,8 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
       description: item.description,
       name: item.erp_name,
       sku: item.sku,
-      system_qty: Number(item.erp_stock ?? 0),
-      physical_qty: Number(item.total_inventory_qty ?? 0),
+      system_qty: erpStock,
+      physical_qty: physicalQty,
       unit_diff: difference,
       unit_cost: unitCost,
       positive_value: positiveValue,

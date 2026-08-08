@@ -77,7 +77,7 @@ export async function fetchAllItemsAndSync() {
 
   try {
 
-    let currentPage = 134;
+    let currentPage = 0;
 
     let totalProcessed = 0;
 

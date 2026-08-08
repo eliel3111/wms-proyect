@@ -58,7 +58,7 @@ async function ejecutarAjusteManual() {
     {
       itemId: 13465,
       almacenId: 1,
-      cantidadNueva: 100,
+      cantidadNueva: 0,
       cantidadActual: 180
     }
   ]);

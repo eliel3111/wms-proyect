@@ -392,3 +392,558 @@ export async function saveERPInventorySnapshotService(
     };
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+// ============================================================
+// BUSCAR EXISTENCIA ACTUAL DE UN PRODUCTO EN CITRUS
+// ============================================================
+//
+// OBJETIVO:
+//
+// Buscar la existencia REAL ACTUAL de UN producto
+// dentro de UN almacén.
+//
+// Este servicio es utilizado por el worker cuando:
+//
+// - Citrus no respondió al ajuste.
+// - Hubo timeout.
+// - Se perdió la conexión.
+// - El backend no sabe si Citrus aplicó el ajuste.
+//
+// IMPORTANTE:
+//
+// Esta función:
+//
+// ✅ SOLO CONSULTA CITRUS.
+// ✅ NO modifica products.
+// ✅ NO modifica inventory.
+// ✅ NO guarda snapshot.
+// ✅ NO ejecuta sync.
+// ✅ NO hace ajustes.
+//
+// Devuelve solamente la cantidad actual.
+//
+// Ejemplo:
+//
+// const cantidad = await buscarExistenciaActualCitrus({
+//   itemId: 13465,
+//   almacenId: 1
+// });
+//
+// Resultado:
+//
+// 120
+//
+// ============================================================
+
+export async function buscarExistenciaActualCitrus({
+  itemId,
+  almacenId
+}) {
+
+  console.log("");
+  console.log(
+    "🔎🔎🔎 ========================================"
+  );
+
+  console.log(
+    "📦 BUSCANDO EXISTENCIA ACTUAL EN CITRUS"
+  );
+
+  console.log(
+    "🔎🔎🔎 ========================================"
+  );
+
+
+  // ============================================================
+  // 1. VALIDAR ITEM ID
+  // ============================================================
+
+  const parsedItemId =
+    Number(
+      itemId
+    );
+
+
+  if (
+    !Number.isInteger(
+      parsedItemId
+    ) ||
+    parsedItemId <= 0
+  ) {
+
+    throw new Error(
+      `ItemId inválido para consultar existencia. Valor recibido: ${itemId}`
+    );
+
+  }
+
+
+
+  // ============================================================
+  // 2. VALIDAR ALMACÉN
+  // ============================================================
+
+  const parsedAlmacenId =
+    Number(
+      almacenId
+    );
+
+
+  if (
+    !Number.isInteger(
+      parsedAlmacenId
+    ) ||
+    parsedAlmacenId <= 0
+  ) {
+
+    throw new Error(
+      `AlmacenId inválido para consultar existencia. Valor recibido: ${almacenId}`
+    );
+
+  }
+
+
+
+  console.log(
+    "🆔 ITEM ID:",
+    parsedItemId
+  );
+
+
+  console.log(
+    "🏭 ALMACÉN ID:",
+    parsedAlmacenId
+  );
+
+
+
+  // ============================================================
+  // 3. CONFIGURACIÓN
+  // ============================================================
+  //
+  // Actualmente tu consulta general utiliza 3000.
+  //
+  // Como tienes aproximadamente 2,700 productos,
+  // normalmente Citrus debería devolver todo en
+  // una sola página.
+  //
+  // Pero mantenemos paginación por seguridad.
+  //
+  // ============================================================
+
+  const cantidadPorPagina =
+    3000;
+
+
+  const MAX_PAGES =
+    100;
+
+
+  let pagina =
+    0;
+
+
+  let cantidadTotal =
+    0;
+
+
+  let productoEncontrado =
+    false;
+
+
+
+  // ============================================================
+  // 4. BUSCAR EN CITRUS
+  // ============================================================
+
+  while (
+    pagina < MAX_PAGES
+  ) {
+
+    console.log("");
+    console.log(
+      "────────────────────────────────────────"
+    );
+
+    console.log(
+      `📡 CONSULTANDO CITRUS - PÁGINA ${pagina}`
+    );
+
+    console.log(
+      "────────────────────────────────────────"
+    );
+
+
+
+    // ==========================================================
+    // CONSTRUIR SOAP
+    // ==========================================================
+
+    const xml =
+      buildBuscarExistenciaAlmacenXML({
+
+        pagina,
+
+        cantidadPorPagina,
+
+        almacenId:
+          parsedAlmacenId,
+
+        estatus:
+          "A",
+
+        // IMPORTANTE:
+        //
+        // false porque necesitamos poder determinar
+        // correctamente si un producto tiene 0.
+        excluirSinExistencia:
+          false
+
+      });
+
+
+
+    // ==========================================================
+    // LLAMAR CITRUS
+    // ==========================================================
+
+    const data =
+      await callERPExistenciaAlmacen(
+        xml
+      );
+
+
+
+    // ==========================================================
+    // 5. VALIDAR RESPUESTA CITRUS
+    // ==========================================================
+
+    if (!data) {
+
+      throw new Error(
+        "Citrus devolvió una respuesta vacía al consultar existencia."
+      );
+
+    }
+
+
+
+    // Si Citrus incluye Success en la respuesta,
+    // validamos el valor.
+    //
+    // No exigimos que exista porque tu servicio
+    // actual consume directamente Data.Existencias.
+
+    if (
+      data.Success !== undefined &&
+      data.Success !== null
+    ) {
+
+      const citrusSuccess =
+        Number(
+          data.Success
+        );
+
+
+      if (
+        citrusSuccess === 0
+      ) {
+
+        const message =
+          data.Mensaje ||
+          "Citrus rechazó la consulta de existencia.";
+
+
+        throw new Error(
+          message
+        );
+
+      }
+
+    }
+
+
+
+    // ==========================================================
+    // 6. OBTENER EXISTENCIAS DE LA PÁGINA
+    // ==========================================================
+
+    const existenciasPagina =
+      data?.Data?.Existencias ?? [];
+
+
+    if (
+      !Array.isArray(
+        existenciasPagina
+      )
+    ) {
+
+      throw new Error(
+        "Citrus devolvió un formato inválido en Data.Existencias."
+      );
+
+    }
+
+
+
+    console.log(
+      `📦 PRODUCTOS RECIBIDOS EN PÁGINA ${pagina}:`,
+      existenciasPagina.length
+    );
+
+
+
+    // ==========================================================
+    // NO HAY MÁS REGISTROS
+    // ==========================================================
+
+    if (
+      existenciasPagina.length === 0
+    ) {
+
+      console.log(
+        "🛑 NO HAY MÁS EXISTENCIAS EN CITRUS"
+      );
+
+      break;
+
+    }
+
+
+
+    // ==========================================================
+    // 7. BUSCAR SOLAMENTE EL PRODUCTO NECESARIO
+    // ==========================================================
+
+    for (
+      const item
+      of existenciasPagina
+    ) {
+
+      const currentItemId =
+        Number(
+          item?.ItemId
+        );
+
+
+      if (
+        currentItemId !==
+        parsedItemId
+      ) {
+
+        continue;
+
+      }
+
+
+
+      // ========================================================
+      // PRODUCTO ENCONTRADO
+      // ========================================================
+
+      productoEncontrado =
+        true;
+
+
+      const cantidad =
+        Number(
+          item?.Cantidad ?? 0
+        );
+
+
+      if (
+        !Number.isFinite(
+          cantidad
+        )
+      ) {
+
+        throw new Error(
+          `Citrus devolvió una cantidad inválida para ItemId ${parsedItemId}.`
+        );
+
+      }
+
+
+
+      // ========================================================
+      // SUMAR EXISTENCIAS
+      // ========================================================
+      //
+      // Lo hacemos así porque tu servicio actual también
+      // agrupa por ItemId y suma Cantidad.
+      //
+      // Si Citrus devuelve más de una fila para el mismo
+      // producto, obtenemos el total correctamente.
+      //
+      // ========================================================
+
+      cantidadTotal +=
+        cantidad;
+
+
+      console.log(
+        "✅ PRODUCTO ENCONTRADO:"
+      );
+
+
+      console.log({
+
+        ItemId:
+          item.ItemId,
+
+        AlmacenId:
+          item.AlmacenId,
+
+        Cantidad:
+          cantidad
+
+      });
+
+    }
+
+
+
+    // ==========================================================
+    // 8. DETECTAR ÚLTIMA PÁGINA
+    // ==========================================================
+
+    if (
+      existenciasPagina.length <
+      cantidadPorPagina
+    ) {
+
+      console.log(
+        "✅ ÚLTIMA PÁGINA DETECTADA"
+      );
+
+      break;
+
+    }
+
+
+
+    pagina++;
+
+  }
+
+
+
+  // ============================================================
+  // 9. PROTECCIÓN CONTRA PAGINACIÓN INFINITA
+  // ============================================================
+
+  if (
+    pagina >= MAX_PAGES
+  ) {
+
+    throw new Error(
+      `Se alcanzó el límite máximo de ${MAX_PAGES} páginas consultando Citrus.`
+    );
+
+  }
+
+
+
+  // ============================================================
+  // 10. PRODUCTO NO ENCONTRADO
+  // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // Solo consideramos 0 después de completar correctamente
+  // la consulta de Citrus.
+  //
+  // Si Citrus se hubiera caído, callERPExistenciaAlmacen()
+  // debería lanzar error y nunca llegaríamos aquí.
+  //
+  // ============================================================
+
+  if (
+    !productoEncontrado
+  ) {
+
+    console.log("");
+    console.log(
+      "ℹ️ PRODUCTO NO ENCONTRADO EN LAS EXISTENCIAS DE CITRUS"
+    );
+
+    console.log(
+      "📦 EXISTENCIA ACTUAL = 0"
+    );
+
+    console.log(
+      "🆔 ITEM ID:",
+      parsedItemId
+    );
+
+
+    return 0;
+
+  }
+
+
+
+  // ============================================================
+  // 11. VALIDAR TOTAL
+  // ============================================================
+
+  if (
+    !Number.isFinite(
+      cantidadTotal
+    )
+  ) {
+
+    throw new Error(
+      `No se pudo determinar la existencia del ItemId ${parsedItemId}.`
+    );
+
+  }
+
+
+
+  // ============================================================
+  // 12. RESULTADO
+  // ============================================================
+
+  console.log("");
+  console.log(
+    "🟩🟩🟩 ========================================"
+  );
+
+  console.log(
+    "✅ EXISTENCIA ENCONTRADA"
+  );
+
+  console.log(
+    "🆔 ITEM ID:",
+    parsedItemId
+  );
+
+  console.log(
+    "🏭 ALMACÉN:",
+    parsedAlmacenId
+  );
+
+  console.log(
+    "📦 EXISTENCIA ACTUAL:",
+    cantidadTotal
+  );
+
+  console.log(
+    "🟩🟩🟩 ========================================"
+  );
+
+
+  return cantidadTotal;
+
+}

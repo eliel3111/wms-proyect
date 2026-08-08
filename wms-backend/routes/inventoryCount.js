@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -58,6 +58,13 @@ router.get(
 router.get(
   "/warehouses", authMiddleware,
   getActiveWarehouses
+);
+
+
+//Ruta para hacer el ajuste de inventario en citrus
+router.post(
+  "/start-adjustment", authMiddleware,
+  startInventoryAdjustment
 );
 
 
