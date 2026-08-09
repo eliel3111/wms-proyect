@@ -14,7 +14,7 @@ import {
 // INICIAR AJUSTE DE INVENTARIO
 // ============================================================
 
-export async function startInventoryAdjustment(
+export async function startInventoryAdjustment( 
   req,
   res
 ) {
@@ -265,7 +265,8 @@ export async function startInventoryAdjustment(
             COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
             COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
             CASE WHEN eis.item_id IS NULL THEN false ELSE true END AS exist_erp,
-            false AS product_no_exist
+            false AS product_no_exist,
+            true AS wms_counted
           FROM counted c
           JOIN products p
             ON p.sku = c.product_sku
@@ -286,6 +287,7 @@ export async function startInventoryAdjustment(
           unit_cost,
           exist_erp,
           product_no_exist,
+          wms_counted,
           updated_at
         )
         SELECT
@@ -300,6 +302,7 @@ export async function startInventoryAdjustment(
           unit_cost,
           exist_erp,
           product_no_exist,
+          wms_counted,
           NOW()
         FROM prepared
         ON CONFLICT (erp_id, session_id)
@@ -313,6 +316,7 @@ export async function startInventoryAdjustment(
           unit_cost = EXCLUDED.unit_cost,
           exist_erp = EXCLUDED.exist_erp,
           product_no_exist = EXCLUDED.product_no_exist,
+          wms_counted = EXCLUDED.wms_counted,
           updated_at = NOW()
         RETURNING
           erp_id,
@@ -327,7 +331,8 @@ export async function startInventoryAdjustment(
           difference,
           status,
           exist_erp,
-          product_no_exist
+          product_no_exist,
+  wms_counted
         `,
         [sessionId]
       );
@@ -363,102 +368,102 @@ export async function startInventoryAdjustment(
     // PRODUCTOS ERP CON BALANCE NO CONTADOS
     // ============================================================
 
-    const productsMissingResult =
-      await client.query(
-        `
-        WITH missing AS (
-          SELECT
-            eis.item_id::bigint AS erp_id,
-            $1::bigint AS session_id,
-            p.sku,
-            p.erp_name,
-            p.erp_sku,
-            p.description,
-            0::numeric AS total_inventory_qty,
-            COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
-            COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
-            true AS exist_erp,
-            CASE WHEN p.sku IS NULL THEN true ELSE false END AS product_no_exist
-          FROM erp_inventory_snapshot eis
-          LEFT JOIN LATERAL (
-            SELECT sku, erp_name, erp_sku, description
-            FROM products
-            WHERE erp_id = eis.item_id
-            LIMIT 1
-          ) p ON true
-          WHERE eis.session_inventory_id = $1
-            AND COALESCE(eis.erp_stock, 0) > 0
-            AND NOT (eis.item_id = ANY($2::bigint[]))
-        )
-        INSERT INTO inventory_erp_report (
-          erp_id,
-          session_id,
-          sku,
-          erp_name,
-          erp_sku,
-          description,
-          total_inventory_qty,
-          erp_stock,
-          unit_cost,
-          exist_erp,
-          product_no_exist,
-          updated_at
-        )
-        SELECT
-          erp_id,
-          session_id,
-          sku,
-          erp_name,
-          erp_sku,
-          description,
-          total_inventory_qty,
-          erp_stock,
-          unit_cost,
-          exist_erp,
-          product_no_exist,
-          NOW()
-        FROM missing
-        ON CONFLICT (erp_id, session_id)
-        DO UPDATE SET
-          sku = EXCLUDED.sku,
-          erp_name = EXCLUDED.erp_name,
-          erp_sku = EXCLUDED.erp_sku,
-          description = EXCLUDED.description,
-          total_inventory_qty = EXCLUDED.total_inventory_qty,
-          erp_stock = EXCLUDED.erp_stock,
-          unit_cost = EXCLUDED.unit_cost,
-          exist_erp = EXCLUDED.exist_erp,
-          product_no_exist = EXCLUDED.product_no_exist,
-          updated_at = NOW()
-        RETURNING
-          erp_id AS item_id,
-          session_id,
-          erp_stock,
-          unit_cost,
-          sku,
-          description,
-          erp_name,
-          erp_sku,
-          product_no_exist,
-          difference,
-          status,
-          exist_erp
-        `,
-        [
-          sessionId,
-          wmsIds
-        ]
-      );
-
-
-    const productsMissing =
-      productsMissingResult.rows;
-
-
-    console.log(
-      "🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:",
-      productsMissing.length
-    );
+    /*   const productsMissingResult =
+         await client.query(
+           `
+           WITH missing AS (
+             SELECT
+               eis.item_id::bigint AS erp_id,
+               $1::bigint AS session_id,
+               p.sku,
+               p.erp_name,
+               p.erp_sku,
+               p.description,
+               0::numeric AS total_inventory_qty,
+               COALESCE(eis.erp_stock, 0)::numeric AS erp_stock,
+               COALESCE(eis.unit_cost, 0)::numeric AS unit_cost,
+               true AS exist_erp,
+               CASE WHEN p.sku IS NULL THEN true ELSE false END AS product_no_exist
+             FROM erp_inventory_snapshot eis
+             LEFT JOIN LATERAL (
+               SELECT sku, erp_name, erp_sku, description
+               FROM products
+               WHERE erp_id = eis.item_id
+               LIMIT 1
+             ) p ON true
+             WHERE eis.session_inventory_id = $1
+               AND COALESCE(eis.erp_stock, 0) > 0
+               AND NOT (eis.item_id = ANY($2::bigint[]))
+           )
+           INSERT INTO inventory_erp_report (
+             erp_id,
+             session_id,
+             sku,
+             erp_name,
+             erp_sku,
+             description,
+             total_inventory_qty,
+             erp_stock,
+             unit_cost,
+             exist_erp,
+             product_no_exist,
+             updated_at
+           )
+           SELECT
+             erp_id,
+             session_id,
+             sku,
+             erp_name,
+             erp_sku,
+             description,
+             total_inventory_qty,
+             erp_stock,
+             unit_cost,
+             exist_erp,
+             product_no_exist,
+             NOW()
+           FROM missing
+           ON CONFLICT (erp_id, session_id)
+           DO UPDATE SET
+             sku = EXCLUDED.sku,
+             erp_name = EXCLUDED.erp_name,
+             erp_sku = EXCLUDED.erp_sku,
+             description = EXCLUDED.description,
+             total_inventory_qty = EXCLUDED.total_inventory_qty,
+             erp_stock = EXCLUDED.erp_stock,
+             unit_cost = EXCLUDED.unit_cost,
+             exist_erp = EXCLUDED.exist_erp,
+             product_no_exist = EXCLUDED.product_no_exist,
+             updated_at = NOW()
+           RETURNING
+             erp_id AS item_id,
+             session_id,
+             erp_stock,
+             unit_cost,
+             sku,
+             description,
+             erp_name,
+             erp_sku,
+             product_no_exist,
+             difference,
+             status,
+             exist_erp
+           `,
+           [
+             sessionId,
+             wmsIds
+           ]
+         );
+   
+   
+       const productsMissing =
+         productsMissingResult.rows;
+   
+   
+       console.log(
+         "🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:",
+         productsMissing.length
+       );*/
 
 
     // ============================================================
@@ -502,8 +507,8 @@ export async function startInventoryAdjustment(
 
         FROM inventory_erp_report
 
-        WHERE
-          session_id = $1
+        WHERE session_id = $1
+          AND wms_counted = true
 
         ORDER BY
           id ASC
@@ -991,7 +996,8 @@ export async function startInventoryAdjustment(
 
 
         WHERE
-          ier.session_id = $3
+  ier.session_id = $3
+  AND ier.wms_counted = true
 
 
         ORDER BY
@@ -1162,7 +1168,7 @@ export async function startInventoryAdjustment(
         );
 
       } catch (
-        rollbackError
+      rollbackError
       ) {
 
         console.error(
