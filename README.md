@@ -272,3 +272,9 @@ Full-Stack Software Engineer | React | TypeScript | Node.js | PostgreSQL
 [LinkedIn](https://www.linkedin.com/in/elielrodriguez/)
 
 📧 [eliel3111@gmail.com](mailto:eliel3111@gmail.com)
+
+---
+
+## 🎥 SIDIAL WMS Demo
+
+![SIDIAL WMS Demo](./assets/wms-demo-preview.png)
