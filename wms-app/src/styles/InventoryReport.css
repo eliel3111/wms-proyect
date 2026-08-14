@@ -200,6 +200,7 @@
 
   display: flex;
   justify-content: flex-end;
+  gap: 20px;
 
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -233,6 +234,11 @@
 .inventory-report-button-action:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 30px rgba(37, 99, 235, 0.36);
+}
+
+.zero-adjustment {
+  background: red;
+  color: white;
 }
 
 /* ================================

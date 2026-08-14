@@ -73,7 +73,7 @@ console.log(resultado);
   }
 }
 
-await ejecutarAjusteManual();
+//await ejecutarAjusteManual();
 
 //ALEGRA
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪

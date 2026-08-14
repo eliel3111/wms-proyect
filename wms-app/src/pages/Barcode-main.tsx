@@ -18,6 +18,7 @@ export interface Product {
     erp_id: string | null;
     erp_name: string | null;
     supplier_barcode: string | null;
+    total_qty_on_hand: number;
 }
 
 type PrintType = "internal" | "supplier";
@@ -362,28 +363,54 @@ export default function BarcodePage() {
 
 
                     {products.map((p) => (
-                        <div
-                            key={p.id}
-                            className="barcode-product-card"
-                            onClick={() => setSelectedProduct(p)}
-                        >
+    <div
+        key={p.id}
+        className="barcode-product-card"
+        onClick={() => setSelectedProduct(p)}
+    >
+        <div className="barcode-description">
+            {p.erp_name}<br />
+            {p.description}<br />
+            {p.erp_sku}<br />
+            {p.erp_id}
+        </div>
 
-                            <div className="barcode-description">
-                                {p.erp_name}<br />
-                                {p.description}<br />
-                                {p.erp_sku}<br />
-                                {p.erp_id}
-                            </div>
+        <div className="barcode-card-bottom">
 
-                            <div className="barcode-details">
-                                <div>Codigo Interno: {p.sku ?? "-"}</div>
+            <div className="barcode-details">
+                <div>
+                    Codigo Interno: {p.sku ?? "-"}
+                </div>
 
-                                {p.supplier_barcode && (
-                                    <div>Codigo de Proveedor: {p.supplier_barcode}</div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                {p.supplier_barcode && (
+                    <div>
+                        Codigo de Proveedor: {p.supplier_barcode}
+                    </div>
+                )}
+            </div>
+
+{p.total_qty_on_hand > 0 && (
+                    <div className="product-stock">
+                <div className="product-stock-icon">
+                    ✓
+                </div>
+
+                <div className="product-stock-info">
+                    <span className="product-stock-label">
+                        Stock disponible
+                    </span>
+
+                    <span className="product-stock-quantity">
+                        {p.total_qty_on_hand ?? 0} unidades
+                    </span>
+                </div>
+            </div>
+                )}
+            
+
+        </div>
+    </div>
+))}
                 </div>
 
             </div>

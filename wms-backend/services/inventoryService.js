@@ -3,6 +3,101 @@ import { db } from "../db.js";
 
 
 
+//Service to obtain the current stock of an array of skus
+export async function getInventoryLocationsBySkus(db, skus = []) {
+
+  try {
+
+    if (!Array.isArray(skus) || skus.length === 0) {
+      return new Map();
+    }
+
+    const uniqueSkus = [...new Set(skus)];
+
+    const result = await db.query(`
+      SELECT
+        ibl.product_sku,
+        ibl.location_id,
+
+        SUM(ibl.qty_on_hand) AS qty_on_hand,
+
+        l.id,
+        l.code,
+        l.warehouse_id,
+        l.is_active
+
+      FROM inventory_by_location ibl
+
+      LEFT JOIN locations l
+        ON l.id = ibl.location_id
+
+      WHERE ibl.product_sku = ANY($1)
+
+      GROUP BY
+        ibl.product_sku,
+        ibl.location_id,
+        l.id,
+        l.code,
+        l.warehouse_id,
+        l.is_active
+
+      ORDER BY
+        ibl.product_sku,
+        ibl.location_id
+    `, [uniqueSkus]);
+
+
+    const inventoryMap = new Map();
+
+
+    uniqueSkus.forEach(sku => {
+
+      inventoryMap.set(sku, {
+        total_qty_on_hand: 0,
+        locations: []
+      });
+
+    });
+
+
+    result.rows.forEach(row => {
+
+      const sku = row.product_sku;
+
+      const qty = Number(row.qty_on_hand || 0);
+
+      const productInventory = inventoryMap.get(sku);
+
+      productInventory.total_qty_on_hand += qty;
+
+      productInventory.locations.push({
+        location_id: row.location_id,
+        location_code: row.code,
+        qty_on_hand: qty,
+        warehouse_id: row.warehouse_id,
+        is_active: row.is_active
+      });
+
+    });
+
+
+    return inventoryMap;
+
+  } catch (error) {
+
+    console.error(
+      "❌ ERROR OBTENIENDO INVENTARIO POR SKU:",
+      error
+    );
+
+    // IMPORTANTE:
+    // dejamos que el controller maneje el response HTTP
+    throw error;
+  }
+}
+
+
+
 
 export async function moveInventory(req, res) {
   const {

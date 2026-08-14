@@ -295,11 +295,18 @@ export default function InventoryReport() {
             {/* 3. BUTTON */}
             <div className="inventory-report-button">
                 <div
+                    className="inventory-report-button-action zero-adjustment"
+                    onClick={handleApplyInventory}
+                >
+                    <CheckSquare size={24} />
+                    <span>Aplicar Inventario en CERO (0.000)</span>
+                </div>
+                <div
                     className="inventory-report-button-action"
                     onClick={handleApplyInventory}
                 >
                     <CheckSquare size={24} />
-                    <span>Aplicar Inventario</span>
+                    <span>Aplicar Inventario CONTADO</span>
                 </div>
             </div>
         </div>

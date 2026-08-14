@@ -145,7 +145,7 @@ export default function ReceivingFinal() {
     if (confirmation.show) {
            return <ConfirmationScreen
                 title="¡RECEPCIÓN CERRADA!"
-                message={`Recepción ${confirmation.receiptCode} completada`}
+                message={`Recepción ${confirmation.receiptCode} completada. RECUERDE HACER EL PUTAWAY!`}
                 autoCloseMs={3000}
                 onFinish={() => {
                     navigate("/menu");

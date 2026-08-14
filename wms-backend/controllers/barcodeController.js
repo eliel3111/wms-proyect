@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { getInventoryLocationsBySkus } from "../services/inventoryService.js"
 
 export async function upsertSupplierBarcode(req, res) {
   console.log("🚀 START → upsertSupplierBarcode");
@@ -156,156 +157,454 @@ export async function upsertSupplierBarcode(req, res) {
 
 
 export async function searchProducts(req, res) {
+
   try {
+
     const { text } = req.body;
 
     console.log("TEXT:", text);
 
+
+    // ==========================================
+    // VALIDAR TEXTO
+    // ==========================================
+
     if (!text) {
+
       return res.status(400).json({
         success: false,
+        title: "Invalid Search",
         message: "Debe enviar texto de búsqueda"
       });
+
     }
 
-    let productsFromBarcode = [];
 
     const cleanText = text.trim();
 
-    // 🔥 NUEVO: dividir palabras
+
     const words = cleanText
       .split(" ")
       .map(w => w.trim())
       .filter(Boolean);
 
-    // 🔹 1. Buscar en barcode
-    // 🔥 0. BUSCAR BARCODE EXACTO (PRIORIDAD MÁXIMA)
-    const exactBarcodeRes = await db.query(`
-  SELECT DISTINCT product_sku
-  FROM product_barcodes
-  WHERE barcode = $1
-  LIMIT 20
-`, [cleanText]);
 
-    console.log("🟥 SE ENCOTRO BARCODE EXACTO: ", exactBarcodeRes.rows.length);
+    // ============================================================
+    // 1️⃣ BUSCAR BARCODE EXACTO
+    // ============================================================
+
+    const exactBarcodeRes = await db.query(`
+      SELECT DISTINCT product_sku
+      FROM product_barcodes
+      WHERE barcode = $1
+      LIMIT 20
+    `, [cleanText]);
+
+
+    console.log(
+      "🟥 SE ENCONTRÓ BARCODE EXACTO:",
+      exactBarcodeRes.rows.length
+    );
+
+
+    // ============================================================
+    // SI ENCUENTRA BARCODE EXACTO → RETORNAR INMEDIATAMENTE
+    // ============================================================
 
     if (exactBarcodeRes.rows.length > 0) {
-      const skus = exactBarcodeRes.rows.map(r => r.product_sku);
+
+      const skus =
+        exactBarcodeRes.rows.map(
+          row => row.product_sku
+        );
+
+
+      // ==========================================
+      // PRODUCTOS
+      // ==========================================
 
       const exactProducts = await db.query(`
-    SELECT id, sku, description, erp_sku, erp_name, erp_id
-    FROM products
-    WHERE sku = ANY($1)
-  `, [skus]);
+        SELECT
+          id,
+          sku,
+          description,
+          erp_sku,
+          erp_name,
+          erp_id
+        FROM products
+        WHERE sku = ANY($1)
+      `, [skus]);
 
-      // 🔥 supplier barcode también
-      let supplierMap = new Map();
+
+      // ==========================================
+      // SUPPLIER BARCODES
+      // ==========================================
+
+      const supplierMap = new Map();
+
 
       const supplierRes = await db.query(`
-    SELECT product_sku, barcode
-    FROM product_barcodes
-    WHERE product_sku = ANY($1)
-      AND barcode_type = 'supplier'
-  `, [skus]);
+        SELECT
+          product_sku,
+          barcode
+        FROM product_barcodes
+        WHERE product_sku = ANY($1)
+          AND barcode_type = 'supplier'
+      `, [skus]);
+
 
       supplierRes.rows.forEach(row => {
+
         if (!supplierMap.has(row.product_sku)) {
-          supplierMap.set(row.product_sku, row.barcode);
+
+          supplierMap.set(
+            row.product_sku,
+            row.barcode
+          );
+
         }
+
       });
 
-      const finalProducts = exactProducts.rows.map(p => ({
-        ...p,
-        supplier_barcode: supplierMap.get(p.sku) || null
-      }));
 
-      // 🔥 ⛔ IMPORTANTE: RETORNAR AQUÍ
+      // ==========================================
+      // INVENTARIO Y UBICACIONES
+      // ==========================================
+
+      const inventoryMap =
+        await getInventoryLocationsBySkus(
+          db,
+          skus
+        );
+
+
+      // ==========================================
+      // CONSTRUIR RESULTADO
+      // ==========================================
+
+      const finalProducts =
+        exactProducts.rows.map(product => {
+
+          const inventory =
+            inventoryMap.get(product.sku) || {
+              total_qty_on_hand: 0,
+              locations: []
+            };
+
+
+          return {
+
+            ...product,
+
+            supplier_barcode:
+              supplierMap.get(product.sku) || null,
+
+            total_qty_on_hand:
+              inventory.total_qty_on_hand,
+
+            locations:
+              inventory.locations
+
+          };
+
+        });
+
+
+      console.log(
+        "✅ PRODUCTOS ENCONTRADOS POR BARCODE:"
+      );
+
+      console.log(finalProducts);
+
+
       return res.json({
+
         success: true,
+
         data: finalProducts
+
       });
+
     }
 
-    // 🔥 NUEVO: construir búsqueda dinámica
-    let conditions = [];
-    let values = [];
+
+    // ============================================================
+    // 2️⃣ SI NO HAY BARCODE EXACTO
+    // HACER BÚSQUEDA POR TEXTO
+    // ============================================================
+
+    const conditions = [];
+    const values = [];
+
 
     words.forEach((word, index) => {
+
       const paramIndex = index + 1;
 
-    conditions.push(`
-(
-  sku ILIKE $${paramIndex} OR
-  erp_sku ILIKE $${paramIndex} OR
-  erp_name ILIKE $${paramIndex} OR
-  REPLACE(description, '^', '') ILIKE $${paramIndex} OR
-  status ILIKE $${paramIndex} OR
-  reference ILIKE $${paramIndex} OR
-  erp_id::text ILIKE $${paramIndex}
-)
-`);
+
+      conditions.push(`
+        (
+          sku ILIKE $${paramIndex}
+          OR erp_sku ILIKE $${paramIndex}
+          OR erp_name ILIKE $${paramIndex}
+          OR REPLACE(description, '^', '') ILIKE $${paramIndex}
+          OR status ILIKE $${paramIndex}
+          OR reference ILIKE $${paramIndex}
+          OR erp_id::text ILIKE $${paramIndex}
+        )
+      `);
+
 
       values.push(`%${word}%`);
+
     });
 
-    const whereClause = conditions.length
-      ? conditions.join(" AND ")
-      : "1=1";
+
+    const whereClause =
+      conditions.length > 0
+        ? conditions.join(" AND ")
+        : "1=1";
+
+
+    // ==========================================
+    // BUSCAR PRODUCTOS
+    // ==========================================
 
     const directRes = await db.query(`
-      SELECT id, sku, description, erp_sku, erp_name, erp_id
+      SELECT
+        id,
+        sku,
+        description,
+        erp_sku,
+        erp_name,
+        erp_id
       FROM products
       WHERE ${whereClause}
       LIMIT 20
     `, values);
 
-    // 🔹 Merge sin duplicados
-    const map = new Map();
 
-    [...productsFromBarcode, ...directRes.rows].forEach(p => {
-      map.set(p.sku, p);
+    console.log(
+      "🔎 PRODUCTOS ENCONTRADOS POR TEXTO:",
+      directRes.rows.length
+    );
+
+
+    // ==========================================
+    // MERGE SIN DUPLICADOS
+    // ==========================================
+
+    const productsFromBarcode = [];
+
+    const productMap = new Map();
+
+
+    [
+      ...productsFromBarcode,
+      ...directRes.rows
+    ].forEach(product => {
+
+      productMap.set(
+        product.sku,
+        product
+      );
+
     });
 
-    // 🔥 👇 AQUÍ CONVIERTES A ARRAY
-    const products = Array.from(map.values());
 
-    // 🔥 👇 OBTENER SKUS
-    const skus = products.map(p => p.sku);
+    // ==========================================
+    // CONVERTIR A ARRAY
+    // ==========================================
 
-    // 🔥 👇 NUEVO: buscar supplier barcodes
-    let supplierMap = new Map();
+    const products =
+      Array.from(productMap.values());
+
+
+    // ==========================================
+    // OBTENER SKUS
+    // ==========================================
+
+    const skus =
+      products.map(
+        product => product.sku
+      );
+
+
+    console.log(
+      "📦 SKUS PARA BUSCAR INVENTARIO:",
+      skus
+    );
+
+
+    // ==========================================
+    // SUPPLIER BARCODES
+    // ==========================================
+
+    const supplierMap = new Map();
+
 
     if (skus.length > 0) {
+
       const supplierRes = await db.query(`
-    SELECT product_sku, barcode
-    FROM product_barcodes
-    WHERE product_sku = ANY($1)
-      AND barcode_type = 'supplier'
-  `, [skus]);
+        SELECT
+          product_sku,
+          barcode
+        FROM product_barcodes
+        WHERE product_sku = ANY($1)
+          AND barcode_type = 'supplier'
+      `, [skus]);
+
 
       supplierRes.rows.forEach(row => {
+
         if (!supplierMap.has(row.product_sku)) {
-          supplierMap.set(row.product_sku, row.barcode);
+
+          supplierMap.set(
+            row.product_sku,
+            row.barcode
+          );
+
         }
+
       });
+
     }
 
-    // 🔥 👇 PEGARLO AL RESULTADO
-    const finalProducts = products.map(p => ({
-      ...p,
-      supplier_barcode: supplierMap.get(p.sku) || null
-    }));
+
+    // ============================================================
+    // 🔥 INVENTARIO Y UBICACIONES
+    // ============================================================
+
+    let inventoryMap = new Map();
+
+
+    if (skus.length > 0) {
+
+      inventoryMap =
+        await getInventoryLocationsBySkus(
+          db,
+          skus
+        );
+
+    }
+
+
+    // ============================================================
+    // 🔥 CONSTRUIR RESPUESTA FINAL
+    // ============================================================
+
+    const finalProducts =
+      products.map(product => {
+
+        const inventory =
+          inventoryMap.get(product.sku) || {
+            total_qty_on_hand: 0,
+            locations: []
+          };
+
+
+        return {
+
+          ...product,
+
+          supplier_barcode:
+            supplierMap.get(product.sku) || null,
+
+          total_qty_on_hand:
+            inventory.total_qty_on_hand,
+
+          locations:
+            inventory.locations
+
+        };
+
+      });
+
+
+    console.log(
+      "✅ PRODUCTOS FINALES:"
+    );
+
+    console.log(finalProducts);
+
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
 
     return res.json({
+
       success: true,
+
       data: finalProducts
+
     });
 
+
   } catch (error) {
-    console.error("🔥 ERROR:", error);
-    res.status(500).json({
+
+    // ============================================================
+    // ❌ CUALQUIER ERROR DE DATABASE
+    // ============================================================
+
+    console.error("");
+    console.error(
+      "❌ ========================================"
+    );
+    console.error(
+      "❌ ERROR BUSCANDO PRODUCTOS EN DATABASE"
+    );
+    console.error(
+      "❌ ========================================"
+    );
+
+    console.error(
+      "MESSAGE:",
+      error.message
+    );
+
+    console.error(
+      "CODE:",
+      error.code
+    );
+
+    console.error(
+      "DETAIL:",
+      error.detail
+    );
+
+    console.error(
+      "TABLE:",
+      error.table
+    );
+
+    console.error(
+      "COLUMN:",
+      error.column
+    );
+
+    console.error(
+      "CONSTRAINT:",
+      error.constraint
+    );
+
+    console.error(
+      "STACK:",
+      error.stack
+    );
+
+
+    return res.status(500).json({
+
       success: false,
-      message: error.message
+
+      title: "Database Error",
+
+      message:
+        "An error occurred while retrieving the product information."
+
     });
+
   }
+
 }
