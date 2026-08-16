@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -7,8 +7,8 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 
-router.post("/scanned", inventoryScan);
-router.post("/apply-count", applyInventoryCount);
+router.post("/scanned", authMiddleware, inventoryScan);
+router.post("/apply-count", authMiddleware, applyInventoryCount);
 
 
 // Pantalla Inventory Monitor: obtiene la configuración de inventario y valida si existe una sesión activa.
@@ -65,6 +65,14 @@ router.get(
 router.post(
   "/start-adjustment", authMiddleware,
   startInventoryAdjustment
+);
+
+
+
+//Ruta para hacer el ajuste de inventario en citrus los productos en cero
+router.post(
+  "/start-adjustment-zero", authMiddleware,
+  startInventoryAdjustmentZero
 );
 
 

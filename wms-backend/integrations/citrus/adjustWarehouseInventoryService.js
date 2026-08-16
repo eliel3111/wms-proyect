@@ -154,12 +154,20 @@ export async function ajustarExistenciaAlmacen(
     // 3. OBTENER AUTENTICACIÓN DE CITRUS
     // ==========================================================
 
+
     const {
       token,
       ticket,
       companyId,
       userId
     } = await getERPAuth();
+
+    console.log("✅ CITRUS AUTH RESULT:", {
+  ticket,
+  companyId,
+  userId,
+  hasToken: Boolean(token)
+});
 
     if (!token) {
       throw new Error(

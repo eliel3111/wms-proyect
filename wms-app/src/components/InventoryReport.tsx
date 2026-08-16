@@ -211,6 +211,56 @@ export default function InventoryReport() {
         }
     }
 
+
+    //APLICAR AJUSTE DE INVENTARIO
+    async function handleApplyInventoryZero() {
+        console.log("📦 Ejecutando ajuste de inventario");
+
+        try {
+            const response = await apiClient.post(
+                "/inventory/start-adjustment-zero"
+            );
+
+            const data = response.data;
+
+            if (!data.success) {
+                openModal({
+                    title: data.title || "Error",
+                    message:
+                        data.message ||
+                        "No se pudo iniciar el ajuste de inventario.",
+                });
+
+                return;
+            }
+
+            console.log(
+                "✅ Ajuste de inventario iniciado:",
+                data
+            );
+
+            openModal({
+                title: "Ajuste iniciado",
+                message:
+                    data.message ||
+                    "El ajuste de inventario fue iniciado correctamente.",
+            });
+
+        } catch (error: any) {
+            console.error(
+                "❌ Error iniciando ajuste de inventario:",
+                error
+            );
+
+            openModal({
+                title: "Error aplicando inventario",
+                message:
+                    error?.response?.data?.message ||
+                    "No se pudo iniciar el ajuste de inventario.",
+            });
+        }
+    }
+
     function handleReporteAuditoria() {
         console.log("🧾 Ejecutando Reporte de Auditoría");
 
@@ -296,7 +346,7 @@ export default function InventoryReport() {
             <div className="inventory-report-button">
                 <div
                     className="inventory-report-button-action zero-adjustment"
-                    onClick={handleApplyInventory}
+                    onClick={handleApplyInventoryZero}
                 >
                     <CheckSquare size={24} />
                     <span>Aplicar Inventario en CERO (0.000)</span>

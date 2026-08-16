@@ -56,9 +56,9 @@ async function ejecutarAjusteManual() {
     const resultado =
   await ajustarExistenciaAlmacen([
     {
-      itemId: 13465,
+      itemId: 30,
       almacenId: 1,
-      cantidadNueva: 0,
+      cantidadNueva: 150,
       cantidadActual: 180
     }
   ]);
@@ -73,7 +73,7 @@ console.log(resultado);
   }
 }
 
-//await ejecutarAjusteManual();
+await ejecutarAjusteManual();
 
 //ALEGRA
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
