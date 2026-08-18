@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useModal } from "../context/ModalContext";
 import "../styles/InventoryReport.css";
 import apiClient from "../services/apiClient";
-
+import ConfirmationModal from "../components/ConfirmationModal";
 interface ReportOption {
     id: number;
     title: string;
@@ -40,6 +40,23 @@ export default function InventoryReport() {
 
     const [hoveredReport, setHoveredReport] = useState<ReportOption | null>(null);
     const { openModal } = useModal();
+    const [showConfirmation, setShowConfirmation] =
+        useState(false);
+
+    const [confirmationTitle, setConfirmationTitle] =
+        useState("");
+
+    const [confirmationMessage, setConfirmationMessage] =
+        useState("");
+
+    const [confirmationText, setConfirmationText] =
+        useState("Confirmar");
+
+    const [confirmationAction, setConfirmationAction] =
+        useState<(() => Promise<void>) | null>(null);
+
+    const [confirmationLoading, setConfirmationLoading] =
+        useState(false);
 
     //REPORTE FINAL DEL INVENTARIO
     async function handleReporteFinalInventario() {
@@ -287,6 +304,34 @@ export default function InventoryReport() {
         console.log("⚠️ Reporte no reconocido:", reportId);
     }
 
+    //FUNCION PARA ABRIR EL MODAL
+    function openConfirmation({
+        title,
+        message,
+        confirmText,
+        action
+    }: {
+        title: string;
+        message: string;
+        confirmText: string;
+        action: () => Promise<void>;
+    }) {
+
+        setConfirmationTitle(title);
+
+        setConfirmationMessage(message);
+
+        setConfirmationText(confirmText);
+
+        // IMPORTANTE:
+        // guardamos una función dentro del state
+        setConfirmationAction(
+            () => action
+        );
+
+        setShowConfirmation(true);
+    }
+
 
     return (
         <div className="inventory-report-container">
@@ -346,19 +391,116 @@ export default function InventoryReport() {
             <div className="inventory-report-button">
                 <div
                     className="inventory-report-button-action zero-adjustment"
-                    onClick={handleApplyInventoryZero}
+
+                    onClick={() =>
+                        openConfirmation({
+                            title: "Aplicar inventario en cero",
+
+                            message:
+                                "¿Está seguro de que desea llevar a cero (0.000) en Citrus todos los productos que no fueron contados durante el inventario físico?",
+
+                            confirmText:
+                                "Aplicar en CERO",
+
+                            action:
+                                handleApplyInventoryZero
+                        })
+                    }
                 >
                     <CheckSquare size={24} />
-                    <span>Aplicar Inventario en CERO (0.000)</span>
+
+                    <span>
+                        Aplicar Inventario en CERO (0.000)
+                    </span>
                 </div>
                 <div
                     className="inventory-report-button-action"
-                    onClick={handleApplyInventory}
+
+                    onClick={() =>
+                        openConfirmation({
+                            title: "Aplicar inventario contado",
+
+                            message:
+                                "¿Está seguro de que desea aplicar en Citrus las cantidades físicas contadas durante este inventario?",
+
+                            confirmText:
+                                "Aplicar CONTADO",
+
+                            action:
+                                handleApplyInventory
+                        })
+                    }
                 >
                     <CheckSquare size={24} />
-                    <span>Aplicar Inventario CONTADO</span>
+
+                    <span>
+                        Aplicar Inventario CONTADO
+                    </span>
                 </div>
             </div>
+
+
+
+            <ConfirmationModal
+
+                isOpen={
+                    showConfirmation
+                }
+
+                title={
+                    confirmationTitle
+                }
+
+                message={
+                    confirmationMessage
+                }
+
+                confirmText={
+                    confirmationText
+                }
+
+                cancelText="Cancelar"
+
+                loading={
+                    confirmationLoading
+                }
+
+                onClose={() => {
+
+                    if (confirmationLoading) {
+                        return;
+                    }
+
+                    setShowConfirmation(false);
+
+                    setConfirmationAction(null);
+                }}
+
+                onConfirm={async () => {
+
+                    if (!confirmationAction) {
+                        return;
+                    }
+
+                    try {
+
+                        setConfirmationLoading(true);
+
+                        await confirmationAction();
+
+                        setShowConfirmation(false);
+
+                        setConfirmationAction(null);
+
+                    } finally {
+
+                        setConfirmationLoading(false);
+
+                    }
+
+                }}
+
+            />
         </div>
     );
 }

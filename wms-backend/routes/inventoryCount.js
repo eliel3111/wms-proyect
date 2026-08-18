@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -13,6 +13,11 @@ router.post("/apply-count", authMiddleware, applyInventoryCount);
 
 // Pantalla Inventory Monitor: obtiene la configuración de inventario y valida si existe una sesión activa.
 router.get("/session-status", authMiddleware, getInventorySessionStatus);
+
+router.post(
+  "/session/resume", authMiddleware,
+  resumeInventorySession
+);
 
 
 // Actualiza el modo de ajuste de inventario (final/immediate) si no existe una sesión activa.

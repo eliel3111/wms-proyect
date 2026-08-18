@@ -14,7 +14,7 @@ import {
 // INICIAR AJUSTE DE INVENTARIO
 // ============================================================
 
-export async function startInventoryAdjustment( 
+export async function startInventoryAdjustment(
   req,
   res
 ) {
@@ -637,8 +637,8 @@ export async function startInventoryAdjustment(
     // ============================================================
 
     const existingJobResult =
-  await client.query(
-    `
+      await client.query(
+        `
     SELECT
       id,
       job_type,
@@ -661,10 +661,10 @@ export async function startInventoryAdjustment(
 
     LIMIT 1
     `,
-    [
-      sessionId
-    ]
-  );
+        [
+          sessionId
+        ]
+      );
 
 
     const existingJob =
@@ -882,14 +882,14 @@ RETURNING *
 
 
     console.log(
-  "✅ COUNTED JOB CREADO:",
-  {
-    jobId: adjustmentJobId,
-    jobType: "counted",
-    sessionId,
-    totalProducts: reportLines.length
-  }
-);
+      "✅ COUNTED JOB CREADO:",
+      {
+        jobId: adjustmentJobId,
+        jobType: "counted",
+        sessionId,
+        totalProducts: reportLines.length
+      }
+    );
 
 
 
@@ -1131,7 +1131,7 @@ RETURNING *
         success: true,
 
         message:
-  "El ajuste de productos contados fue iniciado correctamente.",
+          "El ajuste de productos contados fue iniciado correctamente.",
 
         data: {
 
@@ -1231,7 +1231,7 @@ RETURNING *
 
 
 
-export async function startInventoryAdjustmentZero( 
+export async function startInventoryAdjustmentZero(
   req,
   res
 ) {
@@ -1585,9 +1585,9 @@ export async function startInventoryAdjustmentZero(
     // PRODUCTOS ERP CON BALANCE NO CONTADOS
     // ============================================================
 
-      const productsMissingResult =
-         await client.query(
-           `
+    const productsMissingResult =
+      await client.query(
+        `
            WITH missing AS (
     SELECT
         eis.item_id::bigint AS erp_id,
@@ -1701,21 +1701,21 @@ FROM missing
              status,
              exist_erp
            `,
-           [
-             sessionId,
-             wmsIds
-           ]
-         );
-   
-   
-       const productsMissing =
-         productsMissingResult.rows;
-   
-   
-       console.log(
-         "🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:",
-         productsMissing.length
-       );
+        [
+          sessionId,
+          wmsIds
+        ]
+      );
+
+
+    const productsMissing =
+      productsMissingResult.rows;
+
+
+    console.log(
+      "🟥 TOTAL PRODUCTOS ERP CON BALANCE NO CONTADOS:",
+      productsMissing.length
+    );
 
 
     // ============================================================
@@ -1889,8 +1889,8 @@ FROM missing
     // ============================================================
 
     const existingJobResult =
-  await client.query(
-    `
+      await client.query(
+        `
     SELECT
       id,
       job_type,
@@ -1910,8 +1910,8 @@ FROM missing
 
     LIMIT 1
     `,
-    [sessionId]
-  );
+        [sessionId]
+      );
 
 
     const existingJob =
@@ -3631,7 +3631,391 @@ export async function startInventorySession(req, res) {
 
 
 
+// ============================================================
+// REANUDAR CONTEO DE INVENTARIO
+// REVIEW → IN-PROGRESS
+// ============================================================
 
+export async function resumeInventorySession(
+  req,
+  res
+) {
+
+  const client =
+    await db.connect();
+
+  try {
+
+    console.log("");
+    console.log(
+      "🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦========================================"
+    );
+
+    console.log(
+      "🔄 REANUDANDO SESIÓN DE INVENTARIO"
+    );
+
+    console.log(
+      "🟦🟦🟦 ========================================"
+    );
+
+
+    const {
+      id
+    } = req.body;
+
+
+    // ==========================================================
+    // 1. VALIDAR ID
+    // ==========================================================
+
+    if (!id) {
+
+      return res.json({
+
+        success:
+          false,
+
+        title:
+          "Sesión inválida",
+
+        message:
+          "Debe enviar el id de la sesión."
+
+      });
+
+    }
+
+
+    await client.query(
+      "BEGIN"
+    );
+
+
+    // ==========================================================
+    // 2. BUSCAR SESIÓN
+    // ==========================================================
+    //
+    // FOR UPDATE evita que otro proceso
+    // modifique la misma sesión al mismo tiempo.
+    //
+    // ==========================================================
+
+    const sessionResult =
+      await client.query(
+        `
+        SELECT
+          s.*,
+          u.full_name
+
+        FROM inventory_sessions s
+
+        LEFT JOIN users u
+          ON u.id = s.user_id
+
+        WHERE
+          s.id = $1
+
+        LIMIT 1
+
+        FOR UPDATE OF s
+        `,
+        [
+          id
+        ]
+      );
+
+
+    // ==========================================================
+    // 3. CONFIRMAR QUE EXISTE
+    // ==========================================================
+
+    if (
+      sessionResult.rows.length === 0
+    ) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+
+      return res.json({
+
+        success:
+          false,
+
+        title:
+          "Sesión no encontrada",
+
+        message:
+          "La sesión de inventario no existe."
+
+      });
+
+    }
+
+
+    const session =
+      sessionResult.rows[0];
+
+
+    console.log(
+      "📦 SESIÓN ENCONTRADA:",
+      {
+        id:
+          session.id,
+
+        code:
+          session.code,
+
+        status:
+          session.status
+      }
+    );
+
+
+    // ==========================================================
+    // 4. VALIDAR STATUS
+    // ==========================================================
+    //
+    // Solamente permitimos:
+    //
+    // review → in-progress
+    //
+    // ==========================================================
+
+    if (
+      session.status !==
+      "review"
+    ) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+
+      return res.json({
+
+        success:
+          false,
+
+        title:
+          "No se puede reanudar la sesión",
+
+        message:
+          `La sesión debe estar en estado review para reanudar el conteo. Estado actual: ${session.status}.`
+
+      });
+
+    }
+
+    // VALIDAD QUE NO HAY NINGUN AJUSTE APLICADO A ESA SESSION.
+
+    const completedAdjustmentResult =
+      await client.query(
+        `
+    SELECT EXISTS (
+
+      SELECT 1
+
+      FROM inventory_adjustment_jobs
+
+      WHERE
+        inventory_session_id = $1
+
+        AND status = 'completed'
+
+    ) AS has_completed_adjustment
+    `,
+        [
+          session.id
+        ]
+      );
+
+
+    const hasCompletedAdjustment =
+      completedAdjustmentResult
+        .rows[0]
+        ?.has_completed_adjustment === true;
+
+
+    console.log(
+      "🔎 ¿EXISTE AJUSTE COMPLETADO?:",
+      hasCompletedAdjustment
+    );
+
+
+    // ==========================================================
+    // SI YA SE APLICÓ UN AJUSTE → NO REANUDAR
+    // ==========================================================
+
+    if (
+      hasCompletedAdjustment
+    ) {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+
+      return res.json({
+
+        success:
+          false,
+
+        title:
+          "No se puede reanudar la sesión",
+
+        message:
+          "No se puede seguir contando luego de que se aplicó un ajuste en CITRUS."
+
+      });
+
+    }
+
+    // ==========================================================
+    // 5. CAMBIAR A IN-PROGRESS
+    // ==========================================================
+
+    const updateResult =
+      await client.query(
+        `
+        UPDATE inventory_sessions
+
+        SET
+
+          status =
+            'in-progress',
+
+          updated_at =
+            NOW()
+
+        WHERE
+          id = $1
+
+        RETURNING
+          *
+        `,
+        [
+          id
+        ]
+      );
+
+
+    const updatedSession =
+      updateResult.rows[0];
+
+
+    // ==========================================================
+    // 6. AGREGAR FULL_NAME
+    // ==========================================================
+
+    updatedSession.full_name =
+      session.full_name;
+
+
+    // ==========================================================
+    // 7. COMMIT
+    // ==========================================================
+
+    await client.query(
+      "COMMIT"
+    );
+
+
+    console.log(
+      "✅ SESIÓN REANUDADA:"
+    );
+
+    console.log(
+      {
+        id:
+          updatedSession.id,
+
+        code:
+          updatedSession.code,
+
+        status:
+          updatedSession.status
+      }
+    );
+
+    console.log(
+      "🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦========================================"
+    );
+    // ==========================================================
+    // 8. RESPUESTA FRONTEND
+    // ==========================================================
+
+    return res.json({
+
+      success:
+        true,
+
+      title:
+        "Conteo reanudado",
+
+      message:
+        "La sesión volvió a estar en progreso. Puede continuar realizando el conteo físico.",
+
+      hasActiveSession:
+        true,
+
+      session:
+        updatedSession
+
+    });
+
+
+  } catch (error) {
+
+    try {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+    } catch (rollbackError) {
+
+      console.error(
+        "❌ ERROR EN ROLLBACK:",
+        rollbackError
+      );
+
+    }
+
+
+    console.error("");
+    console.error(
+      "🟥 ERROR REANUDANDO SESIÓN:"
+    );
+
+    console.error(
+      error
+    );
+
+
+    return res.status(500).json({
+
+      success:
+        false,
+
+      title:
+        "Error reanudando sesión",
+
+      message:
+        "Ocurrió un error al intentar reanudar el conteo de inventario."
+
+    });
+
+
+  } finally {
+
+    client.release();
+
+  }
+
+}
 
 
 

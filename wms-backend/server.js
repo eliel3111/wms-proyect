@@ -56,10 +56,10 @@ async function ejecutarAjusteManual() {
     const resultado =
   await ajustarExistenciaAlmacen([
     {
-      itemId: 30,
+      itemId: 20,
       almacenId: 1,
-      cantidadNueva: 150,
-      cantidadActual: 180
+      cantidadNueva: 999,
+      cantidadActual: 0
     }
   ]);
 

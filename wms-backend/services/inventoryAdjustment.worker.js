@@ -1,5 +1,4 @@
-
-
+//wms-backend/services/inventoryAdjustment.worker.js
 import sgMail from "@sendgrid/mail";
 //🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧 Every ERP will have different function
 import {
@@ -29,10 +28,10 @@ sgMail.setApiKey(
 // CONFIGURACIÓN
 // ============================================================
 
-const FAST_VERIFICATION_ATTEMPTS = 12;
+const FAST_VERIFICATION_ATTEMPTS = 3;
 
 const FAST_VERIFICATION_DELAY_MS =
-  10_000;
+  5_000;
 
 
 // Después de mandar el correo,
@@ -843,7 +842,7 @@ async function markLineVerifying({
 
       next_retry_at =
         NOW()
-        + INTERVAL '10 seconds',
+        + INTERVAL '5 seconds',
 
       updated_at =
         NOW()
@@ -1374,6 +1373,10 @@ async function executeAdjustment({
       });
 
 
+
+      
+
+
       return {
 
         status:
@@ -1430,50 +1433,137 @@ async function executeAdjustment({
 
   } catch (error) {
 
-    // ==========================================================
-    // TIMEOUT / INTERNET / CITRUS CAÍDO
-    // ==========================================================
-    //
-    // NO sabemos si Citrus recibió el ajuste.
-    //
-    // Por eso NO ponemos failed
-    // y NO reenviamos inmediatamente.
-    //
-    // ==========================================================
+  // ==========================================================
+  // CITRUS RESPONDIÓ Y RECHAZÓ EL AJUSTE
+  // ==========================================================
+
+  if (
+    error.code ===
+    "CITRUS_REJECTED"
+  ) {
 
     console.error("");
     console.error(
-      "⚠️ NO SE PUDO CONFIRMAR EL AJUSTE."
+      "🟥 CITRUS RECHAZÓ EL AJUSTE."
     );
 
     console.error(
+      "🟥 LINE ID:",
+      line.id
+    );
+
+    console.error(
+      "🟥 ERP PRODUCT:",
+      line.erp_product_id
+    );
+
+    console.error(
+      "🟥 MESSAGE:",
       error.message
     );
 
 
-    await markLineVerifying({
+    // ========================================================
+    // MARCAR LÍNEA FAILED
+    // ========================================================
+
+    await markLineFailed({
+
+      lineId:
+        line.id,
+
+      citrusMessage:
+        error.message,
+
+      citrusResponse:
+        error.citrusResult || {}
+
+    });
+
+
+    // ========================================================
+    // MARCAR JOB FAILED
+    // ========================================================
+
+    await markJobFailed({
+
+      jobId:
+        job.id,
 
       lineId:
         line.id,
 
       message:
-        error.message ||
-        "No se pudo confirmar la respuesta de Citrus.",
+        error.message
 
-      response:
-        serializeError(
-          error
-        )
+    });
+
+
+    // ========================================================
+    // ENVIAR EMAIL
+    // ========================================================
+
+    await sendCitrusAdjustmentErrorEmail({
+
+      job,
+
+      line,
+
+      error
 
     });
 
 
     return {
+
       status:
-        "verify"
+        "failed",
+
+      message:
+        error.message
+
     };
 
   }
+
+
+  // ==========================================================
+  // TIMEOUT / INTERNET / CITRUS CAÍDO
+  // ==========================================================
+
+  console.error("");
+  console.error(
+    "⚠️ NO SE PUDO CONFIRMAR EL AJUSTE."
+  );
+
+  console.error(
+    error.message
+  );
+
+
+  await markLineVerifying({
+
+    lineId:
+      line.id,
+
+    message:
+      error.message ||
+      "No se pudo confirmar la respuesta de Citrus.",
+
+    response:
+      serializeError(
+        error
+      )
+
+  });
+
+
+  return {
+    status:
+      "verify"
+  };
+
+}
 
 }
 
@@ -2821,6 +2911,149 @@ export async function resumeInventoryAdjustmentWorkers() {
 
     console.error(
       error
+    );
+
+  }
+
+}
+
+
+
+// ============================================================
+// EMAIL ERROR AJUSTE CITRUS
+// ============================================================
+
+async function sendCitrusAdjustmentErrorEmail({
+  job,
+  line,
+  error
+}) {
+
+  try {
+
+    console.log("");
+    console.log(
+      "📧 ENVIANDO EMAIL DE ERROR DE AJUSTE..."
+    );
+
+
+    await sgMail.send({
+
+      to:
+        CITRUS_ALERT_EMAIL,
+
+      from: {
+        email:
+          CITRUS_ALERT_FROM,
+
+        name:
+          "Sidial WMS"
+      },
+
+      subject:
+        `Error ajustando inventario en Citrus - Job ${job.id}`,
+
+      text:
+`
+Ocurrió un error durante el ajuste de inventario en Citrus.
+
+Job ID: ${job.id}
+Inventory Session ID: ${job.inventory_session_id}
+
+Line ID: ${line.id}
+Report Line ID: ${line.report_line_id}
+
+ERP Product ID: ${line.erp_product_id}
+ERP Warehouse ID: ${line.erp_warehouse_id}
+
+Cantidad actual: ${line.citrus_qty_before}
+Cantidad deseada: ${line.desired_qty}
+
+Error:
+${error.message}
+
+Código:
+${error.code || "N/A"}
+
+El job fue detenido para evitar ajustes incorrectos.
+      `,
+
+      html:
+`
+<h2>Error ajustando inventario en Citrus</h2>
+
+<p>
+  Citrus rechazó uno de los ajustes de inventario.
+</p>
+
+<p>
+  <b>Job ID:</b>
+  ${job.id}
+</p>
+
+<p>
+  <b>Inventory Session ID:</b>
+  ${job.inventory_session_id}
+</p>
+
+<p>
+  <b>Line ID:</b>
+  ${line.id}
+</p>
+
+<p>
+  <b>ERP Product ID:</b>
+  ${line.erp_product_id}
+</p>
+
+<p>
+  <b>ERP Warehouse ID:</b>
+  ${line.erp_warehouse_id}
+</p>
+
+<p>
+  <b>Cantidad actual:</b>
+  ${line.citrus_qty_before}
+</p>
+
+<p>
+  <b>Cantidad deseada:</b>
+  ${line.desired_qty}
+</p>
+
+<p>
+  <b>Error:</b>
+  ${error.message}
+</p>
+
+<p>
+  <b>Código:</b>
+  ${error.code || "N/A"}
+</p>
+
+<p>
+  El proceso fue detenido para evitar ajustes incorrectos.
+</p>
+      `
+    });
+
+
+    console.log(
+      "✅ EMAIL DE ERROR ENVIADO."
+    );
+
+
+  } catch (emailError) {
+
+    // El fallo del correo NO debe romper
+    // el manejo del error original.
+
+    console.error(
+      "🟥 ERROR ENVIANDO EMAIL DE ERROR:"
+    );
+
+    console.error(
+      emailError
     );
 
   }

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
 import type { AdjustmentMode, InventorySession } from "./InventorySession.tsx";
+import ConfirmationModal from "../components/ConfirmationModal";
 import "../styles/InventoryMonitorOptions.css";
 
 type Props = {
@@ -16,40 +18,94 @@ export default function InventoryActiveSessionView({
   setHasActiveSession,
   setSession
 }: Props) {
+
+
   const { openModal } = useModal();
+  const [showCancelConfirmation, setShowCancelConfirmation] =
+    useState(false);
+
 
   const handleStartOrComplete = async () => {
     try {
-      const endpoint =
-        session.status === "draft"
-          ? "/inventory/session/start"
-          : "/inventory/session/complete";
 
-      const response = await apiClient.post(endpoint, {
-        id: session.id
-      });
+      let endpoint = "";
 
-      const data = response.data;
+      // DRAFT → INICIAR
+      if (session.status === "draft") {
+        endpoint = "/inventory/session/start";
+      }
 
-      if (!data.success) {
-        
+      // IN-PROGRESS → FINALIZAR
+      else if (session.status === "in-progress") {
+        endpoint = "/inventory/session/complete";
+      }
+
+      // REVIEW → VOLVER A CONTAR
+      else if (session.status === "review") {
+        endpoint = "/inventory/session/resume";
+      }
+
+      else {
         openModal({
-        title: data.title,
-        message: data.message,
-      });
+          title: "Estado no válido",
+          message:
+            `No se puede procesar una sesión con estado ${session.status}.`,
+        });
+
         return;
       }
 
-      setHasActiveSession(data.hasActiveSession);
-      setSession(data.session);
-    } catch (error) {
-      console.error("❌ Error procesando sesión:", error);
 
-    
+      const response = await apiClient.post(
+        endpoint,
+        {
+          id: session.id
+        }
+      );
+
+
+      const data = response.data;
+
+
+      if (!data.success) {
+
+        openModal({
+          title:
+            data.title || "Error",
+
+          message:
+            data.message ||
+            "No se pudo procesar la sesión de inventario.",
+        });
+
+        return;
+      }
+
+
+      setHasActiveSession(
+        data.hasActiveSession
+      );
+
+      setSession(
+        data.session
+      );
+
+    } catch (error) {
+
+      console.error(
+        "❌ Error procesando sesión:",
+        error
+      );
+
+
       openModal({
-        title: "Error de sesión",
-        message: "No se pudo procesar la sesión de inventario.",
+        title:
+          "Error de sesión",
+
+        message:
+          "No se pudo procesar la sesión de inventario.",
       });
+
     }
   };
 
@@ -62,11 +118,11 @@ export default function InventoryActiveSessionView({
       const data = response.data;
 
       if (!data.success) {
-        
+
         openModal({
-        title: data.title,
-        message: data.message,
-      });
+          title: data.title,
+          message: data.message,
+        });
         return;
       }
 
@@ -75,7 +131,7 @@ export default function InventoryActiveSessionView({
     } catch (error) {
       console.error("❌ Error cancelando sesión:", error);
 
-    
+
       openModal({
         title: "Error cancelando sesión",
         message: "No se pudo cancelar la sesión de inventario.",
@@ -108,13 +164,12 @@ export default function InventoryActiveSessionView({
           <div className="inventory-session-label">Estado:</div>
 
           <div
-            className={`inventory-session-status ${
-              session.status === "draft"
-                ? "draft"
-                : session.status === "review"
+            className={`inventory-session-status ${session.status === "draft"
+              ? "draft"
+              : session.status === "review"
                 ? "review"
                 : "in-progress"
-            }`}
+              }`}
           >
             {session.status}
           </div>
@@ -139,7 +194,9 @@ export default function InventoryActiveSessionView({
       <div className="inventory-monitor-session-down">
         <button
           className="inventory-session-close-btn"
-          onClick={handleCancelSession}
+          onClick={() =>
+            setShowCancelConfirmation(true)
+          }
         >
           Cancelar Sesión
         </button>
@@ -148,11 +205,46 @@ export default function InventoryActiveSessionView({
           className="inventory-session-action-btn"
           onClick={handleStartOrComplete}
         >
+
           {session.status === "draft"
             ? "Iniciar Sesión"
-            : "Finalizar Sesión"}
+
+            : session.status === "in-progress"
+              ? "Finalizar Sesión"
+
+              : session.status === "review"
+                ? "Reanudar Conteo"
+
+                : "Procesar Sesión"
+          }
+
         </button>
       </div>
+
+
+      <ConfirmationModal
+        isOpen={showCancelConfirmation}
+
+        title="Cancelar sesión de inventario"
+
+        message="¿Está seguro de que desea cancelar esta sesión de inventario? Esta acción cancelará la sesión actual."
+
+        confirmText="Sí, cancelar sesión"
+
+        cancelText="No, volver"
+
+        onClose={() =>
+          setShowCancelConfirmation(false)
+        }
+
+        onConfirm={async () => {
+
+          await handleCancelSession();
+
+          setShowCancelConfirmation(false);
+
+        }}
+      />
     </div>
   );
 }
