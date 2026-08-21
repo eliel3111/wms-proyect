@@ -7,7 +7,7 @@ import { log } from "console";
 const router = express.Router();
 
 // Close a reception process
-router.post("/close", CloseReception);
+router.post("/close",authMiddleware, CloseReception);
 
 
 // Search ALL open or patial purchase orders

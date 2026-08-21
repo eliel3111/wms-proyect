@@ -1,3 +1,4 @@
+//wms-backend/server.js
 console.log("🚨 SERVER NUEVO EJECUTANDO 🚨");
 import "./env.js"; // 🔥 PRIMERO
 
@@ -73,7 +74,7 @@ console.log(resultado);
   }
 }
 
-await ejecutarAjusteManual();
+//await ejecutarAjusteManual();
 
 //ALEGRA
 //🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪🟪
@@ -168,7 +169,7 @@ console.log("🎉 Todos los batches procesados");
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-//startCitrusCron();
+startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {
@@ -454,7 +455,12 @@ app.get("/__ping", (req, res) => res.send("pong"));
 // -----------------------------
 // 3. Iniciar servidor
 // -----------------------------
+// -----------------------------
+// 3. Iniciar servidor
+// -----------------------------
+
 const server = http.createServer(app);
+
 
 const io = new Server(server, {
   cors: {
@@ -462,20 +468,150 @@ const io = new Server(server, {
   },
 });
 
-// Guardar instancia global
+
+// ============================================================
+// GUARDAR INSTANCIA GLOBAL DE SOCKET.IO
+// ============================================================
+
 setIO(io);
 
+
+// ============================================================
+// SOCKET CONNECTION
+// ============================================================
+
 io.on("connection", (socket) => {
-  console.log("🟢 Cliente conectado:", socket.id);
 
-  socket.on("join_inventory_summary", () => {
-    socket.join("inventory_summary");
-    console.log(`📦 ${socket.id} joined inventory_summary`);
-  });
+  console.log(
+    "🟢 Cliente conectado:",
+    socket.id
+  );
 
-  socket.on("disconnect", () => {
-    console.log("🔴 Cliente desconectado:", socket.id);
-  });
+
+  // ==========================================================
+  // INVENTORY SUMMARY
+  // ==========================================================
+
+  socket.on(
+    "join_inventory_summary",
+    () => {
+
+      socket.join(
+        "inventory_summary"
+      );
+
+
+      console.log(
+        `📦 ${socket.id} joined inventory_summary`
+      );
+
+    }
+  );
+
+
+  // ==========================================================
+  // INVENTORY ADJUSTMENT
+  // ENTRAR AL ROOM DEL JOB
+  // ==========================================================
+
+  socket.on(
+    "inventory_adjustment:join",
+    ({ jobId }) => {
+
+      const parsedJobId =
+        Number(jobId);
+
+
+      // Validar Job ID
+      if (
+        !Number.isInteger(parsedJobId) ||
+        parsedJobId <= 0
+      ) {
+
+        console.log(
+          "⚠️ Job ID inválido recibido:",
+          jobId
+        );
+
+        return;
+
+      }
+
+
+      // Cada job tendrá su propio room
+      const room =
+        `inventory_adjustment_job:${parsedJobId}`;
+
+
+      socket.join(
+        room
+      );
+
+
+      console.log(
+        `📡 Socket ${socket.id} entró a ${room}`
+      );
+
+    }
+  );
+
+
+  // ==========================================================
+  // INVENTORY ADJUSTMENT
+  // SALIR DEL ROOM
+  // ==========================================================
+
+  socket.on(
+    "inventory_adjustment:leave",
+    ({ jobId }) => {
+
+      const parsedJobId =
+        Number(jobId);
+
+
+      if (
+        !Number.isInteger(parsedJobId) ||
+        parsedJobId <= 0
+      ) {
+
+        return;
+
+      }
+
+
+      const room =
+        `inventory_adjustment_job:${parsedJobId}`;
+
+
+      socket.leave(
+        room
+      );
+
+
+      console.log(
+        `📴 Socket ${socket.id} salió de ${room}`
+      );
+
+    }
+  );
+
+
+  // ==========================================================
+  // DISCONNECT
+  // ==========================================================
+
+  socket.on(
+    "disconnect",
+    () => {
+
+      console.log(
+        "🔴 Cliente desconectado:",
+        socket.id
+      );
+
+    }
+  );
+
 });
 
 server.listen(PORT, "0.0.0.0", () => {

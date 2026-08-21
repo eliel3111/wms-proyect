@@ -1,0 +1,234 @@
+/* ==========================================
+   MULTI VALUE SEARCH INPUT
+========================================== */
+
+.multi-search {
+  min-height: 42px;
+
+  display: flex;
+  align-items: stretch;
+
+  background: #ffffff;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+
+  overflow: hidden;
+
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+
+  box-sizing: border-box;
+}
+
+
+/* Focus general del componente */
+.multi-search:focus-within {
+  border-color: #1877f2;
+
+  box-shadow:
+    0 0 0 3px rgba(24, 119, 242, 0.12);
+}
+
+
+/* ==========================================
+   SEARCH BUTTON
+========================================== */
+
+.multi-search-button {
+  width: 46px;
+  min-width: 46px;
+
+  border: none;
+  border-right: 1px solid #e2e8f0;
+
+  background: #f8fafc;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.multi-search-button:hover {
+  background: #eef3f8;
+}
+
+
+.multi-search-button:active {
+  background: #e2e8f0;
+}
+
+
+.multi-search-button svg {
+  width: 20px;
+  height: 20px;
+
+  fill: none;
+  stroke: #334155;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+/* ==========================================
+   INPUT CONTENT
+========================================== */
+
+.multi-search-content {
+  flex: 1;
+
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 6px;
+
+  padding: 5px 8px;
+
+  box-sizing: border-box;
+
+  cursor: text;
+}
+
+
+/* ==========================================
+   CHIP / TAG
+========================================== */
+
+.multi-search-chip {
+  max-width: 180px;
+  height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+
+  background: #eef2f7;
+
+  border: 1px solid #dce3eb;
+  border-radius: 6px;
+
+  overflow: hidden;
+
+  color: #243244;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  flex-shrink: 0;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.multi-search-chip:hover {
+  background: #e7edf4;
+  border-color: #cbd5e1;
+}
+
+
+.multi-search-chip-text {
+  padding: 0 4px 0 9px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ==========================================
+   CHIP REMOVE BUTTON
+========================================== */
+
+.multi-search-chip-remove {
+  width: 28px;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+
+  background: transparent;
+
+  color: #64748b;
+
+  font-size: 20px;
+  font-weight: 400;
+
+  cursor: pointer;
+
+  line-height: 1;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.multi-search-chip-remove:hover {
+  background: #dbe2ea;
+  color: #111827;
+}
+
+
+/* ==========================================
+   ACTUAL INPUT
+========================================== */
+
+.multi-search-input {
+  flex: 1;
+
+  min-width: 90px;
+  height: 30px;
+
+  padding: 0 4px;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+
+  color: #1e293b;
+
+  font-size: 14px;
+
+  font-family: inherit;
+
+  box-sizing: border-box;
+}
+
+
+.multi-search-input::placeholder {
+  color: #94a3b8;
+}
+
+
+/* ==========================================
+   DISABLED
+========================================== */
+
+.multi-search-disabled {
+  opacity: 0.6;
+  background: #f8fafc;
+}
+
+
+.multi-search-disabled button,
+.multi-search-disabled input {
+  cursor: not-allowed;
+}

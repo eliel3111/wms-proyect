@@ -1981,39 +1981,131 @@ export async function cancelPicking(req, res) {
 
 
 // obtiene todos los picking de despacho y sus asignaciones
+// Obtiene todos los picking de despacho y sus asignaciones
 export async function getPickings(req, res) {
   try {
 
-    console.log("🟥 Endpoint GET /picking/available-users [getPickings()] iniciado");
+    console.log("🟥 Endpoint GET /picking/active-orders [getPickings()] iniciado");
+
+    /* =========================
+       1️⃣ QUERY PARAMS
+    ========================= */
+
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
+    // Frontend manda:
+    // search=1256,1300,1450
+
+    const searchValues = req.query.search
+      ? String(req.query.search)
+          .split(",")
+          .map(value => value.trim())
+          .filter(Boolean)
+      : [];
+
+    console.log("🔎 Search recibido:", req.query.search);
+    console.log("🔎 Search convertido a array:", searchValues);
+
+
     /* =========================
-       1️⃣ TOTAL REGISTROS
+       2️⃣ WHERE DINÁMICO
     ========================= */
-    const totalResult = await db.query(`
-      SELECT COUNT(*) AS total
-      FROM stock_picking
+
+    let whereClause = `
       WHERE state NOT IN ('done', 'cancel')
         AND picking_type = 'outgoing'
-    `);
+    `;
 
-    const total = Number(totalResult.rows[0].total);
+    const queryParams = [];
+
+    /*
+      Si hay valores de búsqueda:
+
+      ["1256", "1300"]
+
+      buscamos cualquier picking cuyo
+      order_name contenga 1256 O 1300
+    */
+
+    if (searchValues.length > 0) {
+
+  queryParams.push(searchValues);
+
+  whereClause += `
+    AND EXISTS (
+      SELECT 1
+      FROM unnest($1::text[]) AS search_value
+      WHERE
+        COALESCE(stock_picking.order_name, '') ILIKE '%' || search_value || '%'
+        OR
+        COALESCE(stock_picking.erp_cliente, '') ILIKE '%' || search_value || '%'
+    )
+  `;
+}
+
 
     /* =========================
-       2️⃣ OBTENER PICKINGS
+       3️⃣ TOTAL REGISTROS
     ========================= */
-    const pickingResult = await db.query(`
-      SELECT id, name, user_id, erp_cliente, order_name
-      FROM stock_picking
-      WHERE state NOT IN ('done', 'cancel')
-        AND picking_type = 'outgoing'
-      ORDER BY id DESC
-      LIMIT $1 OFFSET $2
-    `, [limit, offset]);
+
+    const totalResult = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM stock_picking
+        ${whereClause}
+      `,
+      queryParams
+    );
+
+    const total = Number(
+      totalResult.rows[0].total
+    );
+
+
+    /* =========================
+       4️⃣ OBTENER PICKINGS
+    ========================= */
+
+    const pickingParams = [...queryParams];
+
+    // Los índices dependen de si existe búsqueda o no
+    const limitIndex = pickingParams.length + 1;
+
+    pickingParams.push(limit);
+
+    const offsetIndex = pickingParams.length + 1;
+
+    pickingParams.push(offset);
+
+
+    const pickingResult = await db.query(
+      `
+        SELECT
+          id,
+          name,
+          user_id,
+          erp_cliente,
+          order_name
+        FROM stock_picking
+
+        ${whereClause}
+
+        ORDER BY id DESC
+
+        LIMIT $${limitIndex}
+        OFFSET $${offsetIndex}
+      `,
+      pickingParams
+    );
 
     const pickings = pickingResult.rows;
+
+
+    /* =========================
+       5️⃣ SIN RESULTADOS
+    ========================= */
 
     if (pickings.length === 0) {
       return res.json({
@@ -2021,119 +2113,236 @@ export async function getPickings(req, res) {
         data: [],
         total,
         page,
-        limit
+        limit,
+        search: searchValues
       });
     }
 
-    /* =========================
-       3️⃣ IDS
-    ========================= */
-    const pickingIds = pickings.map(p => p.id);
 
     /* =========================
-       4️⃣ PICKING ASSIGNMENTS
+       6️⃣ IDS
     ========================= */
-    const assignmentResult = await db.query(`
-      SELECT stock_picking_id, picker_id
-      FROM picking_assignments
-      WHERE stock_picking_id = ANY($1)
-    `, [pickingIds]);
+
+    const pickingIds = pickings.map(
+      p => p.id
+    );
+
+
+    /* =========================
+       7️⃣ PICKING ASSIGNMENTS
+    ========================= */
+
+    const assignmentResult = await db.query(
+      `
+        SELECT
+          stock_picking_id,
+          picker_id
+        FROM picking_assignments
+        WHERE stock_picking_id = ANY($1)
+      `,
+      [pickingIds]
+    );
+
 
     const assignmentMap = new Map();
 
+
     assignmentResult.rows.forEach(row => {
+
       assignmentMap.set(
         Number(row.stock_picking_id),
         Number(row.picker_id)
       );
+
     });
 
+
     /* =========================
-       5️⃣ PICKERS
+       8️⃣ PICKERS
     ========================= */
-    const pickerIds = [...new Set(assignmentResult.rows.map(r => r.picker_id))];
-    //console.log("PICKERS IDS:", pickerIds)
+
+    const pickerIds = [
+      ...new Set(
+        assignmentResult.rows.map(
+          r => r.picker_id
+        )
+      )
+    ];
+
+
     let pickerMap = new Map();
 
+
     if (pickerIds.length > 0) {
-      const pickerResult = await db.query(`
-        SELECT id, user_id, active, active_today
-        FROM pickers
-        WHERE id = ANY($1)
-      `, [pickerIds]);
+
+      const pickerResult = await db.query(
+        `
+          SELECT
+            id,
+            user_id,
+            active,
+            active_today
+          FROM pickers
+          WHERE id = ANY($1)
+        `,
+        [pickerIds]
+      );
+
 
       pickerResult.rows.forEach(row => {
-        pickerMap.set(row.id, row);
+
+        pickerMap.set(
+          row.id,
+          row
+        );
+
       });
     }
-    //console.log("PICKERS IDS:", pickerMap);
-    /* =========================
-       6️⃣ USERS
-    ========================= */
-    const userIds = [...new Set(
-      Array.from(pickerMap.values()).map(p => p.user_id)
-    )];
 
-    //console.log("USERS:", userIds);
+
+    /* =========================
+       9️⃣ USERS
+    ========================= */
+
+    const userIds = [
+      ...new Set(
+        Array.from(
+          pickerMap.values()
+        ).map(
+          p => p.user_id
+        )
+      )
+    ];
+
 
     let userMap = new Map();
 
+
     if (userIds.length > 0) {
-      const userResult = await db.query(`
-        SELECT id, full_name
-        FROM users
-        WHERE id = ANY($1)
-      `, [userIds]);
+
+      const userResult = await db.query(
+        `
+          SELECT
+            id,
+            full_name
+          FROM users
+          WHERE id = ANY($1)
+        `,
+        [userIds]
+      );
+
 
       userResult.rows.forEach(row => {
-        userMap.set(row.id, row.full_name);
+
+        userMap.set(
+          row.id,
+          row.full_name
+        );
+
       });
     }
-    //console.log("NAMES:", userMap);
+
+
     /* =========================
-       7️⃣ ENRIQUECER DATA
+       🔟 ENRIQUECER DATA
     ========================= */
+
     const result = pickings.map(p => {
-      //console.log(p.id);
-      //console.log(assignmentMap);
-      const pickerId = assignmentMap.get(Number(p.id)) || null;
-      const picker = pickerMap.get(pickerId);
+
+      const pickerId =
+        assignmentMap.get(
+          Number(p.id)
+        ) || null;
+
+
+      const picker =
+        pickerMap.get(
+          pickerId
+        );
+
 
       let pickerActive = false;
       let pickerName = null;
-      //console.log(picker);
+
+
       if (picker) {
-        //console.log("eliel");
-        pickerActive = picker.active && picker.active_today;
-        pickerName = userMap.get(picker.user_id) || null;
+
+        pickerActive =
+          picker.active &&
+          picker.active_today;
+
+        pickerName =
+          userMap.get(
+            picker.user_id
+          ) || null;
       }
+
 
       return {
         id: p.id,
+
         name: p.order_name,
-        erp_cliente: p.erp_cliente,
-        picker_id: pickerId,
-        picker_active: pickerActive,
-        picker_name: pickerName
+
+        erp_cliente:
+          p.erp_cliente,
+
+        picker_id:
+          pickerId,
+
+        picker_active:
+          pickerActive,
+
+        picker_name:
+          pickerName
       };
+
     });
-    console.log(
-      `🟨 Pickings: ${pickings.length} | Total: ${total} | Page: ${page} | Limit: ${limit} | Offset: ${offset} | Assignments: ${assignmentMap.size} | Pickers: ${pickerMap.size} | Users: ${userMap.size}`
-    );
-    console.log("🟩 Endpoint GET /picking/available-users [getPickings()] terminado");
+
+
     /* =========================
-       8️⃣ RESPUESTA
+       LOG
     ========================= */
+
+    console.log(
+      `🟨 Pickings: ${pickings.length}
+       | Total: ${total}
+       | Page: ${page}
+       | Limit: ${limit}
+       | Offset: ${offset}
+       | Search: ${JSON.stringify(searchValues)}
+       | Assignments: ${assignmentMap.size}
+       | Pickers: ${pickerMap.size}
+       | Users: ${userMap.size}`
+    );
+
+
+    console.log(
+      "🟩 Endpoint GET /picking/active-orders [getPickings()] terminado"
+    );
+
+
+    /* =========================
+       1️⃣1️⃣ RESPUESTA
+    ========================= */
+
     return res.json({
       success: true,
       data: result,
       total,
       page,
-      limit
+      limit,
+      search: searchValues
     });
 
+
   } catch (error) {
-    console.error("❌ ERROR GET PICKINGS:", error);
+
+    console.error(
+      "❌ ERROR GET PICKINGS:",
+      error
+    );
+
+
     return res.status(500).json({
       success: false,
       message: "ERROR_FETCHING_PICKINGS"

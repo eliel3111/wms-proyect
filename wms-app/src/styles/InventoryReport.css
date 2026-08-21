@@ -1,6 +1,349 @@
+
+.inventory-adjustment-progress-card {
+  width: 100%;
+  padding: 22px;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  background: #ffffff;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+
+  box-shadow:
+    0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.inventory-report-button-action.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+
+/* ========================================
+   HEADER
+======================================== */
+
+.inventory-adjustment-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+
+.inventory-adjustment-progress-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+
+.inventory-adjustment-progress-icon {
+  width: 46px;
+  height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffd814,
+      #f7ca00
+    );
+
+  border-radius: 14px;
+
+  font-size: 22px;
+}
+
+
+.inventory-adjustment-progress-title-group h3 {
+  margin: 0;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  color: #0f172a;
+}
+
+
+.inventory-adjustment-progress-title-group span {
+  display: block;
+
+  margin-top: 4px;
+
+  font-size: 13px;
+
+  color: #64748b;
+}
+
+
+/* ========================================
+   STATUS
+======================================== */
+
+.inventory-adjustment-status {
+  padding: 7px 13px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+}
+
+
+.status-pending {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+
+.status-processing {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+
+.status-waiting_citrus,
+.status-verifying {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+
+.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+
+.status-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+
+/* ========================================
+   PROGRESS
+======================================== */
+
+.inventory-adjustment-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+.inventory-adjustment-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  font-size: 14px;
+
+  color: #475569;
+}
+
+
+.inventory-adjustment-progress-labels strong {
+  font-size: 18px;
+
+  color: #0f172a;
+}
+
+
+.inventory-adjustment-progress-track {
+  width: 100%;
+  height: 14px;
+
+  overflow: hidden;
+
+  background: #edf1f5;
+
+  border-radius: 999px;
+}
+
+
+.inventory-adjustment-progress-fill {
+  height: 100%;
+
+  background:
+    linear-gradient(
+      90deg,
+      #ffd814,
+      #f7ca00
+    );
+
+  border-radius: 999px;
+
+  transition:
+    width 0.4s ease;
+}
+
+
+/* ========================================
+   STATS
+======================================== */
+
+.inventory-adjustment-progress-stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 12px;
+}
+
+
+.inventory-adjustment-stat {
+  padding: 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  background: #f8fafc;
+
+  border: 1px solid #eef2f7;
+  border-radius: 14px;
+}
+
+
+.inventory-adjustment-stat strong {
+  font-size: 22px;
+
+  color: #0f172a;
+}
+
+
+.inventory-adjustment-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+
+  color: #64748b;
+}
+
+
+/* ========================================
+   CURRENT PRODUCT
+======================================== */
+
+.inventory-adjustment-current {
+  padding: 15px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+
+  background: #fffbea;
+
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+}
+
+
+.inventory-adjustment-current-label {
+  font-size: 13px;
+  font-weight: 700;
+
+  color: #92400e;
+}
+
+
+.inventory-adjustment-current-info {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+
+  font-size: 13px;
+
+  color: #475569;
+}
+
+
+.inventory-adjustment-current-info strong {
+  color: #0f172a;
+}
+
+
+/* ========================================
+   MESSAGE
+======================================== */
+
+.inventory-adjustment-progress-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding-top: 4px;
+
+  font-size: 13px;
+
+  color: #64748b;
+}
+
+
+.inventory-adjustment-progress-message-dot {
+  width: 9px;
+  height: 9px;
+
+  flex-shrink: 0;
+
+  background: #f7ca00;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 0 4px rgba(247, 202, 0, 0.15);
+}
+
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 700px) {
+
+  .inventory-adjustment-progress-header {
+    align-items: flex-start;
+  }
+
+
+  .inventory-adjustment-progress-stats {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+
+  .inventory-adjustment-current {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+
+  .inventory-adjustment-current-info {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+  }
+
+}
+
+
+
 .inventory-report-container {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   padding: 10px;
   box-sizing: border-box;
 

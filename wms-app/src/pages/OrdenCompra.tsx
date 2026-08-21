@@ -62,6 +62,26 @@ export default function OrdenCompra() {
 
     const { openModal } = useModal();
 
+    // Código que originó el modal de productos repetidos
+    const repeatedScannedCodeRef =
+        useRef<string>("");
+
+    // ID exacto de la línea repetida elegida por el usuario
+    const selectedRepeatedProductIdRef =
+        useRef<number | null>(null);
+
+    // ===============================================
+    // PRODUCTOS REPETIDOS EN LA ORDEN
+    // ===============================================
+
+    const [repeatedProducts, setRepeatedProducts] =
+        useState<Product[]>([]);
+
+    const [isRepeatedModalOpen, setIsRepeatedModalOpen] =
+        useState(false);
+
+
+
     useEffect(() => {
         if (!id) return;
         console.log("CHECK 1")
@@ -333,14 +353,247 @@ export default function OrdenCompra() {
         setSelectedIndex(null);
         lastCodeRef.current = "";
         setIsScannerMode(true); // opcional: reactivar scanner
+        setIsModalOpen(false);
+
+        setSelectedIndex(null);
+
+        selectedIndexRef.current =
+            null;
+
+        // 🔥 Ya terminó de trabajar esta línea repetida
+        selectedRepeatedProductIdRef.current =
+            null;
+
+        repeatedScannedCodeRef.current =
+            "";
+
+        lastCodeRef.current =
+            "";
+
+        setIsScannerMode(true);
     }
 
 
+    // ======================================================
+    // CERRAR MODAL DE PRODUCTOS REPETIDOS
+    // ======================================================
+
+   function closeRepeatedProductsModal() {
+
+    console.log(
+        "❌ Cerrando modal de productos repetidos"
+    );
+
+
+    // Cerrar modal
+    setIsRepeatedModalOpen(false);
+
+
+    // Vaciar productos
+    setRepeatedProducts([]);
+
+
+    // Quitar selección
+    setSelectedIndex(null);
+
+    selectedIndexRef.current =
+        null;
+
+
+    // Ninguna línea repetida elegida
+    selectedRepeatedProductIdRef.current =
+        null;
+
+
+    // Limpiar código que abrió el modal
+    repeatedScannedCodeRef.current =
+        "";
+
+
+    // Permitir volver a escanear
+    lastCodeRef.current =
+        "";
+
+
+    // Limpiar buffer
+    scanBufferRef.current =
+        "";
+
+
+    // Reactivar scanner
+    setIsScannerMode(true);
+}
+    // ======================================================
+    // SELECCIONAR UNA LÍNEA DE PRODUCTO REPETIDO
+    // ======================================================
+
+    function selectRepeatedProduct(
+        product: Product
+    ) {
+
+        console.log("");
+        console.log("✅✅✅ ========================================");
+        console.log("✅ LÍNEA REPETIDA SELECCIONADA");
+        console.log("✅✅✅ ========================================");
+
+        console.log({
+            id: product.id,
+            sku: product.sku,
+            erp_id: product.erp_id,
+            erp_sku: product.erp_sku,
+            ordered_qty: product.ordered_qty,
+            received_qty: product.received_qty
+        });
+
+
+        // ==================================================
+        // 1️⃣ BUSCAR EL ÍNDICE REAL EN products
+        //
+        // NO buscamos por SKU.
+        // NO buscamos por barcode.
+        //
+        // Buscamos por ID porque la línea es única.
+        // ==================================================
+
+        const index =
+            productsRef.current.findIndex(
+                (currentProduct) =>
+                    currentProduct.id === product.id
+            );
+
+
+        if (index === -1) {
+
+            console.error(
+                "❌ No se encontró la línea seleccionada en products:",
+                product.id
+            );
+
+            return;
+        }
+
+
+        console.log(
+            "📍 Índice real encontrado:",
+            index
+        );
+
+
+        // ==================================================
+        // 2️⃣ GUARDAR QUÉ LÍNEA REPETIDA FUE ELEGIDA
+        // ==================================================
+
+        selectedRepeatedProductIdRef.current =
+            product.id;
+
+
+        // ==================================================
+        // 3️⃣ SELECCIONAR ESA LÍNEA
+        //
+        // Exactamente igual que tu flujo normal.
+        // ==================================================
+
+        setSelectedIndex(index);
+
+        selectedIndexRef.current =
+            index;
+
+
+        // ==================================================
+        // 4️⃣ GUARDAR EL CÓDIGO COMO ÚLTIMO SCAN
+        //
+        // Esto permite:
+        //
+        // usuario eligió Línea 2
+        // vuelve a escanear mismo barcode
+        // → incrementReceivedQty()
+        // → incrementa Línea 2
+        // ==================================================
+
+        lastCodeRef.current =
+            repeatedScannedCodeRef.current;
+
+
+        // ==================================================
+        // 5️⃣ RESETEAR ERRORES
+        // ==================================================
+
+        setQuantityError(false);
+
+
+        // ==================================================
+        // 6️⃣ CERRAR MODAL DE REPETIDOS
+        // ==================================================
+
+        setIsRepeatedModalOpen(false);
+
+        setRepeatedProducts([]);
+
+
+        // ==================================================
+        // 7️⃣ LIMPIAR BUFFER
+        // ==================================================
+
+        scanBufferRef.current = "";
+
+
+        // ==================================================
+        // 8️⃣ REACTIVAR SCANNER
+        // ==================================================
+
+        setIsScannerMode(true);
+
+
+        // ==================================================
+        // 9️⃣ ABRIR TU ScanModal NORMAL
+        // ==================================================
+
+        setIsModalOpen(true);
+    }
 
     //FUNCTION TO SEARCH PRODUCT BARCODES
     function handleScannedCode(code: string) {
-        const barcode = code.trim();
+        setIsRepeatedModalOpen(false);
+        const barcode =
+            code.trim();
+
         if (!barcode) return;
+
+
+        // ==================================================
+        // 🔥 PRIMERA VALIDACIÓN DEL SCAN
+        //
+        // Antes de ejecutar CUALQUIER lógica normal
+        // verificamos líneas repetidas.
+        // ==================================================
+
+        const hasRepeatedProducts =
+            checkRepeatedProduct(
+                barcode
+            );
+
+
+        // ==================================================
+        // SI ESTÁ REPETIDO:
+        //
+        // DETENER COMPLETAMENTE ESTE FLUJO
+        // ==================================================
+
+        if (hasRepeatedProducts) {
+
+            console.log(
+                "⛔ Flujo normal detenido por producto repetido"
+            );
+
+            return;
+        }
+
+
+        // ==================================================
+        // DESDE AQUÍ TU CÓDIGO ACTUAL
+        // ==================================================
+
+        console.log("CHECK 10")
         console.log("CHECK 10")
         console.log("RECIBIDO:", barcode);
         console.log("LAST REF:", lastCodeRef.current);
@@ -672,6 +925,273 @@ export default function OrdenCompra() {
 
 
 
+    // ======================================================
+    // VERIFICAR SI EL PRODUCTO ESCANEADO ESTÁ REPETIDO
+    // ======================================================
+
+    function checkRepeatedProduct(
+        scannedCode: string
+    ): boolean {
+
+        const code = scannedCode.trim();
+
+        if (!code) {
+            return false;
+        }
+
+        // ==================================================
+        // UNA LÍNEA REPETIDA YA FUE ELEGIDA
+        //
+        // Si el usuario vuelve a leer el mismo código,
+        // no volvemos a mostrar el modal de repetidos.
+        //
+        // Dejamos continuar handleScannedCode para que
+        // llegue a incrementReceivedQty().
+        // ==================================================
+
+        const currentSelectedProduct =
+            selectedIndexRef.current !== null
+                ? productsRef.current[
+                selectedIndexRef.current
+                ]
+                : null;
+
+
+        if (
+            selectedRepeatedProductIdRef.current !== null &&
+            currentSelectedProduct?.id ===
+            selectedRepeatedProductIdRef.current &&
+            code === lastCodeRef.current
+        ) {
+
+            console.log(
+                "✅ Línea repetida ya elegida → continuar con esa línea:",
+                {
+                    product_id:
+                        currentSelectedProduct.id,
+
+                    sku:
+                        currentSelectedProduct.sku,
+
+                    scanned_code:
+                        code
+                }
+            );
+
+            return false;
+        }
+
+        const currentProducts =
+            productsRef.current;
+
+        console.log("");
+        console.log("🔍🔍🔍 ========================================");
+        console.log("🔍 VERIFICANDO PRODUCTO REPETIDO");
+        console.log("🔍🔍🔍 ========================================");
+        console.log("📡 Código escaneado:", code);
+
+
+        // ==================================================
+        // 1️⃣ BUSCAR COINCIDENCIAS DIRECTAS
+        //
+        // Puede coincidir por:
+        // - barcode
+        // - SKU interno
+        // ==================================================
+
+        const directMatches =
+            currentProducts.filter((product) => {
+
+                const barcodeMatch =
+                    Array.isArray(product.barcodes) &&
+                    product.barcodes.includes(code);
+
+                const skuMatch =
+                    product.sku === code;
+
+                return (
+                    barcodeMatch ||
+                    skuMatch
+                );
+            });
+
+
+        console.log(
+            "📦 Coincidencias directas:",
+            directMatches.length
+        );
+
+
+        // ==================================================
+        // NO ENCONTRAMOS NADA
+        //
+        // No hacemos nada.
+        // Dejamos que handleScannedCode maneje
+        // el producto inexistente normalmente.
+        // ==================================================
+
+        if (directMatches.length === 0) {
+
+            console.log(
+                "➡️ No hay coincidencias → flujo normal"
+            );
+
+            return false;
+        }
+
+
+        // ==================================================
+        // 2️⃣ OBTENER LOS SKU RELACIONADOS
+        //
+        // Ejemplo:
+        //
+        // barcode 123456
+        // encuentra SKU-500
+        //
+        // Ahora vamos a buscar TODAS las líneas
+        // SKU-500 de la orden.
+        // ==================================================
+
+        const matchedSkus = new Set(
+            directMatches
+                .map((product) =>
+                    product.sku
+                )
+                .filter(Boolean)
+        );
+
+
+        // ==================================================
+        // 3️⃣ BUSCAR TODAS LAS LÍNEAS RELACIONADAS
+        //
+        // Una línea entra si:
+        //
+        // - tiene el mismo SKU encontrado
+        // O
+        // - tiene directamente el barcode leído
+        // ==================================================
+
+        const allMatches =
+            currentProducts.filter((product) => {
+
+                const sameSku =
+                    matchedSkus.has(
+                        product.sku
+                    );
+
+                const sameBarcode =
+                    Array.isArray(product.barcodes) &&
+                    product.barcodes.includes(code);
+
+                return (
+                    sameSku ||
+                    sameBarcode
+                );
+            });
+
+
+        // ==================================================
+        // 4️⃣ EVITAR DUPLICAR LA MISMA LÍNEA
+        //
+        // La identidad real de la línea es product.id
+        // que corresponde a purchase_order_lines.id
+        // ==================================================
+
+        const uniqueMatches =
+            Array.from(
+                new Map(
+                    allMatches.map(
+                        (product) => [
+                            product.id,
+                            product
+                        ]
+                    )
+                ).values()
+            );
+
+
+        console.log(
+            "📊 Líneas relacionadas:",
+            uniqueMatches.length
+        );
+
+        console.log(
+            "📦 Productos encontrados:",
+            uniqueMatches
+        );
+
+
+        // ==================================================
+        // 5️⃣ HAY MÁS DE UNA LÍNEA
+        //
+        // DETENER EL FLUJO COMPLETAMENTE
+        // ==================================================
+
+        if (uniqueMatches.length > 1) {
+
+            console.log("");
+            console.log("⚠️⚠️⚠️ ========================================");
+            console.log("⚠️ PRODUCTO REPETIDO");
+            console.log(
+                "⚠️ Cantidad de líneas:",
+                uniqueMatches.length
+            );
+            console.log("⚠️⚠️⚠️ ========================================");
+            console.log("");
+
+            // 🔥 Guardar el código que provocó
+            // el modal de repetidos
+            repeatedScannedCodeRef.current =
+                code;
+
+
+            // Guardar todas las líneas
+            setRepeatedProducts(
+                uniqueMatches
+            );
+
+
+            // Cerrar modal normal
+            setIsModalOpen(false);
+
+
+            // No dejar ninguna línea normal seleccionada
+            setSelectedIndex(null);
+
+            selectedIndexRef.current =
+                null;
+
+
+            // Detener scanner mientras
+            // está abierta la pantalla especial
+            //setIsScannerMode(true);
+
+
+            // Abrir modal especial
+            setIsRepeatedModalOpen(true);
+
+
+            // TRUE significa:
+            // handleScannedCode debe detenerse
+            return true;
+        }
+
+
+        // ==================================================
+        // 6️⃣ SOLO EXISTE UNA LÍNEA
+        //
+        // NO hacemos nada.
+        // Continúa handleScannedCode normalmente.
+        // ==================================================
+
+        console.log(
+            "✅ Solo una línea → flujo normal"
+        );
+
+        return false;
+    }
+
+
 
     if (loading) {
         return <LoadingScreen />;
@@ -777,6 +1297,294 @@ export default function OrdenCompra() {
                 </div>
             </div>
 
+            {/* =====================================================
+    PRODUCTOS REPETIDOS
+===================================================== */}
+
+            {isRepeatedModalOpen && (
+
+                <div className="repeated-modal-overlay">
+
+                    <div className="repeated-modal">
+
+                        {/* ================================
+                HEADER
+            ================================= */}
+
+                        <div className="repeated-modal-header">
+
+                            <div className="repeated-modal-header-left">
+
+                                <div className="repeated-warning-icon">
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                    >
+                                        <path
+                                            d="M12 3L2.8 19a2 2 0 0 0 1.74 3h14.92a2 2 0 0 0 1.74-3L12 3Z"
+                                            fill="currentColor"
+                                        />
+
+                                        <rect
+                                            x="11"
+                                            y="8"
+                                            width="2"
+                                            height="7"
+                                            rx="1"
+                                            fill="white"
+                                        />
+
+                                        <circle
+                                            cx="12"
+                                            cy="18"
+                                            r="1.2"
+                                            fill="white"
+                                        />
+                                    </svg>
+
+                                </div>
+
+
+                                <div className="repeated-modal-heading">
+
+                                    <h2>
+                                        Producto repetido
+                                    </h2>
+
+                                    <p>
+                                        Seleccione una de las líneas:
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                className="repeated-modal-x"
+                                onClick={
+                                    closeRepeatedProductsModal
+                                }
+                                aria-label="Cerrar"
+                            >
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        d="M6 6L18 18M18 6L6 18"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.2"
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
+
+                            </button>
+
+                        </div>
+
+
+                        {/* ================================
+                PRODUCTOS
+            ================================= */}
+
+                        <div className="repeated-modal-content">
+
+                            {repeatedProducts.map(
+                                (product, index) => {
+
+                                    const orderedQty =
+                                        Number(
+                                            product.ordered_qty ?? 0
+                                        );
+
+                                    const receivedQty =
+                                        Number(
+                                            product.received_qty ?? 0
+                                        );
+
+
+                                    /*
+                                     * Para que sea idéntico
+                                     * al diseño:
+                                     *
+                                     * 5 ordenado
+                                     * 2 recibido
+                                     * diferencia = -3
+                                     */
+                                    const differenceQty =
+                                        receivedQty -
+                                        orderedQty;
+
+
+                                    return (
+
+                                        <button
+    key={product.id}
+    type="button"
+    className="repeated-line-card"
+    onClick={() =>
+        selectRepeatedProduct(product)
+    }
+    aria-label={
+        `Seleccionar línea ${index + 1}, ` +
+        `${product.sku}`
+    }
+>
+
+                                            {/* LINE + SKU */}
+
+                                            <div className="repeated-line-top">
+
+                                                <span className="repeated-line-badge">
+                                                    Línea {index + 1}
+                                                </span>
+
+                                                <span className="repeated-line-sku">
+                                                    {product.sku}
+                                                </span>
+
+                                            </div>
+
+
+                                            {/* ERP INFO */}
+
+                                            <div className="repeated-line-erp">
+
+                                                {product.erp_name || "-"}
+
+                                                <span> / </span>
+
+                                                {product.erp_sku || "-"}
+
+                                                <span> / </span>
+
+                                                {product.erp_id || "-"}
+
+                                            </div>
+
+
+
+
+
+                                            <div className="repeated-line-divider" />
+
+
+                                            {/* QUANTITIES */}
+
+                                            <div className="repeated-line-quantities">
+
+
+                                                {/* ORDERED */}
+
+                                                <div className="repeated-qty-item">
+
+                                                    <span className="repeated-qty-label">
+                                                        Ordenado
+                                                    </span>
+
+                                                    <strong className="repeated-qty-value">
+                                                        {orderedQty.toFixed(2)}
+                                                    </strong>
+
+                                                </div>
+
+
+                                                <div className="repeated-qty-separator" />
+
+
+                                                {/* RECEIVED */}
+
+                                                <div className="repeated-qty-item">
+
+                                                    <span className="repeated-qty-label">
+                                                        Recibido
+                                                    </span>
+
+                                                    <strong className="repeated-qty-value">
+                                                        {receivedQty.toFixed(2)}
+                                                    </strong>
+
+                                                </div>
+
+
+                                                <div className="repeated-qty-separator" />
+
+
+                                                {/* DIFFERENCE */}
+
+                                                <div className="repeated-qty-item">
+
+                                                    <span className="repeated-qty-label">
+                                                        Diferencia
+                                                    </span>
+
+                                                    <strong
+                                                        className={`
+                                                repeated-qty-value
+                                                repeated-difference
+                                                ${differenceQty < 0
+                                                                ? "negative"
+                                                                : differenceQty > 0
+                                                                    ? "positive"
+                                                                    : "zero"
+                                                            }
+                                            `}
+                                                    >
+
+                                                        {differenceQty > 0
+                                                            ? "+"
+                                                            : ""}
+
+                                                        {differenceQty.toFixed(2)}
+
+                                                    </strong>
+
+                                                </div>
+
+                                            </div>
+
+                                        </button>
+                                    );
+                                }
+                            )}
+
+                        </div>
+
+
+                        {/* ================================
+                FOOTER
+            ================================= */}
+
+                        <div className="repeated-modal-footer">
+
+                            <button
+                                type="button"
+                                className="repeated-modal-close-button"
+                                onClick={
+                                    closeRepeatedProductsModal
+                                }
+                            >
+                                CERRAR
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            )}
+
+
+            {/* =====================================================
+    TU MODAL NORMAL
+===================================================== */}
+
             <ScanModal
                 open={isModalOpen}
                 title={selectedProduct ? "Producto encontrado" : "Producto no existe"}
@@ -786,10 +1594,10 @@ export default function OrdenCompra() {
                     <div className="modal-container">
                         <div
                             className={`modal-sku ${selectedDisplayOrdered > 0 &&
-                                    selectedDisplayReceived >=
-                                    selectedDisplayOrdered
-                                    ? "confirmed"
-                                    : ""
+                                selectedDisplayReceived >=
+                                selectedDisplayOrdered
+                                ? "confirmed"
+                                : ""
                                 }`}
                         >
                             {selectedProduct.erp_name}

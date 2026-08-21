@@ -101,133 +101,29 @@ export async function CloseReception(req, res) {
     //------------------------------------------------------
     // 5️⃣ Obtener líneas de la orden de compra
     const poLinesResult = await client.query(
-  `
-  SELECT
-    id,
-    purchase_order_id,
-    line_number,
-    erp_order_id,
-    erp_product_id,
-    erp_line_key,
-    sku,
-    description,
-    ordered_qty,
-    received_qty,
-    unit_price,
-    discount,
-    taxes,
-    product_exists,
-    deleted_erp
-  FROM purchase_order_lines
-  WHERE purchase_order_id = $1
-    AND COALESCE(
-      deleted_erp,
-      false
-    ) = false
-  ORDER BY
-    CASE
-      WHEN line_number ~ '^[0-9]+$'
-      THEN line_number::integer
-      ELSE 999999999
-    END,
-    id
-  FOR UPDATE
-  `,
-  [purchaseOrderId]
-);
+      `
+      SELECT
+        id,
+        sku,
+        ordered_qty,
+        received_qty
+      FROM purchase_order_lines
+      WHERE purchase_order_id = $1
+      `,
+      [purchaseOrderId]
+    );
 
     if (poLinesResult.rowCount === 0) {
       throw new Error("PO_LINES_NO_EXISTE");
     }
 
-    const lines = poLinesResult.rows.map(
-  (line) => ({
-    ...line,
-
-    id:
-      Number(line.id),
-
-    purchase_order_id:
-      Number(
-        line.purchase_order_id
-      ),
-
-    line_number:
-      String(
-        line.line_number
-      ),
-
-    erp_order_id:
-      line.erp_order_id !== null
-        ? Number(
-            line.erp_order_id
-          )
-        : null,
-
-    erp_product_id:
-      line.erp_product_id !== null
-        ? Number(
-            line.erp_product_id
-          )
-        : null,
-
-    erp_line_key:
-      line.erp_line_key || null,
-
-    ordered_qty:
-      Number(
-        line.ordered_qty || 0
-      ),
-
-    received_qty:
-      Number(
-        line.received_qty || 0
-      ),
-
-    unit_price:
-      Number(
-        line.unit_price || 0
-      ),
-
-    discount:
-      Number(
-        line.discount || 0
-      ),
-
-    taxes:
-      normalizeTaxes(
-        line.taxes
-      ),
-
-    product_exists:
-      line.product_exists === true,
-
-    deleted_erp:
-      line.deleted_erp === true
-  })
-);
-
-
-    const skus = [
-  ...new Set(
-    lines
-      .map((line) => line.sku)
-      .filter(Boolean)
-  )
-];
-    console.log("");
-console.log(
-  "📦 LÍNEAS ACTIVAS DE LA ORDEN:"
-);
-
-console.dir(lines, {
-  depth: null,
-  colors: true
-});
+    const lines = poLinesResult.rows;
+    const skus = lines.map(l => l.sku);
+    console.log(lines);
     //-----------------------------------------------------
     // BUSCAR LA DESCRIPCION DE LOS PRODUCTOS DE LA ORDEN
     const productsResult = await client.query(
-  `
+      `
   SELECT
     sku,
     description,
@@ -235,29 +131,20 @@ console.dir(lines, {
     erp_sku,
     erp_id
   FROM products
-  WHERE sku = ANY($1::varchar[])
+  WHERE sku = ANY($1)
   `,
-  [skus]
-);
-   const productMap = {};
+      [skus]
+    );
+    const productMap = {};
 
-for (const product of productsResult.rows) {
-  productMap[product.sku] = {
-    description:
-      product.description || null,
-
-    erp_name:
-      product.erp_name || null,
-
-    erp_sku:
-      product.erp_sku || null,
-
-    erp_id:
-      product.erp_id !== null
-        ? Number(product.erp_id)
-        : null
-  };
-}
+    for (const p of productsResult.rows) {
+      productMap[p.sku] = {
+        description: p.description,
+        erp_name: p.erp_name,
+        erp_sku: p.erp_sku,
+        erp_id: p.erp_id,
+      };
+    }
 
     //------------------------------------------------
     // 1️⃣ Traer encabezado completo
@@ -283,13 +170,13 @@ for (const product of productsResult.rows) {
 
 FROM receipts r
 
-JOIN purchase_orders po 
+JOIN purchase_orders po
   ON po.id = r.purchase_order_id
 
-JOIN users u 
+JOIN users u
   ON u.id = r.operator_id
 
-JOIN companies c 
+JOIN companies c
   ON c.id = 1
 
 WHERE r.id = $1;
@@ -337,104 +224,31 @@ WHERE r.id = $1;
     console.log("🏬 Warehouse ID:", warehouseId);
 
     // AGREGAR TODAS LAS DESCRIPCIONES PARA LAS LINES PDF
-   const enrichedLines = lines.map(
-  (line, index) => {
-    const productInfo =
-      productMap[line.sku] || {};
+    const enrichedLines = lines.map((line, index) => {
+      const difference_qty = line.received_qty - line.ordered_qty;
+      const productInfo = productMap[line.sku] || {};
 
-    const orderedQty =
-      Number(line.ordered_qty || 0);
+      return {
+        line_no: index + 1,
+        id: line.id,                // 🔢 1,2,3...
+        sku: line.sku,
+        description: productMap[line.sku] || "SIN DESCRIPCIÓN",
+        erp_name:
+          productInfo.erp_name || null,
 
-    const receivedQty =
-      Number(line.received_qty || 0);
+        erp_sku:
+          productInfo.erp_sku || null,
 
-    const differenceQty =
-      receivedQty - orderedQty;
+        erp_id:
+          productInfo.erp_id || null,
 
-    return {
-      /*
-       * Posición visual para el PDF.
-       */
-      line_no:
-        index + 1,
+        ordered_qty: line.ordered_qty,
+        ordered_qty: line.ordered_qty,
+        received_qty: line.received_qty,
+        difference_qty,                    // ➖ calculado
+      };
+    });
 
-      /*
-       * ID interno de purchase_order_lines.
-       */
-      id:
-        line.id,
-
-      purchase_order_id:
-        line.purchase_order_id,
-
-      line_number:
-        line.line_number,
-
-      /*
-       * Identificadores de Alegra.
-       */
-      erp_order_id:
-        line.erp_order_id,
-
-      erp_product_id:
-        line.erp_product_id ||
-        productInfo.erp_id ||
-        null,
-
-      erp_line_key:
-        line.erp_line_key ||
-        null,
-
-      /*
-       * Información del producto.
-       */
-      sku:
-        line.sku,
-
-      description:
-        line.description ||
-        productInfo.description ||
-        "SIN DESCRIPCIÓN",
-
-      erp_name:
-        productInfo.erp_name ||
-        null,
-
-      erp_sku:
-        productInfo.erp_sku ||
-        null,
-
-      erp_id:
-        line.erp_product_id ||
-        productInfo.erp_id ||
-        null,
-
-      /*
-       * Información comercial de Alegra.
-       */
-      unit_price:
-        Number(line.unit_price || 0),
-
-      discount:
-        Number(line.discount || 0),
-
-      taxes:
-        normalizeTaxes(line.taxes),
-
-      /*
-       * Cantidades.
-       */
-      ordered_qty:
-        orderedQty,
-
-      received_qty:
-        receivedQty,
-
-      difference_qty:
-        differenceQty
-    };
-  }
-);
     //console.log("LINES FINAL", enrichedLines);
 
     //CREAR STOCKLINES
@@ -546,93 +360,127 @@ WHERE r.id = $1;
 
 
     // ==========================================================
-// AGRUPAR CANTIDADES POR SKU SOLAMENTE PARA INVENTARIO
-// ==========================================================
+    // AGRUPAR CANTIDADES POR SKU
+    // SOLO PARA INVENTARIO Y MOVIMIENTOS
+    // ==========================================================
 
-const inventoryBySkuMap = new Map();
+    const inventoryBySkuMap = new Map();
 
-for (const line of stockLinesAdjusted) {
-  const sku = String(
-    line.sku || ""
-  ).trim();
+    for (const line of stockLinesAdjusted) {
 
-  const qty = Number(
-    line.restante || 0
-  );
+      const sku = String(
+        line.sku || ""
+      ).trim();
 
-  if (!sku) {
-    throw new Error(
-      `SKU_MISSING_FOR_PURCHASE_ORDER_LINE_${line.id}`
-    );
-  }
+      const qty = Number(
+        line.restante || 0
+      );
 
-  if (!Number.isFinite(qty)) {
-    throw new Error(
-      `INVALID_RECEIVED_QTY_FOR_SKU_${sku}`
-    );
-  }
 
-  if (qty <= 0) {
+      // ==========================================
+      // VALIDAR SKU
+      // ==========================================
+
+      if (!sku) {
+
+        throw new Error(
+          `SKU_MISSING_FOR_PURCHASE_ORDER_LINE_${line.id}`
+        );
+      }
+
+
+      // ==========================================
+      // VALIDAR CANTIDAD
+      // ==========================================
+
+      if (!Number.isFinite(qty)) {
+
+        throw new Error(
+          `INVALID_RECEIVED_QTY_FOR_SKU_${sku}`
+        );
+      }
+
+
+      // No agregar cantidades cero o negativas
+      if (qty <= 0) {
+
+        console.log(
+          `⚠️ SKU ${sku} omitido porque la cantidad es ${qty}`
+        );
+
+        continue;
+      }
+
+
+      // ==========================================
+      // CREAR SKU EN EL MAPA
+      // ==========================================
+
+      if (!inventoryBySkuMap.has(sku)) {
+
+        inventoryBySkuMap.set(
+          sku,
+          {
+            sku,
+
+            restante: 0,
+
+            // Solo auditoría / logs
+            purchase_order_line_ids: []
+          }
+        );
+      }
+
+
+      const groupedLine =
+        inventoryBySkuMap.get(sku);
+
+
+      // ==========================================
+      // SUMAR CANTIDAD
+      // ==========================================
+
+      groupedLine.restante += qty;
+
+
+      // Guardamos las líneas que formaron
+      // esta cantidad agrupada
+      groupedLine.purchase_order_line_ids.push(
+        line.id
+      );
+    }
+
+
+    // Convertir Map → Array
+    const inventoryLinesGrouped = [
+      ...inventoryBySkuMap.values()
+    ];
+
+
+    console.log("");
     console.log(
-      `⚠️ SKU ${sku} omitido porque la cantidad es ${qty}`
+      "📦 LÍNEAS INDIVIDUALES DE LA RECEPCIÓN:"
     );
 
-    continue;
-  }
-
-  /*
-   * Si todavía no existe el SKU en el mapa,
-   * creamos su registro agrupado.
-   */
-  if (!inventoryBySkuMap.has(sku)) {
-    inventoryBySkuMap.set(sku, {
-      sku,
-      restante: 0,
-
-      /*
-       * Solo para auditoría y logs.
-       */
-      purchase_order_line_ids: []
-    });
-  }
-
-  const groupedLine =
-    inventoryBySkuMap.get(sku);
-
-  /*
-   * Acumular las cantidades de todas las líneas
-   * que tengan el mismo SKU.
-   */
-  groupedLine.restante += qty;
-
-  groupedLine.purchase_order_line_ids.push(
-    line.id
-  );
-}
-
-const inventoryLinesGrouped = [
-  ...inventoryBySkuMap.values()
-];
-
-console.log("");
-console.log(
-  "📦 LÍNEAS INDIVIDUALES DE LA RECEPCIÓN:"
-);
-
-console.dir(stockLinesAdjusted, {
-  depth: null
-});
-
-console.log("");
-console.log(
-  "📦 INVENTARIO AGRUPADO POR SKU:"
-);
-
-console.dir(inventoryLinesGrouped, {
-  depth: null
-});
+    console.dir(
+      stockLinesAdjusted,
+      {
+        depth: null
+      }
+    );
 
 
+    console.log("");
+    console.log(
+      "📦 INVENTARIO AGRUPADO POR SKU:"
+    );
+
+    console.dir(
+      inventoryLinesGrouped,
+      {
+        depth: null
+      }
+    );
 
 
 
@@ -689,114 +537,268 @@ console.dir(inventoryLinesGrouped, {
 
 
 
-    //----------------------------------------------------
-    //PONER LA CANTIDAD POR UBICACION POR CADA PRODUCTO
-    console.log("====================================");
-    console.log("📦 INVENTORY UPSERT");
-    console.log("====================================");
+//----------------------------------------------------
+// ACTUALIZAR INVENTARIO POR SKU AGRUPADO
+//----------------------------------------------------
 
-    console.log("🏬 WAREHOUSE ID:", warehouseId);
-    console.log("📍 LOCATION ID:", locationId);
-    console.log("📦 STOCK LINES:", JSON.stringify(stockLinesAdjusted, null, 2));
-    if (stockLinesAdjusted.length > 0) {
+console.log(
+  "===================================="
+);
 
-      const values = [];
-      const params = [];
+console.log(
+  "📦 INVENTORY UPSERT AGRUPADO"
+);
 
-      stockLinesAdjusted.forEach((line, i) => {
+console.log(
+  "===================================="
+);
 
-        console.log(`📦 LINEA ${i + 1}`);
-        console.log({
-          sku: line.sku,
-          qty: line.restante,
-          warehouseId,
-          locationId
-        });
+console.log(
+  "🏬 WAREHOUSE ID:",
+  warehouseId
+);
+
+console.log(
+  "📍 LOCATION ID:",
+  locationId
+);
+
+console.log(
+  "📦 INVENTORY GROUPED:",
+  JSON.stringify(
+    inventoryLinesGrouped,
+    null,
+    2
+  )
+);
 
 
-        const base = i * 4; // 👈 ahora son 4 columnas
+if (
+  inventoryLinesGrouped.length > 0
+) {
 
-        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`);
+  const values = [];
 
-        params.push(
-          warehouseId,          // ✅ warehouse_id
-          locationId,           // ✅ location_id
-          line.sku,             // product_sku
-          line.restante     // qty
-        );
+  const params = [];
+
+
+  inventoryLinesGrouped.forEach(
+    (line, i) => {
+
+      console.log(
+        `📦 SKU AGRUPADO ${i + 1}`
+      );
+
+      console.log({
+        sku:
+          line.sku,
+
+        qty:
+          line.restante,
+
+        warehouseId,
+
+        locationId,
+
+        purchase_order_line_ids:
+          line.purchase_order_line_ids
       });
 
-      console.log("📋 VALUES SQL:");
-      console.log(values);
 
-      console.log("📋 PARAMS SQL:");
-      console.log(params);
+      /*
+       * Cada fila tiene:
+       *
+       * warehouse_id
+       * location_id
+       * product_sku
+       * qty_on_hand
+       */
+      const base =
+        i * 4;
 
 
+      values.push(`
+        (
+          $${base + 1},
+          $${base + 2},
+          $${base + 3},
+          $${base + 4}
+        )
+      `);
 
-      const upsertInventorySQL = `
+
+      params.push(
+
+        // warehouse_id
+        warehouseId,
+
+        // location_id
+        locationId,
+
+        // product_sku
+        line.sku,
+
+        // cantidad TOTAL de ese SKU
+        line.restante
+      );
+    }
+  );
+
+
+  console.log(
+    "📋 VALUES SQL:",
+    values
+  );
+
+  console.log(
+    "📋 PARAMS SQL:",
+    params
+  );
+
+
+  const upsertInventorySQL = `
     INSERT INTO inventory_by_location
-      (warehouse_id, location_id, product_sku, qty_on_hand)
+    (
+      warehouse_id,
+      location_id,
+      product_sku,
+      qty_on_hand
+    )
+
     VALUES
+
       ${values.join(",")}
-    ON CONFLICT (warehouse_id, location_id, product_sku)
+
+    ON CONFLICT
+    (
+      warehouse_id,
+      location_id,
+      product_sku
+    )
+
     DO UPDATE SET
-      qty_on_hand = inventory_by_location.qty_on_hand
-                  + EXCLUDED.qty_on_hand
+
+      qty_on_hand =
+        inventory_by_location.qty_on_hand
+        +
+        EXCLUDED.qty_on_hand
   `;
 
-      await client.query(upsertInventorySQL, params);
-    }
 
-    console.log("✅ UPSERT COMPLETADO");
-    console.log("📦 INVENTARIO AFECTADO:");
+  await client.query(
+    upsertInventorySQL,
+    params
+  );
+}
 
+
+console.log(
+  "✅ UPSERT INVENTARIO COMPLETADO"
+);
 
 
     //------------------------------------------------
-    // REGISTRAR MOVIMIENTOS DE INVENTARIO (HISTORIAL)
+// REGISTRAR MOVIMIENTOS DE INVENTARIO
+// AGRUPADOS POR SKU
+//------------------------------------------------
 
-    if (stockLinesAdjusted.length > 0) {
+if (
+  inventoryLinesGrouped.length > 0
+) {
 
-      const moveValues = [];
-      const moveParams = [];
+  const moveValues = [];
 
-      stockLinesAdjusted.forEach((line, i) => {
-        const base = i * 7;
+  const moveParams = [];
 
-        moveValues.push(`
-      ($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4},
-       $${base + 5}, $${base + 6}, $${base + 7})
-    `);
 
-        moveParams.push(
-          line.sku,              // ✅ product_sku
-          null,                  // from_location_id (entra al almacén)
-          locationId,            // to_location_id
-          line.restante,     // qty
-          "RECEIPT",             // movement_type
-          "RECEPTION",           // reference_type
-          receiptId.toString()   // reference_id
-        );
-      });
+  inventoryLinesGrouped.forEach(
+    (line, i) => {
 
-      const insertMovementsSQL = `
-        INSERT INTO inventory_movements
+      const base =
+        i * 7;
+
+
+      moveValues.push(`
         (
-          product_sku,
-          from_location_id,
-          to_location_id,
-          qty,
-          movement_type,
-          reference_type,
-          reference_id
+          $${base + 1},
+          $${base + 2},
+          $${base + 3},
+          $${base + 4},
+          $${base + 5},
+          $${base + 6},
+          $${base + 7}
         )
-        VALUES
-        ${moveValues.join(",")}
-      `;
+      `);
 
-      await client.query(insertMovementsSQL, moveParams);
+
+      moveParams.push(
+
+        // product_sku
+        line.sku,
+
+        // from_location_id
+        // null porque está entrando
+        null,
+
+        // to_location_id
+        locationId,
+
+        // cantidad TOTAL agrupada
+        line.restante,
+
+        // movement_type
+        "RECEIPT",
+
+        // reference_type
+        "RECEPTION",
+
+        // reference_id
+        receiptId.toString()
+      );
+
+
+      console.log(
+        "📦 MOVIMIENTO AGRUPADO:",
+        {
+          sku:
+            line.sku,
+
+          qty:
+            line.restante,
+
+          receiptId,
+
+          purchase_order_line_ids:
+            line.purchase_order_line_ids
+        }
+      );
     }
+  );
+
+
+  const insertMovementsSQL = `
+    INSERT INTO inventory_movements
+    (
+      product_sku,
+      from_location_id,
+      to_location_id,
+      qty,
+      movement_type,
+      reference_type,
+      reference_id
+    )
+
+    VALUES
+
+      ${moveValues.join(",")}
+  `;
+
+
+  await client.query(
+    insertMovementsSQL,
+    moveParams
+  );
+}
 
 
     /*//INTEGRACION 🟨🟨🟨🟨🟨🟨🟨
@@ -815,62 +817,57 @@ console.dir(inventoryLinesGrouped, {
 
 
 
-    //---------------------------------------------------
-    await client.query("COMMIT");
-
     //--------------------------------------------------
     // CREAR EL PDF CON LA INFORMACION
 
-    const html = buildReceiptHtml(
-      headerPDF,
-      receiptPdfLines
-    );
-    let pdf = null;
-
-    try {
-      pdf = await generatePdf(html);
-
-    } catch (err) {
-      console.error("⚠️ PDF falló, recepción cerrada igual:", err);
-    }
-
-
-    //--------------------------------------------------
-    //GENERAR NOMBRE DEL FILE:
-    const tenantSlug = header.company_slug;
-    // headerPDF.receiptId
-    const year = new Date().getFullYear();  // 2026
-    const uuid = randomUUID();
-
-    // 📄 nombre del archivo
-    const fileName = `receipt_${year}_${receiptId}_${uuid}.pdf`;
-
-    // 🗂 ruta en S3 (multi-tenant)
-    const s3Key = `${tenantSlug}/receipts/${fileName}`;
-
-    // ☁️ subir a S3
-    await uploadPdfToS3({
-      buffer: pdf,
-      key: s3Key,
-    });
-
-    console.log("✅ PDF subido a S3:", s3Key);
-
+    /*  const html = buildReceiptHtml(headerPDF, enrichedLines);
+      let pdf = null;
+  
+      try {
+        pdf = await generatePdf(html);
+  
+      } catch (err) {
+        console.error("⚠️ PDF falló, recepción cerrada igual:", err);
+      }
+  
+  
+      //--------------------------------------------------
+      //GENERAR NOMBRE DEL FILE:
+      const tenantSlug = header.company_slug;
+      // headerPDF.receiptId
+      const year = new Date().getFullYear();  // 2026
+      const uuid = randomUUID();
+  
+      // 📄 nombre del archivo
+      const fileName = `receipt_${year}_${receiptId}_${uuid}.pdf`;
+  
+      // 🗂 ruta en S3 (multi-tenant)
+      const s3Key = `${tenantSlug}/receipts/${fileName}`;
+  
+      // ☁️ subir a S3
+      await uploadPdfToS3({
+        buffer: pdf,
+        key: s3Key,
+      });
+  
+      console.log("✅ PDF subido a S3:", s3Key);
+  */
 
     // Guardar en la base de datos el s3Key
-    await client.query(
-      `
-      UPDATE receipts
-      SET pdf_s3_key = $1
-      WHERE id = $2
-      `,
-      [s3Key, headerPDF.receiptId]
-    );
-
+    /* await client.query(
+       `
+       UPDATE receipts
+       SET pdf_s3_key = $1
+       WHERE id = $2
+       `,
+       [s3Key, headerPDF.receiptId]
+     );
+ */
     //------------------------------------------------
     //MANDAR PDF POR CORREO
 
     // después de generar el PDF
+    /*try {
     await sendReceiptEmail({
       to: [
         "Cmerino@garlascontrol.com",
@@ -882,15 +879,98 @@ console.dir(inventoryLinesGrouped, {
       receiptCode: header.receipt_code,
       companyName: header.company_slug,
     });
+    } catch (err) {
+    
+      console.error("⚠️ EMAIL NO ENVIADO");
+      console.error(err.message);
+    
+    }*/
 
-
-    return res.status(200).json({
+    /*return res.status(200).json({
       success: true,
       message: "Recepción cerrada correctamente",
       receiptId,
       receiptCode: header.receipt_code,
       pdfKey: s3Key
+    });*/
+
+
+
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      success: true,
+      message: "Recepción cerrada correctamente",
+      receiptId,
+      receiptCode: header.receipt_code,
     });
+
+
+
+
+
+
+
+
+
+
+
+
+    // ✅ Después de responder al frontend
+    setImmediate(async () => {
+      try {
+        const html = buildReceiptHtml(
+          headerPDF,
+          receiptPdfLines
+        );
+        const pdf = await generatePdf(html);
+
+        const tenantSlug = header.company_slug;
+        const year = new Date().getFullYear();
+        const uuid = randomUUID();
+
+        const fileName = `receipt_${year}_${receiptId}_${uuid}.pdf`;
+        const s3Key = `${tenantSlug}/receipts/${fileName}`;
+
+        await uploadPdfToS3({
+          buffer: pdf,
+          key: s3Key,
+        });
+
+        await db.query(
+          `
+      UPDATE receipts
+      SET pdf_s3_key = $1
+      WHERE id = $2
+      `,
+          [s3Key, receiptId]
+        );
+
+        try {
+          await sendReceiptEmail({
+            to: [
+              "Cmerino@garlascontrol.com",
+              "Jdaniel@garlascontrol.com",
+              "Bdeaza@garlascontrol.com",
+              "eliel3111@gmail.com",
+            ],
+            pdfBuffer: pdf,
+            receiptCode: header.receipt_code,
+            companyName: header.company_slug,
+          });
+        } catch (err) {
+          console.error("⚠️ EMAIL NO ENVIADO:", err.message);
+        }
+
+        console.log("✅ PDF/S3/EMAIL background terminado");
+      } catch (err) {
+        console.error("⚠️ ERROR POST-CIERRE RECEPCIÓN:", err.message);
+      }
+    });
+
+
+
   } catch (error) {
     await client.query("ROLLBACK");
 
@@ -906,7 +986,6 @@ console.dir(inventoryLinesGrouped, {
     client.release();
   }
 };
-
 
 
 // Search all the reception information for reception
@@ -1443,6 +1522,7 @@ export async function getReceivingByPoId(req, res) {
 
 
 // Confirm than especific id exist
+// Confirm than especific id exist
 export async function confirmingIdOrder(req, res) {
   const { poNumber, invoiceNo, supplier } = req.body;
   const userId = req.user.id;
@@ -1483,7 +1563,7 @@ export async function confirmingIdOrder(req, res) {
     if (fields.length === 0) {
       const selectResult = await db.query(
         `
-        SELECT id, purchase_order_number, supplier_name, erp_order_id
+        SELECT id, purchase_order_number, supplier_name
         FROM purchase_orders
         WHERE purchase_order_number = TRIM($1)
         `,
@@ -1498,51 +1578,6 @@ export async function confirmingIdOrder(req, res) {
       }
 
       purchaseOrderId = selectResult.rows[0].id;
-      const erpPurchaseOrderId = selectResult.rows[0].erp_order_id;
-
-      // ALEGRA ONLY 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
-      /* ✅ BUSCAR LA ORDEN DIRECTAMENTE EN ALEGRA */
-      if (!erpPurchaseOrderId) {
-        return res.status(400).json({
-          success: false,
-          message: "ERP_ORDER_ID_NOT_FOUND",
-        });
-      }
-
-      const alegraPurchaseOrder =
-        await alegraPurchaseOrdersService.getPurchaseOrderById(
-          erpPurchaseOrderId
-        );
-
-      console.log("");
-      console.log("✅ ORDEN OBTENIDA DESDE ALEGRA");
-      console.dir(alegraPurchaseOrder, {
-        depth: null,
-        colors: true,
-      });
-
-
-      const clientDb = await db.connect();
-
-      try {
-        const linesSyncResult =
-          await syncAlegraPurchaseOrderLines(
-            clientDb,
-            alegraPurchaseOrder,
-            purchaseOrderId
-          );
-
-        console.log("✅ RESULTADO DE LÍNEAS:");
-
-        console.dir(linesSyncResult, {
-          depth: null,
-          colors: true,
-        });
-      } finally {
-        clientDb.release();
-      }
-
-      //🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
 
       return res.status(200).json({
         success: true,
@@ -1551,14 +1586,11 @@ export async function confirmingIdOrder(req, res) {
     }
 
     const query = `
-  UPDATE purchase_orders
-  SET ${fields.join(", ")}
-  WHERE purchase_order_number = TRIM($${idx})
-  RETURNING
-    id,
-    purchase_order_number,
-    erp_order_id
-`;
+      UPDATE purchase_orders
+      SET ${fields.join(", ")}
+      WHERE purchase_order_number = TRIM($${idx})
+      RETURNING id, purchase_order_number
+    `;
 
     values.push(poNumber);
 
@@ -1572,60 +1604,6 @@ export async function confirmingIdOrder(req, res) {
     }
 
     purchaseOrderId = result.rows[0].id;
-    const erpPurchaseOrderId =
-      result.rows[0].erp_order_id;
-    // ALEGRA ONLY 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
-    /* ✅ BUSCAR LA ORDEN DIRECTAMENTE EN ALEGRA */
-    if (!erpPurchaseOrderId) {
-      return res.status(400).json({
-        success: false,
-        message: "ERP_ORDER_ID_NOT_FOUND",
-      });
-    }
-
-    const alegraPurchaseOrder =
-      await alegraPurchaseOrdersService.getPurchaseOrderById(
-        erpPurchaseOrderId
-      );
-
-    console.log("");
-    console.log("✅ ORDEN OBTENIDA DESDE ALEGRA");
-    console.log("🌐 ERP ORDER ID:", erpPurchaseOrderId);
-
-    console.dir(alegraPurchaseOrder, {
-      depth: null,
-      colors: true,
-    });
-
-
-    const clientDb =
-      await db.connect();
-
-    try {
-      const linesSyncResult =
-        await syncAlegraPurchaseOrderLines(
-          clientDb,
-          alegraPurchaseOrder,
-          purchaseOrderId
-        );
-
-      console.log(
-        "✅ RESULTADO DE LÍNEAS:"
-      );
-
-      console.dir(
-        linesSyncResult,
-        {
-          depth: null,
-          colors: true
-        }
-      );
-    } finally {
-      clientDb.release();
-    }
-
-
-    // ALEGRA ONLY 🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨🟨
 
     /* 🔎 Buscar recepción activa */
     let receiptResult = await db.query(

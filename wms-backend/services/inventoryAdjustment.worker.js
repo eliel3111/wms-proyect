@@ -4,6 +4,10 @@ import sgMail from "@sendgrid/mail";
 import {
   buscarExistenciaActualCitrus
 } from "../integrations/citrus/citrus.erpStockSync.js";
+
+import {
+  emitInventoryAdjustmentProgress
+} from "../services/inventoryAdjustmentSocketService.js";
 // ============================================================
 // AJUSTA ESTAS RUTAS SEGÚN TU PROYECTO
 // ============================================================
@@ -2093,6 +2097,215 @@ async function verifyLine(
 
 
 // ============================================================
+// APLICAR RESULTADO FINAL DEL INVENTARIO EN EL WMS
+// ============================================================
+//
+// Se ejecuta SOLAMENTE después de que todas las líneas
+// del job terminaron correctamente en Citrus.
+//
+// job_type:
+//
+// counted
+//   → qty_on_hand = inventory_quantity
+//
+// zero
+//   → qty_on_hand = 0
+//   → qty_reserved = 0
+//
+// ============================================================
+
+async function applyCompletedInventoryJobToWms(
+  client,
+  job
+) {
+
+  console.log("");
+  console.log(
+    "📦📦📦 ========================================"
+  );
+
+  console.log(
+    "📦 ACTUALIZANDO INVENTARIO LOCAL WMS"
+  );
+
+  console.log(
+    "🆔 JOB:",
+    job.id
+  );
+
+  console.log(
+    "📌 JOB TYPE:",
+    job.job_type
+  );
+
+  console.log(
+    "📦📦📦 ========================================"
+  );
+
+
+  // ==========================================================
+  // COUNTED
+  // ==========================================================
+  //
+  // Todo lo físicamente contado:
+  //
+  // inventory_quantity
+  //      ↓
+  // qty_on_hand
+  //
+  // ==========================================================
+
+  if (
+    job.job_type ===
+    "counted"
+  ) {
+
+    const result =
+  await client.query(
+    `
+    UPDATE inventory_by_location ibl
+
+    SET
+      qty_on_hand =
+        COALESCE(
+          ibl.inventory_quantity,
+          0
+        ),
+
+      updated_at =
+        NOW()
+
+    FROM warehouses w
+
+    WHERE
+      w.id =
+        ibl.warehouse_id
+
+      AND w.erp_id =
+        $1
+
+      AND (
+        ibl.counted_by IS NOT NULL
+        OR ibl.counted_at IS NOT NULL
+      )
+
+    RETURNING
+      ibl.id,
+      ibl.product_sku,
+      ibl.location_id,
+      ibl.inventory_quantity,
+      ibl.qty_on_hand
+    `,
+    [
+      job.erp_warehouse_id
+    ]
+  );
+
+
+    console.log(
+      "✅ LÍNEAS CONTADAS ACTUALIZADAS EN WMS:",
+      result.rows.length
+    );
+
+
+    return {
+      type:
+        "counted",
+
+      updatedLines:
+        result.rows.length
+    };
+
+  }
+
+
+  // ==========================================================
+  // ZERO
+  // ==========================================================
+  //
+  // Todo lo NO contado:
+  //
+  // counted_by = NULL
+  // counted_at = NULL
+  //
+  // se considera existencia física 0.
+  //
+  // ==========================================================
+
+  if (
+    job.job_type ===
+    "zero"
+  ) {
+
+    const result =
+  await client.query(
+    `
+    UPDATE inventory_by_location ibl
+
+    SET
+      qty_on_hand =
+        0.000,
+
+      qty_reserved =
+        0.000,
+
+      updated_at =
+        NOW()
+
+    FROM warehouses w
+
+    WHERE
+      w.id =
+        ibl.warehouse_id
+
+      AND w.erp_id =
+        $1
+
+      AND ibl.counted_by IS NULL
+
+      AND ibl.counted_at IS NULL
+
+    RETURNING
+      ibl.id,
+      ibl.product_sku,
+      ibl.location_id,
+      ibl.qty_on_hand,
+      ibl.qty_reserved
+    `,
+    [
+      job.erp_warehouse_id
+    ]
+  );
+
+
+    console.log(
+      "✅ LÍNEAS NO CONTADAS PUESTAS EN CERO:",
+      result.rows.length
+    );
+
+
+    return {
+      type:
+        "zero",
+
+      updatedLines:
+        result.rows.length
+    };
+
+  }
+
+
+  throw new Error(
+    `Job type no soportado para actualizar WMS: ${job.job_type}`
+  );
+
+}
+
+// ============================================================
+// MARCAR JOB COMPLETED
+// ============================================================
+
+// ============================================================
 // MARCAR JOB COMPLETED
 // ============================================================
 
@@ -2100,53 +2313,245 @@ async function markJobCompleted(
   jobId
 ) {
 
+  // Primero sincronizamos contadores.
   await refreshJobCounters(
     jobId
   );
 
 
-  await db.query(
-    `
-    UPDATE inventory_adjustment_jobs
+  const client =
+    await db.connect();
 
-    SET
 
-      status =
-        'completed',
+  try {
 
-      current_line_id =
-        NULL,
+    await client.query(
+      "BEGIN"
+    );
 
-      error_message =
-        NULL,
 
-      completed_at =
-        NOW(),
+    // ========================================================
+    // OBTENER JOB Y BLOQUEARLO
+    // ========================================================
 
-      updated_at =
-        NOW()
+    const jobResult =
+      await client.query(
+        `
+        SELECT
+          id,
+          inventory_session_id,
+          job_type,
+          erp_warehouse_id,
+          status,
+          total_products,
+          processed_products,
+          successful_products,
+          failed_products
 
-    WHERE
-      id = $1
-    `,
-    [
+        FROM inventory_adjustment_jobs
+
+        WHERE
+          id = $1
+
+        FOR UPDATE
+        `,
+        [
+          jobId
+        ]
+      );
+
+
+    const job =
+      jobResult.rows[0];
+
+
+    if (!job) {
+
+      throw new Error(
+        `No existe el job ${jobId}.`
+      );
+
+    }
+
+
+    // ========================================================
+    // SEGURIDAD:
+    // TODAS LAS LÍNEAS DEBEN ESTAR SUCCESS
+    // ========================================================
+
+    const linesResult =
+      await client.query(
+        `
+        SELECT
+          COUNT(*)::integer AS total,
+
+          COUNT(*) FILTER (
+            WHERE status = 'success'
+          )::integer AS successful,
+
+          COUNT(*) FILTER (
+            WHERE status <> 'success'
+          )::integer AS not_success
+
+        FROM inventory_adjustment_job_lines
+
+        WHERE
+          job_id = $1
+        `,
+        [
+          jobId
+        ]
+      );
+
+
+    const counters =
+      linesResult.rows[0];
+
+
+    const total =
+      Number(
+        counters.total || 0
+      );
+
+
+    const successful =
+      Number(
+        counters.successful || 0
+      );
+
+
+    const notSuccess =
+      Number(
+        counters.not_success || 0
+      );
+
+
+    console.log(
+      "📊 VALIDANDO JOB ANTES DE ACTUALIZAR WMS:",
+      {
+        total,
+        successful,
+        notSuccess
+      }
+    );
+
+
+    if (
+      total === 0 ||
+      notSuccess > 0 ||
+      successful !== total
+    ) {
+
+      throw new Error(
+        `El job ${jobId} no puede finalizar. ` +
+        `${successful}/${total} líneas están success.`
+      );
+
+    }
+
+
+    // ========================================================
+    // ACTUALIZAR INVENTARIO LOCAL WMS
+    // ========================================================
+
+    const wmsResult =
+      await applyCompletedInventoryJobToWms(
+        client,
+        job
+      );
+
+
+    console.log(
+      "📦 RESULTADO ACTUALIZACIÓN WMS:",
+      wmsResult
+    );
+
+
+    // ========================================================
+    // MARCAR JOB COMPLETED
+    // ========================================================
+
+    await client.query(
+      `
+      UPDATE inventory_adjustment_jobs
+
+      SET
+        status =
+          'completed',
+
+        current_line_id =
+          NULL,
+
+        error_message =
+          NULL,
+
+        completed_at =
+          NOW(),
+
+        updated_at =
+          NOW()
+
+      WHERE
+        id = $1
+      `,
+      [
+        jobId
+      ]
+    );
+
+
+    await client.query(
+      "COMMIT"
+    );
+
+
+    console.log("");
+    console.log(
+      "🟩🟩🟩 ========================================"
+    );
+
+    console.log(
+      "✅ AJUSTE CITRUS COMPLETADO"
+    );
+
+    console.log(
+      "✅ INVENTARIO WMS ACTUALIZADO"
+    );
+
+    console.log(
+      `✅ JOB ${jobId} COMPLETED`
+    );
+
+    console.log(
+      "🟩🟩🟩 ========================================"
+    );
+
+
+  } catch (error) {
+
+    await client.query(
+      "ROLLBACK"
+    );
+
+
+    console.error(
+      "🟥 ERROR FINALIZANDO INVENTORY JOB:",
       jobId
-    ]
-  );
+    );
+
+    console.error(
+      error
+    );
 
 
-  console.log("");
-  console.log(
-    "🟩🟩🟩 ========================================"
-  );
+    throw error;
 
-  console.log(
-    "✅ AJUSTE DE INVENTARIO COMPLETADO"
-  );
 
-  console.log(
-    "🟩🟩🟩 ========================================"
-  );
+  } finally {
+
+    client.release();
+
+  }
 
 }
 
@@ -2448,7 +2853,16 @@ export async function startInventoryAdjustmentWorker(
       jobId
     );
 
+await emitInventoryAdjustmentProgress(
+  jobId,
+  {
+    phase:
+      "processing",
 
+    message:
+      "Iniciando ajuste de inventario..."
+  }
+);
 
     // ==========================================================
     // LOOP PRINCIPAL
@@ -2499,29 +2913,124 @@ export async function startInventoryAdjustmentWorker(
 
 
       // ========================================================
-      // OBTENER SIGUIENTE LÍNEA
-      // ========================================================
+// OBTENER SIGUIENTE LÍNEA
+// ========================================================
 
-      const line =
-        await getNextJobLine(
-          jobId
-        );
+const line =
+  await getNextJobLine(
+    jobId
+  );
 
 
+// ========================================================
+// NO QUEDAN LÍNEAS
+// ========================================================
+//
+// IMPORTANTE:
+//
+// SI getNextJobLine() DEVUELVE NULL,
+// SIGNIFICA QUE YA NO HAY NADA MÁS QUE PROCESAR.
+//
+// DEBEMOS VALIDAR ESTO ANTES DE USAR:
+// line.status
+// line.id
+// line.erp_product_id
+//
+// ========================================================
 
-      // ========================================================
-      // NO QUEDAN LÍNEAS
-      // ========================================================
+if (!line) {
 
-      if (!line) {
+  console.log("");
+  console.log(
+    "✅✅✅ ========================================"
+  );
 
-        await markJobCompleted(
-          jobId
-        );
+  console.log(
+    `✅ NO QUEDAN LÍNEAS PARA EL JOB ${jobId}`
+  );
 
-        return;
+  console.log(
+    "✅ MARCANDO JOB COMO COMPLETED"
+  );
 
-      }
+  console.log(
+    "✅✅✅ ========================================"
+  );
+
+
+  await markJobCompleted(
+    jobId
+  );
+
+
+  await emitInventoryAdjustmentProgress(
+    jobId,
+    {
+
+      phase:
+        "completed",
+
+      message:
+        "El ajuste de inventario terminó correctamente."
+
+    }
+  );
+
+
+  console.log(
+    `🏁 JOB ${jobId} COMPLETADO CORRECTAMENTE`
+  );
+
+
+  return;
+
+}
+
+
+// ========================================================
+// EMITIR PRODUCTO QUE SE VA A PROCESAR
+// ========================================================
+//
+// AQUÍ YA SABEMOS QUE line EXISTE.
+//
+// ========================================================
+
+await emitInventoryAdjustmentProgress(
+  jobId,
+  {
+
+    phase:
+      line.status,
+
+    message:
+      "Procesando producto...",
+
+    currentProduct: {
+
+      lineId:
+        Number(
+          line.id
+        ),
+
+      erpProductId:
+        Number(
+          line.erp_product_id
+        ),
+
+      desiredQty:
+        Number(
+          line.desired_qty
+        ),
+
+      citrusQtyBefore:
+        Number(
+          line.citrus_qty_before
+        )
+
+    }
+
+  }
+);
 
 
 
@@ -2581,15 +3090,44 @@ export async function startInventoryAdjustmentWorker(
         // ======================================================
 
         if (
-          result.status ===
-          "success"
-        ) {
+  result.status ===
+  "success"
+) {
 
-          // siguiente línea
+  await emitInventoryAdjustmentProgress(
+    jobId,
+    {
 
-          continue;
+      phase:
+        "product_completed",
 
-        }
+      message:
+        `Producto ${line.erp_product_id} ajustado correctamente.`,
+
+      currentProduct: {
+
+        lineId:
+          Number(line.id),
+
+        erpProductId:
+          Number(
+            line.erp_product_id
+          ),
+
+        desiredQty:
+          Number(
+            line.desired_qty
+          )
+
+      }
+
+    }
+  );
+
+
+  continue;
+
+}
 
 
 
@@ -2621,6 +3159,33 @@ export async function startInventoryAdjustmentWorker(
             result.message
           );
 
+          await emitInventoryAdjustmentProgress(
+  jobId,
+  {
+
+    phase:
+      "failed",
+
+    message:
+      result.message,
+
+    currentProduct: {
+
+      lineId:
+        Number(line.id),
+
+      erpProductId:
+        Number(
+          line.erp_product_id
+        )
+
+    }
+
+  }
+);
+
+
+
 
           return;
 
@@ -2633,18 +3198,39 @@ export async function startInventoryAdjustmentWorker(
         // ======================================================
 
         if (
-          result.status ===
-          "verify"
-        ) {
+  result.status ===
+  "verify"
+) {
 
-          // No continuar con otra línea.
-          //
-          // Primero debemos determinar
-          // qué pasó con esta.
+  await emitInventoryAdjustmentProgress(
+    jobId,
+    {
 
-          continue;
+      phase:
+        "verifying",
 
-        }
+      message:
+        "Verificando el ajuste con Citrus...",
+
+      currentProduct: {
+
+        lineId:
+          Number(line.id),
+
+        erpProductId:
+          Number(
+            line.erp_product_id
+          )
+
+      }
+
+    }
+  );
+
+
+  continue;
+
+}
 
       }
 
@@ -2690,6 +3276,31 @@ export async function startInventoryAdjustmentWorker(
         line.status ===
         "waiting_citrus"
       ) {
+
+        await emitInventoryAdjustmentProgress(
+  jobId,
+  {
+
+    phase:
+      "waiting_citrus",
+
+    message:
+      "Esperando confirmación de Citrus...",
+
+    currentProduct: {
+
+      lineId:
+        Number(line.id),
+
+      erpProductId:
+        Number(
+          line.erp_product_id
+        )
+
+    }
+
+  }
+);
 
         const result =
           await verifyLine(

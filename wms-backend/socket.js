@@ -1,3 +1,5 @@
+//wms-backend/socket.js
+
 let io;
 
 export const setIO = (newIO) => {
