@@ -902,41 +902,53 @@ export async function scanPickingCode(req, res) {
     // ==============================
     // 🔥 IGNORAR VALIDACIÓN LOCATION
     // ==============================
-    if (
-      detectedType === "location" &&
-      pickingConfig.allow_picking_without_locations === true
-    ) {
-      const warehouseResult = await client.query(`
-  SELECT id
-  FROM warehouses
-  WHERE is_default = true
-    AND status = 'ACTIVE'
-  LIMIT 1
-`);
+   // ==============================
+// 🔥 PERMITIR CUALQUIER LOCATION EXISTENTE
+// ==============================
+if (
+  detectedType === "location" &&
+  pickingConfig.allow_picking_without_locations === true
+) {
+  console.log("🔎 Confirmando que location existe:", normalizedCode);
 
-      if (warehouseResult.rowCount === 0) {
-        throw new Error("No existe warehouse por defecto");
-      }
+  const locationCheck = await client.query(
+    `
+    SELECT id, code, warehouse_id, location_type
+    FROM locations
+    WHERE UPPER(TRIM(code)) = UPPER(TRIM($1))
+    LIMIT 1
+    `,
+    [normalizedCode]
+  );
 
-      const warehouseId = warehouseResult.rows[0].id;
+  if (locationCheck.rowCount === 0) {
+    console.log("❌ Location no existe:", normalizedCode);
 
-      let defaultLocation =
-        await getOrCreateDefaultLocation(
-          client,
-          warehouseId
-        );
-      console.log("✅ Location permitida sin validar picking", defaultLocation);
+    return res.json({
+      success: false,
+      code: "LOCATION_NOT_FOUND",
+      title: "Ubicación no encontrada",
+      message: "La ubicación escaneada no existe"
+    });
+  }
 
-      return res.json({
-        success: true,
-        type: "location",
-        data: {
-          id: defaultLocation.id,
-          code: defaultLocation.code
-        },
-        skipPickingValidation: true
-      });
-    }
+  const scannedLocation = locationCheck.rows[0];
+
+  console.log(
+    "✅ Location existe y se permite sin validar contra picking:",
+    scannedLocation
+  );
+
+  return res.json({
+    success: true,
+    type: "location",
+    data: {
+      id: scannedLocation.id,
+      code: scannedLocation.code
+    },
+    skipPickingValidation: true
+  });
+}
 
 
 

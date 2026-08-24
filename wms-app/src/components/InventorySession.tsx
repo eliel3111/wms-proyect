@@ -8,17 +8,35 @@ import "../styles/InventoryMonitorOptions.css";
 export type AdjustmentMode = "final" | "immediate";
 
 export type InventorySession = {
+
   id: number;
+
   code: string;
+
   user_id: number;
+
   full_name?: string;
+
   name?: string;
-  status: "draft" | "in-progress" | "review" | "posted" | "cancelled";
+
+  status:
+    | "draft"
+    | "in-progress"
+    | "review"
+    | "posted"
+    | "cancelled";
+
   start_date: string | null;
+
   end_date?: string | null;
+
   created_at?: string;
+
   updated_at?: string;
+
+  has_completed_adjustment?: boolean;
 };
+
 
 export default function InventorySession() {
   const { openModal } = useModal();

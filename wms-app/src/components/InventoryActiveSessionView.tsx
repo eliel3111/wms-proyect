@@ -139,6 +139,113 @@ export default function InventoryActiveSessionView({
     }
   };
 
+
+  const handleFinalizeSession =
+    async () => {
+
+      try {
+
+        console.log(
+          "🟩 FINALIZANDO SESIÓN:",
+          session.id
+        );
+
+
+        const response =
+          await apiClient.post(
+            "/inventory/session/finalize",
+            {
+              id:
+                session.id
+            }
+          );
+
+
+        const data =
+          response.data;
+
+
+        console.log(
+          "📦 RESPUESTA FINALIZE:",
+          data
+        );
+
+
+        if (
+          !data.success
+        ) {
+
+          openModal({
+
+            title:
+              data.title ||
+              "No se pudo finalizar",
+
+            message:
+              data.message ||
+              "No se pudo finalizar la sesión de inventario."
+
+          });
+
+
+          return;
+
+        }
+
+
+        // ======================================================
+        // YA NO EXISTE SESIÓN ACTIVA
+        // ======================================================
+
+        setHasActiveSession(
+          false
+        );
+
+
+        setSession(
+          null
+        );
+
+
+        // ======================================================
+        // MENSAJE
+        // ======================================================
+
+        openModal({
+
+          title:
+            data.title ||
+            "Inventario finalizado",
+
+          message:
+            data.message ||
+            "La sesión de inventario fue finalizada correctamente."
+
+        });
+
+
+      } catch (error) {
+
+        console.error(
+          "❌ ERROR FINALIZANDO SESIÓN:",
+          error
+        );
+
+
+        openModal({
+
+          title:
+            "Error finalizando inventario",
+
+          message:
+            "No se pudo finalizar la sesión de inventario."
+
+        });
+
+      }
+
+    };
+
   return (
     <div className="inventory-monitor-container-option">
       <div className="inventory-monitor-session-up">
@@ -192,6 +299,7 @@ export default function InventoryActiveSessionView({
       </div>
 
       <div className="inventory-monitor-session-down">
+
         <button
           className="inventory-session-close-btn"
           onClick={() =>
@@ -210,7 +318,7 @@ export default function InventoryActiveSessionView({
             ? "Iniciar Sesión"
 
             : session.status === "in-progress"
-              ? "Finalizar Sesión"
+              ? "Revisar Sesión"
 
               : session.status === "review"
                 ? "Reanudar Conteo"
@@ -219,6 +327,18 @@ export default function InventoryActiveSessionView({
           }
 
         </button>
+
+        {session.status === "review" &&
+          session.has_completed_adjustment === true && (
+
+            <button
+              className="inventory-session-action-btn green"
+              onClick={handleFinalizeSession}
+            >
+              Finalizar la Sesión
+            </button>
+
+          )}
       </div>
 
 

@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession, finalizeInventorySession } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -78,6 +78,15 @@ router.post(
 router.post(
   "/start-adjustment-zero", authMiddleware,
   startInventoryAdjustmentZero
+);
+
+
+// Finaliza definitivamente una sesión luego del ajuste.
+// review → posted
+router.post(
+  "/session/finalize",
+  authMiddleware,
+  finalizeInventorySession
 );
 
 

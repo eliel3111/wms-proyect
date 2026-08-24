@@ -706,7 +706,7 @@ async function markLineSuccess({
       lineId,
 
       citrusMessage ||
-        "Ajuste realizado correctamente.",
+      "Ajuste realizado correctamente.",
 
       JSON.stringify(
         citrusResponse || {}
@@ -1378,7 +1378,7 @@ async function executeAdjustment({
 
 
 
-      
+
 
 
       return {
@@ -1437,137 +1437,137 @@ async function executeAdjustment({
 
   } catch (error) {
 
-  // ==========================================================
-  // CITRUS RESPONDIÓ Y RECHAZÓ EL AJUSTE
-  // ==========================================================
+    // ==========================================================
+    // CITRUS RESPONDIÓ Y RECHAZÓ EL AJUSTE
+    // ==========================================================
 
-  if (
-    error.code ===
-    "CITRUS_REJECTED"
-  ) {
+    if (
+      error.code ===
+      "CITRUS_REJECTED"
+    ) {
+
+      console.error("");
+      console.error(
+        "🟥 CITRUS RECHAZÓ EL AJUSTE."
+      );
+
+      console.error(
+        "🟥 LINE ID:",
+        line.id
+      );
+
+      console.error(
+        "🟥 ERP PRODUCT:",
+        line.erp_product_id
+      );
+
+      console.error(
+        "🟥 MESSAGE:",
+        error.message
+      );
+
+
+      // ========================================================
+      // MARCAR LÍNEA FAILED
+      // ========================================================
+
+      await markLineFailed({
+
+        lineId:
+          line.id,
+
+        citrusMessage:
+          error.message,
+
+        citrusResponse:
+          error.citrusResult || {}
+
+      });
+
+
+      // ========================================================
+      // MARCAR JOB FAILED
+      // ========================================================
+
+      await markJobFailed({
+
+        jobId:
+          job.id,
+
+        lineId:
+          line.id,
+
+        message:
+          error.message
+
+      });
+
+
+      // ========================================================
+      // ENVIAR EMAIL
+      // ========================================================
+
+      await sendCitrusAdjustmentErrorEmail({
+
+        job,
+
+        line,
+
+        error
+
+      });
+
+
+      return {
+
+        status:
+          "failed",
+
+        message:
+          error.message
+
+      };
+
+    }
+
+
+    // ==========================================================
+    // TIMEOUT / INTERNET / CITRUS CAÍDO
+    // ==========================================================
 
     console.error("");
     console.error(
-      "🟥 CITRUS RECHAZÓ EL AJUSTE."
+      "⚠️ NO SE PUDO CONFIRMAR EL AJUSTE."
     );
 
     console.error(
-      "🟥 LINE ID:",
-      line.id
-    );
-
-    console.error(
-      "🟥 ERP PRODUCT:",
-      line.erp_product_id
-    );
-
-    console.error(
-      "🟥 MESSAGE:",
       error.message
     );
 
 
-    // ========================================================
-    // MARCAR LÍNEA FAILED
-    // ========================================================
-
-    await markLineFailed({
-
-      lineId:
-        line.id,
-
-      citrusMessage:
-        error.message,
-
-      citrusResponse:
-        error.citrusResult || {}
-
-    });
-
-
-    // ========================================================
-    // MARCAR JOB FAILED
-    // ========================================================
-
-    await markJobFailed({
-
-      jobId:
-        job.id,
+    await markLineVerifying({
 
       lineId:
         line.id,
 
       message:
-        error.message
+        error.message ||
+        "No se pudo confirmar la respuesta de Citrus.",
 
-    });
-
-
-    // ========================================================
-    // ENVIAR EMAIL
-    // ========================================================
-
-    await sendCitrusAdjustmentErrorEmail({
-
-      job,
-
-      line,
-
-      error
+      response:
+        serializeError(
+          error
+        )
 
     });
 
 
     return {
-
       status:
-        "failed",
-
-      message:
-        error.message
-
+        "verify"
     };
 
   }
-
-
-  // ==========================================================
-  // TIMEOUT / INTERNET / CITRUS CAÍDO
-  // ==========================================================
-
-  console.error("");
-  console.error(
-    "⚠️ NO SE PUDO CONFIRMAR EL AJUSTE."
-  );
-
-  console.error(
-    error.message
-  );
-
-
-  await markLineVerifying({
-
-    lineId:
-      line.id,
-
-    message:
-      error.message ||
-      "No se pudo confirmar la respuesta de Citrus.",
-
-    response:
-      serializeError(
-        error
-      )
-
-  });
-
-
-  return {
-    status:
-      "verify"
-  };
-
-}
 
 }
 
@@ -1605,7 +1605,7 @@ async function verifyLine(
 
   const slowMode =
     line.status ===
-      "waiting_citrus";
+    "waiting_citrus";
 
 
 
@@ -2160,17 +2160,14 @@ async function applyCompletedInventoryJobToWms(
     "counted"
   ) {
 
-    const result =
+  const result =
   await client.query(
     `
     UPDATE inventory_by_location ibl
 
     SET
       qty_on_hand =
-        COALESCE(
-          ibl.inventory_quantity,
-          0
-        ),
+        ibl.inventory_quantity,
 
       updated_at =
         NOW()
@@ -2181,13 +2178,14 @@ async function applyCompletedInventoryJobToWms(
       w.id =
         ibl.warehouse_id
 
-      AND w.erp_id =
+      AND w.erp_warehouse_id =
         $1
 
-      AND (
-        ibl.counted_by IS NOT NULL
-        OR ibl.counted_at IS NOT NULL
-      )
+      AND ibl.counted_by IS NOT NULL
+
+      AND ibl.counted_at IS NOT NULL
+
+      AND ibl.inventory_quantity IS NOT NULL
 
     RETURNING
       ibl.id,
@@ -2258,7 +2256,7 @@ async function applyCompletedInventoryJobToWms(
       w.id =
         ibl.warehouse_id
 
-      AND w.erp_id =
+      AND w.erp_warehouse_id =
         $1
 
       AND ibl.counted_by IS NULL
@@ -2853,16 +2851,16 @@ export async function startInventoryAdjustmentWorker(
       jobId
     );
 
-await emitInventoryAdjustmentProgress(
-  jobId,
-  {
-    phase:
-      "processing",
+    await emitInventoryAdjustmentProgress(
+      jobId,
+      {
+        phase:
+          "processing",
 
-    message:
-      "Iniciando ajuste de inventario..."
-  }
-);
+        message:
+          "Iniciando ajuste de inventario..."
+      }
+    );
 
     // ==========================================================
     // LOOP PRINCIPAL
@@ -2913,124 +2911,124 @@ await emitInventoryAdjustmentProgress(
 
 
       // ========================================================
-// OBTENER SIGUIENTE LÍNEA
-// ========================================================
+      // OBTENER SIGUIENTE LÍNEA
+      // ========================================================
 
-const line =
-  await getNextJobLine(
-    jobId
-  );
-
-
-// ========================================================
-// NO QUEDAN LÍNEAS
-// ========================================================
-//
-// IMPORTANTE:
-//
-// SI getNextJobLine() DEVUELVE NULL,
-// SIGNIFICA QUE YA NO HAY NADA MÁS QUE PROCESAR.
-//
-// DEBEMOS VALIDAR ESTO ANTES DE USAR:
-// line.status
-// line.id
-// line.erp_product_id
-//
-// ========================================================
-
-if (!line) {
-
-  console.log("");
-  console.log(
-    "✅✅✅ ========================================"
-  );
-
-  console.log(
-    `✅ NO QUEDAN LÍNEAS PARA EL JOB ${jobId}`
-  );
-
-  console.log(
-    "✅ MARCANDO JOB COMO COMPLETED"
-  );
-
-  console.log(
-    "✅✅✅ ========================================"
-  );
+      const line =
+        await getNextJobLine(
+          jobId
+        );
 
 
-  await markJobCompleted(
-    jobId
-  );
+      // ========================================================
+      // NO QUEDAN LÍNEAS
+      // ========================================================
+      //
+      // IMPORTANTE:
+      //
+      // SI getNextJobLine() DEVUELVE NULL,
+      // SIGNIFICA QUE YA NO HAY NADA MÁS QUE PROCESAR.
+      //
+      // DEBEMOS VALIDAR ESTO ANTES DE USAR:
+      // line.status
+      // line.id
+      // line.erp_product_id
+      //
+      // ========================================================
+
+      if (!line) {
+
+        console.log("");
+        console.log(
+          "✅✅✅ ========================================"
+        );
+
+        console.log(
+          `✅ NO QUEDAN LÍNEAS PARA EL JOB ${jobId}`
+        );
+
+        console.log(
+          "✅ MARCANDO JOB COMO COMPLETED"
+        );
+
+        console.log(
+          "✅✅✅ ========================================"
+        );
 
 
-  await emitInventoryAdjustmentProgress(
-    jobId,
-    {
-
-      phase:
-        "completed",
-
-      message:
-        "El ajuste de inventario terminó correctamente."
-
-    }
-  );
+        await markJobCompleted(
+          jobId
+        );
 
 
-  console.log(
-    `🏁 JOB ${jobId} COMPLETADO CORRECTAMENTE`
-  );
+        await emitInventoryAdjustmentProgress(
+          jobId,
+          {
+
+            phase:
+              "completed",
+
+            message:
+              "El ajuste de inventario terminó correctamente."
+
+          }
+        );
 
 
-  return;
+        console.log(
+          `🏁 JOB ${jobId} COMPLETADO CORRECTAMENTE`
+        );
 
-}
+
+        return;
+
+      }
 
 
-// ========================================================
-// EMITIR PRODUCTO QUE SE VA A PROCESAR
-// ========================================================
-//
-// AQUÍ YA SABEMOS QUE line EXISTE.
-//
-// ========================================================
+      // ========================================================
+      // EMITIR PRODUCTO QUE SE VA A PROCESAR
+      // ========================================================
+      //
+      // AQUÍ YA SABEMOS QUE line EXISTE.
+      //
+      // ========================================================
 
-await emitInventoryAdjustmentProgress(
-  jobId,
-  {
+      await emitInventoryAdjustmentProgress(
+        jobId,
+        {
 
-    phase:
-      line.status,
+          phase:
+            line.status,
 
-    message:
-      "Procesando producto...",
+          message:
+            "Procesando producto...",
 
-    currentProduct: {
+          currentProduct: {
 
-      lineId:
-        Number(
-          line.id
-        ),
+            lineId:
+              Number(
+                line.id
+              ),
 
-      erpProductId:
-        Number(
-          line.erp_product_id
-        ),
+            erpProductId:
+              Number(
+                line.erp_product_id
+              ),
 
-      desiredQty:
-        Number(
-          line.desired_qty
-        ),
+            desiredQty:
+              Number(
+                line.desired_qty
+              ),
 
-      citrusQtyBefore:
-        Number(
-          line.citrus_qty_before
-        )
+            citrusQtyBefore:
+              Number(
+                line.citrus_qty_before
+              )
 
-    }
+          }
 
-  }
-);
+        }
+      );
 
 
 
@@ -3090,44 +3088,44 @@ await emitInventoryAdjustmentProgress(
         // ======================================================
 
         if (
-  result.status ===
-  "success"
-) {
+          result.status ===
+          "success"
+        ) {
 
-  await emitInventoryAdjustmentProgress(
-    jobId,
-    {
+          await emitInventoryAdjustmentProgress(
+            jobId,
+            {
 
-      phase:
-        "product_completed",
+              phase:
+                "product_completed",
 
-      message:
-        `Producto ${line.erp_product_id} ajustado correctamente.`,
+              message:
+                `Producto ${line.erp_product_id} ajustado correctamente.`,
 
-      currentProduct: {
+              currentProduct: {
 
-        lineId:
-          Number(line.id),
+                lineId:
+                  Number(line.id),
 
-        erpProductId:
-          Number(
-            line.erp_product_id
-          ),
+                erpProductId:
+                  Number(
+                    line.erp_product_id
+                  ),
 
-        desiredQty:
-          Number(
-            line.desired_qty
-          )
+                desiredQty:
+                  Number(
+                    line.desired_qty
+                  )
 
-      }
+              }
 
-    }
-  );
+            }
+          );
 
 
-  continue;
+          continue;
 
-}
+        }
 
 
 
@@ -3160,29 +3158,29 @@ await emitInventoryAdjustmentProgress(
           );
 
           await emitInventoryAdjustmentProgress(
-  jobId,
-  {
+            jobId,
+            {
 
-    phase:
-      "failed",
+              phase:
+                "failed",
 
-    message:
-      result.message,
+              message:
+                result.message,
 
-    currentProduct: {
+              currentProduct: {
 
-      lineId:
-        Number(line.id),
+                lineId:
+                  Number(line.id),
 
-      erpProductId:
-        Number(
-          line.erp_product_id
-        )
+                erpProductId:
+                  Number(
+                    line.erp_product_id
+                  )
 
-    }
+              }
 
-  }
-);
+            }
+          );
 
 
 
@@ -3198,39 +3196,39 @@ await emitInventoryAdjustmentProgress(
         // ======================================================
 
         if (
-  result.status ===
-  "verify"
-) {
+          result.status ===
+          "verify"
+        ) {
 
-  await emitInventoryAdjustmentProgress(
-    jobId,
-    {
+          await emitInventoryAdjustmentProgress(
+            jobId,
+            {
 
-      phase:
-        "verifying",
+              phase:
+                "verifying",
 
-      message:
-        "Verificando el ajuste con Citrus...",
+              message:
+                "Verificando el ajuste con Citrus...",
 
-      currentProduct: {
+              currentProduct: {
 
-        lineId:
-          Number(line.id),
+                lineId:
+                  Number(line.id),
 
-        erpProductId:
-          Number(
-            line.erp_product_id
-          )
+                erpProductId:
+                  Number(
+                    line.erp_product_id
+                  )
 
-      }
+              }
 
-    }
-  );
+            }
+          );
 
 
-  continue;
+          continue;
 
-}
+        }
 
       }
 
@@ -3278,29 +3276,29 @@ await emitInventoryAdjustmentProgress(
       ) {
 
         await emitInventoryAdjustmentProgress(
-  jobId,
-  {
+          jobId,
+          {
 
-    phase:
-      "waiting_citrus",
+            phase:
+              "waiting_citrus",
 
-    message:
-      "Esperando confirmación de Citrus...",
+            message:
+              "Esperando confirmación de Citrus...",
 
-    currentProduct: {
+            currentProduct: {
 
-      lineId:
-        Number(line.id),
+              lineId:
+                Number(line.id),
 
-      erpProductId:
-        Number(
-          line.erp_product_id
-        )
+              erpProductId:
+                Number(
+                  line.erp_product_id
+                )
 
-    }
+            }
 
-  }
-);
+          }
+        );
 
         const result =
           await verifyLine(
@@ -3565,7 +3563,7 @@ async function sendCitrusAdjustmentErrorEmail({
         `Error ajustando inventario en Citrus - Job ${job.id}`,
 
       text:
-`
+        `
 Ocurrió un error durante el ajuste de inventario en Citrus.
 
 Job ID: ${job.id}
@@ -3590,7 +3588,7 @@ El job fue detenido para evitar ajustes incorrectos.
       `,
 
       html:
-`
+        `
 <h2>Error ajustando inventario en Citrus</h2>
 
 <p>

@@ -769,6 +769,44 @@ export default function InventoryReport() {
 
             }
 
+            // =====================================================
+            // NO FUE NECESARIO CREAR JOB EN CITRUS
+            // =====================================================
+
+            if (
+                data.data?.citrusAdjustmentRequired === false
+            ) {
+
+                console.log(
+                    "✅ NO SE REQUIRIÓ JOB ZERO EN CITRUS:",
+                    data.data
+                );
+
+
+                setZeroAdjustmentJobId(
+                    null
+                );
+
+
+                setZeroAdjustmentProgress(
+                    null
+                );
+
+
+                openModal({
+                    title:
+                        data.title ||
+                        "Inventario actualizado",
+
+                    message:
+                        data.message ||
+                        "No había productos pendientes para ajustar a cero en Citrus."
+                });
+
+
+                return;
+            }
+
 
             // =====================================================
             // OBTENER JOB
@@ -1478,84 +1516,84 @@ export default function InventoryReport() {
             {/* 3. BUTTON */}
             <div className="inventory-report-button">
                 <div
-    className={`
+                    className={`
         inventory-report-button-action
         zero-adjustment
         ${zeroAdjustmentStarting ? "disabled" : ""}
     `}
 
-    onClick={() => {
+                    onClick={() => {
 
-        if (zeroAdjustmentStarting) {
-            return;
-        }
+                        if (zeroAdjustmentStarting) {
+                            return;
+                        }
 
-        openConfirmation({
-            title:
-                "Aplicar inventario en cero",
+                        openConfirmation({
+                            title:
+                                "Aplicar inventario en cero",
 
-            message:
-                "¿Está seguro de que desea llevar a cero (0.000) en Citrus todos los productos que no fueron contados durante el inventario físico?",
+                            message:
+                                "¿Está seguro de que desea llevar a cero (0.000) en Citrus todos los productos que no fueron contados durante el inventario físico?",
 
-            confirmText:
-                "Aplicar en CERO",
+                            confirmText:
+                                "Aplicar en CERO",
 
-            action:
-                handleApplyInventoryZero
-        });
+                            action:
+                                handleApplyInventoryZero
+                        });
 
-    }}
->
-    <CheckSquare size={24} />
+                    }}
+                >
+                    <CheckSquare size={24} />
 
-    <span>
-        {
-            zeroAdjustmentStarting
-                ? "Iniciando ajuste a CERO..."
-                : "Aplicar Inventario en CERO (0.000)"
-        }
-    </span>
-</div>
-                
-                
+                    <span>
+                        {
+                            zeroAdjustmentStarting
+                                ? "Iniciando ajuste a CERO..."
+                                : "Aplicar Inventario en CERO (0.000)"
+                        }
+                    </span>
+                </div>
+
+
                 <div
-    className={`
+                    className={`
         inventory-report-button-action
         ${adjustmentStarting ? "disabled" : ""}
     `}
 
-    onClick={() => {
+                    onClick={() => {
 
-        if (adjustmentStarting) {
-            return;
-        }
+                        if (adjustmentStarting) {
+                            return;
+                        }
 
-        openConfirmation({
-            title:
-                "Aplicar inventario contado",
+                        openConfirmation({
+                            title:
+                                "Aplicar inventario contado",
 
-            message:
-                "¿Está seguro de que desea aplicar en Citrus las cantidades físicas contadas durante este inventario?",
+                            message:
+                                "¿Está seguro de que desea aplicar en Citrus las cantidades físicas contadas durante este inventario?",
 
-            confirmText:
-                "Aplicar CONTADO",
+                            confirmText:
+                                "Aplicar CONTADO",
 
-            action:
-                handleApplyInventory
-        });
+                            action:
+                                handleApplyInventory
+                        });
 
-    }}
->
-    <CheckSquare size={24} />
+                    }}
+                >
+                    <CheckSquare size={24} />
 
-    <span>
-        {
-            adjustmentStarting
-                ? "Iniciando ajuste..."
-                : "Aplicar Inventario CONTADO"
-        }
-    </span>
-</div>
+                    <span>
+                        {
+                            adjustmentStarting
+                                ? "Iniciando ajuste..."
+                                : "Aplicar Inventario CONTADO"
+                        }
+                    </span>
+                </div>
             </div>
 
 

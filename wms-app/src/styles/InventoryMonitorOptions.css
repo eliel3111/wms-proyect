@@ -175,6 +175,15 @@
   background: #1d4ed8;
 }
 
+.green {
+  background-color: #16a34a;
+  color: #ffffff;
+}
+
+.green:hover {
+  background-color: #15803d;
+  color: #ffffff;
+}
 /* ==========================
    MOBILE
 ========================== */

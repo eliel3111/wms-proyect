@@ -293,25 +293,42 @@ export async function getInventorySessionStatusService() {
       adjustmentMode
     );
 
-    const sessionResult = await client.query(
-      `
-      SELECT
-        s.id,
-        s.code,
-        s.user_id,
-        u.full_name,
-        s.status,
-        s.start_date,
-        s.end_date,
-        s.created_at,
-        s.updated_at
-      FROM inventory_sessions s
-      INNER JOIN users u ON u.id = s.user_id
-      WHERE s.status IN ('draft', 'in-progress', 'review')
-      ORDER BY s.created_at DESC
-      LIMIT 1
-      `
-    );
+   const sessionResult = await client.query(
+  `
+  SELECT
+    s.id,
+    s.code,
+    s.user_id,
+    u.full_name,
+    s.status,
+    s.start_date,
+    s.end_date,
+    s.created_at,
+    s.updated_at,
+
+    EXISTS (
+      SELECT 1
+      FROM inventory_adjustment_jobs iaj
+      WHERE iaj.inventory_session_id = s.id
+        AND iaj.status = 'completed'
+    ) AS has_completed_adjustment
+
+  FROM inventory_sessions s
+
+  INNER JOIN users u
+    ON u.id = s.user_id
+
+  WHERE s.status IN (
+    'draft',
+    'in-progress',
+    'review'
+  )
+
+  ORDER BY s.created_at DESC
+
+  LIMIT 1
+  `
+);
 
     if (sessionResult.rowCount > 0) {
       return {
