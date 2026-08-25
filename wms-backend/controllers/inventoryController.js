@@ -5515,8 +5515,8 @@ export async function getInventoryFinalReport(req, res) {
           LIMIT 1
         ) p ON true
         WHERE eis.session_inventory_id = $1
-          AND COALESCE(eis.erp_stock, 0) > 0
-          AND NOT (eis.item_id = ANY($2::bigint[]))
+  AND COALESCE(eis.erp_stock, 0) <> 0
+  AND NOT (eis.item_id = ANY($2::bigint[]))
       )
       INSERT INTO inventory_erp_report (
         erp_id,

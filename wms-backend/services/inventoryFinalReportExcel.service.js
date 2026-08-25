@@ -166,10 +166,7 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
       Number(item.total_inventory_qty ?? 0);
 
     
-    const difference =
-  erpStock < 0
-    ? erpStock + physicalQty
-    : physicalQty - erpStock;
+    const difference = physicalQty - erpStock;
 
 
     const unitCost =

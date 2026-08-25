@@ -7,12 +7,95 @@ export async function emitInventorySummary(client) {
   console.log("🚀 Inicio resumen");
 
 
-  // ==============================
-  // PRODUCTOS ÚNICOS POR USUARIO
-  // ==============================
+  // ============================================================
+  // 1. OBTENER SESIÓN ACTIVA Y SU WAREHOUSE
+  // ============================================================
+
+  const sessionResult =
+    await client.query(`
+      SELECT
+        id,
+        code,
+        status,
+        erp_warehouse_id
+
+      FROM inventory_sessions
+
+      WHERE status IN (
+        'draft',
+        'in-progress',
+        'review'
+      )
+
+      ORDER BY
+        updated_at DESC,
+        id DESC
+
+      LIMIT 1
+    `);
+
+
+  // ============================================================
+  // SI NO EXISTE SESIÓN ACTIVA
+  // ============================================================
+
+  if (sessionResult.rows.length === 0) {
+
+    const response = {
+      success: true,
+      summary: [],
+      total: 0,
+      totalProducts: 0,
+      totalPercent: 0
+    };
+
+
+    getIO()
+      .to("inventory_summary")
+      .emit(
+        "inventory_summary",
+        response
+      );
+
+
+    return response;
+  }
+
+
+  const session =
+    sessionResult.rows[0];
+
+
+  const sessionId =
+    Number(
+      session.id
+    );
+
+
+  const erpWarehouseId =
+    Number(
+      session.erp_warehouse_id
+    );
+
+
+  console.log(
+    "📦 SESSION SUMMARY:",
+    {
+      sessionId,
+      code: session.code,
+      erpWarehouseId
+    }
+  );
+
+
+  // ============================================================
+  // 2. PRODUCTOS ÚNICOS POR USUARIO
+  // SOLO DEL WAREHOUSE DE LA SESIÓN
+  // ============================================================
 
   const summaryResult =
-    await client.query(`
+    await client.query(
+      `
       SELECT
         ibl.counted_by AS user_id,
         u.full_name,
@@ -23,12 +106,18 @@ export async function emitInventorySummary(client) {
 
       FROM inventory_by_location ibl
 
+      JOIN warehouses w
+        ON w.id = ibl.warehouse_id
+
       JOIN users u
         ON u.id = ibl.counted_by
 
       WHERE
-        ibl.inventory_quantity > 0
+        w.erp_warehouse_id = $1
+
         AND ibl.counted_by IS NOT NULL
+
+        AND ibl.counted_at IS NOT NULL
 
       GROUP BY
         ibl.counted_by,
@@ -36,26 +125,42 @@ export async function emitInventorySummary(client) {
 
       ORDER BY
         total_lines_counted DESC
-    `);
+      `,
+      [
+        erpWarehouseId
+      ]
+    );
 
 
-  // ==============================
-  // TOTAL PRODUCTOS ÚNICOS CONTADOS
-  // ==============================
+  // ============================================================
+  // 3. TOTAL PRODUCTOS ÚNICOS CONTADOS
+  // SOLO DEL WAREHOUSE
+  // ============================================================
 
   const countedProductsResult =
-    await client.query(`
+    await client.query(
+      `
       SELECT
         COUNT(
-          DISTINCT product_sku
+          DISTINCT ibl.product_sku
         )::int AS total_counted
 
-      FROM inventory_by_location
+      FROM inventory_by_location ibl
+
+      JOIN warehouses w
+        ON w.id = ibl.warehouse_id
 
       WHERE
-        inventory_quantity > 0
-        AND counted_by IS NOT NULL
-    `);
+        w.erp_warehouse_id = $1
+
+        AND ibl.counted_by IS NOT NULL
+
+        AND ibl.counted_at IS NOT NULL
+      `,
+      [
+        erpWarehouseId
+      ]
+    );
 
 
   const total =
@@ -72,37 +177,26 @@ export async function emitInventorySummary(client) {
   );
 
 
-  // ==============================
-  // TOTAL DE PRODUCTOS A CONTAR
-  // ==============================
+  // ============================================================
+  // 4. TOTAL PRODUCTOS A CONTAR
+  // SNAPSHOT DE ESA SESIÓN ESPECÍFICA
+  // ============================================================
 
   const totalProductsResult =
-    await client.query(`
+    await client.query(
+      `
       SELECT
         COUNT(*)::int AS total_products
 
       FROM erp_inventory_snapshot
 
-      WHERE session_inventory_id = (
-
-        SELECT id
-
-        FROM inventory_sessions
-
-        WHERE status IN (
-          'draft',
-          'in-progress',
-          'review'
-        )
-
-        ORDER BY
-          updated_at DESC,
-          id DESC
-
-        LIMIT 1
-
-      )
-    `);
+      WHERE
+        session_inventory_id = $1
+      `,
+      [
+        sessionId
+      ]
+    );
 
 
   const totalProducts =
@@ -119,9 +213,9 @@ export async function emitInventorySummary(client) {
   );
 
 
-  // ==============================
-  // SI NO HAY CONTEOS
-  // ==============================
+  // ============================================================
+  // 5. SI NO HAY CONTEOS
+  // ============================================================
 
   if (
     summaryResult.rows.length === 0
@@ -148,9 +242,9 @@ export async function emitInventorySummary(client) {
   }
 
 
-  // ==============================
-  // PARTICIPACIÓN TOTAL USUARIOS
-  // ==============================
+  // ============================================================
+  // 6. PARTICIPACIÓN TOTAL USUARIOS
+  // ============================================================
 
   const totalUserParticipation =
     summaryResult.rows.reduce(
@@ -163,9 +257,9 @@ export async function emitInventorySummary(client) {
     );
 
 
-  // ==============================
-  // RESUMEN POR USUARIO
-  // ==============================
+  // ============================================================
+  // 7. RESUMEN POR USUARIO
+  // ============================================================
 
   const summary =
     summaryResult.rows.map(
@@ -179,7 +273,6 @@ export async function emitInventorySummary(client) {
         full_name:
           row.full_name,
 
-        // El frontend sigue esperando este nombre
         total_lines_counted:
           Number(
             row.total_lines_counted
@@ -204,9 +297,9 @@ export async function emitInventorySummary(client) {
     );
 
 
-  // ==============================
-  // PORCENTAJE GENERAL
-  // ==============================
+  // ============================================================
+  // 8. PORCENTAJE GENERAL
+  // ============================================================
 
   const totalPercent =
     totalProducts > 0
@@ -231,9 +324,9 @@ export async function emitInventorySummary(client) {
   };
 
 
-  // ==============================
-  // WEBSOCKET
-  // ==============================
+  // ============================================================
+  // 9. WEBSOCKET
+  // ============================================================
 
   getIO()
     .to("inventory_summary")
