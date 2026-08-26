@@ -75,7 +75,7 @@ export default function PickingRoute() {
     const qtyRef = useRef<string>("");
 
     //State de error de location rojo
-    const [locationError, setLocationError] = useState(false);
+   // const [locationError, setLocationError] = useState(false);
 
     function logScannerState(label: string, scanned?: string) {
         console.log(`🧪 ${label}`, {
@@ -277,12 +277,12 @@ closeModal();
 
                     // 🟢 ES UBICACIÓN
                     if (data.success && data.type === "location") {
-                        console.log("📍 UBICACIÓN DETECTADA:", data.data);
+                        console.log("✅ UBICACIÓN VALIDADA POR BACKEND:", data.data);
                         console.log("🟨 Current Location: ", currentLineRef.current?.code);
 
                         handleScanLocation(data.data);
 
-                        if (data.data.code !== currentLineRef.current?.code) {
+                      /*  if (data.data.code !== currentLineRef.current?.code) {
                             setLocationError(true);
 
                             setTimeout(() => {
@@ -290,7 +290,7 @@ closeModal();
                             }, 2000);
 
                             return;
-                        }
+                        }*/
                     }
 
                     // 🔵 ES PRODUCTO
@@ -836,16 +836,13 @@ closeModal();
                     <div className="transfer-card">
 
                         {/* ORIGEN */}
-                        <section
-                            className={`pick-user-location-card
-        ${locationError
-                                    ? "pick-user-location-error"
-                                    : !fromLocation || fromLocation.code !== currentLine?.code
-                                        ? "pick-user-location-empty"
-                                        : ""
-                                }
-    `}
-                        >
+                       <section
+    className={`pick-user-location-card ${
+        !fromLocation
+            ? "pick-user-location-empty"
+            : ""
+    }`}
+>
                             <span className="pick-user-location-label">
                                 Lea la ubicación:
                             </span>

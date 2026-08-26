@@ -5085,8 +5085,8 @@ export async function completeInventorySession(req, res) {
     console.log("✅ COMPLETANDO SESIÓN");
 
     const { id } = req.body;
-    const userId = 1;
-    //const userId = Number(req.user?.id);
+    //const userId = 1;
+    const userId = Number(req.user?.id);
 
     console.log("📥 SESSION ID:", id);
     console.log("👤 USER ID:", userId);
