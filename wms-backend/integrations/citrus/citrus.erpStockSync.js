@@ -30,6 +30,7 @@ export function buildBuscarExistenciaAlmacenXML({
 }
 
 
+
 export async function buscarTodasLasExistenciasAlmacen(client, sessionId) {
 
    if (!sessionId) {
@@ -392,8 +393,6 @@ export async function saveERPInventorySnapshotService(
     };
   }
 }
-
-
 
 
 

@@ -43,7 +43,14 @@ import {
 //import "./integrations/alegra/purchaseOrders.cron.js";
 
 
+//ADM CLOUD
+import axios from "axios";
+import admcloudClient from "./integrations/admcloud/admcloudClient.js";
+import {getAdmCloudProducts} from "./integrations/admcloud/admcloud.items.js";
 
+import {
+  syncAdmCloudProducts
+} from "./integrations/admcloud/admcloud.products.processor.js";
 
 const app = express();
 
@@ -73,6 +80,69 @@ console.log(resultado);
     console.error(error);
   }
 }
+
+
+app.get(
+  "/test-admcloud-products",
+  async (req, res) => {
+
+    try {
+
+      // ====================================
+      // 1. OBTENER TODOS DESDE ADM CLOUD
+      // ====================================
+
+      const products =
+        await getAdmCloudProducts();
+
+
+      // ====================================
+      // 2. SINCRONIZAR CON POSTGRES
+      // ====================================
+
+      const result =
+        await syncAdmCloudProducts(
+          products
+        );
+
+
+      return res.json({
+        success: true,
+
+        total:
+          products.length,
+
+        synchronization:
+          result
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "❌ Error sincronizando Adm Cloud:",
+        error
+      );
+
+
+      return res
+        .status(
+          error.status || 500
+        )
+        .json({
+
+          success: false,
+
+          message:
+            error.message ||
+            "Error sincronizando productos"
+        });
+    }
+  }
+);
+
+
+
 
 //await ejecutarAjusteManual();
 
@@ -169,7 +239,7 @@ console.log("🎉 Todos los batches procesados");
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-startCitrusCron();
+//startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {

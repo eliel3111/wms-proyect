@@ -2096,6 +2096,17 @@ async function verifyLine(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 // ============================================================
 // APLICAR RESULTADO FINAL DEL INVENTARIO EN EL WMS
 // ============================================================
@@ -2103,12 +2114,13 @@ async function verifyLine(
 // Se ejecuta SOLAMENTE después de que todas las líneas
 // del job terminaron correctamente en Citrus.
 //
-// job_type:
-//
-// counted
+// COUNTED:
 //   → qty_on_hand = inventory_quantity
+//   → todos los productos físicamente contados
 //
-// zero
+// ZERO:
+//   → SOLO líneas NO CONTADAS
+//   → SOLO del warehouse ERP de este job
 //   → qty_on_hand = 0
 //   → qty_reserved = 0
 //
@@ -2139,6 +2151,11 @@ async function applyCompletedInventoryJobToWms(
   );
 
   console.log(
+    "🏬 ERP WAREHOUSE:",
+    job.erp_warehouse_id
+  );
+
+  console.log(
     "📦📦📦 ========================================"
   );
 
@@ -2147,57 +2164,48 @@ async function applyCompletedInventoryJobToWms(
   // COUNTED
   // ==========================================================
   //
-  // Todo lo físicamente contado:
+  // Todos los productos físicamente contados.
+  //
+  // NO se filtra por warehouse.
   //
   // inventory_quantity
-  //      ↓
+  //        ↓
   // qty_on_hand
   //
   // ==========================================================
 
   if (
-    job.job_type ===
-    "counted"
+    job.job_type === "counted"
   ) {
 
-  const result =
-  await client.query(
-    `
-    UPDATE inventory_by_location ibl
+    const result =
+      await client.query(
+        `
+        UPDATE inventory_by_location
 
-    SET
-      qty_on_hand =
-        ibl.inventory_quantity,
+        SET
+          qty_on_hand =
+            inventory_quantity,
 
-      updated_at =
-        NOW()
+          updated_at =
+            NOW()
 
-    FROM warehouses w
+        WHERE
+          counted_by IS NOT NULL
 
-    WHERE
-      w.id =
-        ibl.warehouse_id
+          AND counted_at IS NOT NULL
 
-      AND w.erp_warehouse_id =
-        $1
+          AND inventory_quantity IS NOT NULL
 
-      AND ibl.counted_by IS NOT NULL
-
-      AND ibl.counted_at IS NOT NULL
-
-      AND ibl.inventory_quantity IS NOT NULL
-
-    RETURNING
-      ibl.id,
-      ibl.product_sku,
-      ibl.location_id,
-      ibl.inventory_quantity,
-      ibl.qty_on_hand
-    `,
-    [
-      job.erp_warehouse_id
-    ]
-  );
+        RETURNING
+          id,
+          warehouse_id,
+          product_sku,
+          location_id,
+          inventory_quantity,
+          qty_on_hand
+        `
+      );
 
 
     console.log(
@@ -2207,11 +2215,16 @@ async function applyCompletedInventoryJobToWms(
 
 
     return {
+
       type:
         "counted",
 
+      jobId:
+        Number(job.id),
+
       updatedLines:
         result.rows.length
+
     };
 
   }
@@ -2221,83 +2234,134 @@ async function applyCompletedInventoryJobToWms(
   // ZERO
   // ==========================================================
   //
-  // Todo lo NO contado:
+  // SOLO actualiza líneas NO CONTADAS.
   //
-  // counted_by = NULL
-  // counted_at = NULL
+  // IMPORTANTE:
   //
-  // se considera existencia física 0.
+  // Solamente se ponen en cero las líneas pertenecientes
+  // al warehouse ERP que está asociado a este job.
+  //
+  // Warehouse A → se está ajustando
+  // Warehouse B → NO se toca
   //
   // ==========================================================
 
   if (
-    job.job_type ===
-    "zero"
+    job.job_type === "zero"
   ) {
 
     const result =
-  await client.query(
-    `
-    UPDATE inventory_by_location ibl
+      await client.query(
+        `
+        UPDATE inventory_by_location ibl
 
-    SET
-      qty_on_hand =
-        0.000,
+        SET
+          qty_on_hand =
+            0.000,
 
-      qty_reserved =
-        0.000,
+          qty_reserved =
+            0.000,
 
-      updated_at =
-        NOW()
+          updated_at =
+            NOW()
 
-    FROM warehouses w
+        FROM warehouses w
 
-    WHERE
-      w.id =
-        ibl.warehouse_id
+        WHERE
+          w.id =
+            ibl.warehouse_id
 
-      AND w.erp_warehouse_id =
-        $1
+          AND w.erp_warehouse_id =
+            $1
 
-      AND ibl.counted_by IS NULL
+          AND ibl.counted_by IS NULL
 
-      AND ibl.counted_at IS NULL
+          AND ibl.counted_at IS NULL
 
-    RETURNING
-      ibl.id,
-      ibl.product_sku,
-      ibl.location_id,
-      ibl.qty_on_hand,
-      ibl.qty_reserved
-    `,
-    [
-      job.erp_warehouse_id
-    ]
-  );
+          AND (
+            COALESCE(
+              ibl.qty_on_hand,
+              0
+            ) <> 0
+
+            OR
+
+            COALESCE(
+              ibl.qty_reserved,
+              0
+            ) <> 0
+          )
+
+        RETURNING
+          ibl.id,
+          ibl.warehouse_id,
+          ibl.product_sku,
+          ibl.location_id,
+          ibl.qty_on_hand,
+          ibl.qty_reserved
+        `,
+        [
+          job.erp_warehouse_id
+        ]
+      );
 
 
     console.log(
-      "✅ LÍNEAS NO CONTADAS PUESTAS EN CERO:",
+      "✅ LÍNEAS NO CONTADAS DEL WAREHOUSE PUESTAS EN CERO:",
       result.rows.length
     );
 
 
     return {
+
       type:
         "zero",
 
+      jobId:
+        Number(job.id),
+
+      erpWarehouseId:
+        Number(
+          job.erp_warehouse_id
+        ),
+
       updatedLines:
         result.rows.length
+
     };
 
   }
 
+
+  // ==========================================================
+  // JOB TYPE NO SOPORTADO
+  // ==========================================================
 
   throw new Error(
     `Job type no soportado para actualizar WMS: ${job.job_type}`
   );
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ============================================================
 // MARCAR JOB COMPLETED

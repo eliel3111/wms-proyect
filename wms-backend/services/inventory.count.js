@@ -2,37 +2,37 @@
 import { getIO } from "../socket.js";
 import pool from "../db.js";
 
+
+
 export async function emitInventorySummary(client) {
 
   console.log("🚀 Inicio resumen");
 
 
   // ============================================================
-  // 1. OBTENER SESIÓN ACTIVA Y SU WAREHOUSE
+  // 1. OBTENER SESIÓN ACTIVA
   // ============================================================
 
-  const sessionResult =
-    await client.query(`
-      SELECT
-        id,
-        code,
-        status,
-        erp_warehouse_id
+  const sessionResult = await client.query(`
+    SELECT
+      id,
+      code,
+      status
 
-      FROM inventory_sessions
+    FROM inventory_sessions
 
-      WHERE status IN (
-        'draft',
-        'in-progress',
-        'review'
-      )
+    WHERE status IN (
+      'draft',
+      'in-progress',
+      'review'
+    )
 
-      ORDER BY
-        updated_at DESC,
-        id DESC
+    ORDER BY
+      updated_at DESC,
+      id DESC
 
-      LIMIT 1
-    `);
+    LIMIT 1
+  `);
 
 
   // ============================================================
@@ -62,113 +62,78 @@ export async function emitInventorySummary(client) {
   }
 
 
-  const session =
-    sessionResult.rows[0];
+  const session = sessionResult.rows[0];
 
-
-  const sessionId =
-    Number(
-      session.id
-    );
-
-
-  const erpWarehouseId =
-    Number(
-      session.erp_warehouse_id
-    );
+  const sessionId = Number(session.id);
 
 
   console.log(
     "📦 SESSION SUMMARY:",
     {
       sessionId,
-      code: session.code,
-      erpWarehouseId
+      code: session.code
     }
   );
 
 
   // ============================================================
-  // 2. PRODUCTOS ÚNICOS POR USUARIO
-  // SOLO DEL WAREHOUSE DE LA SESIÓN
+  // 2. PRODUCTOS ÚNICOS CONTADOS POR USUARIO
+  // SIN IMPORTAR WAREHOUSE
   // ============================================================
 
-  const summaryResult =
-    await client.query(
-      `
-      SELECT
-        ibl.counted_by AS user_id,
-        u.full_name,
+  const summaryResult = await client.query(`
+    SELECT
+      ibl.counted_by AS user_id,
+      u.full_name,
 
-        COUNT(
-          DISTINCT ibl.product_sku
-        )::int AS total_lines_counted
+      COUNT(
+        DISTINCT ibl.product_sku
+      )::int AS total_lines_counted
 
-      FROM inventory_by_location ibl
+    FROM inventory_by_location ibl
 
-      JOIN warehouses w
-        ON w.id = ibl.warehouse_id
+    JOIN users u
+      ON u.id = ibl.counted_by
 
-      JOIN users u
-        ON u.id = ibl.counted_by
+    WHERE
+      ibl.counted_by IS NOT NULL
 
-      WHERE
-        w.erp_warehouse_id = $1
+      AND ibl.counted_at IS NOT NULL
 
-        AND ibl.counted_by IS NOT NULL
+    GROUP BY
+      ibl.counted_by,
+      u.full_name
 
-        AND ibl.counted_at IS NOT NULL
-
-      GROUP BY
-        ibl.counted_by,
-        u.full_name
-
-      ORDER BY
-        total_lines_counted DESC
-      `,
-      [
-        erpWarehouseId
-      ]
-    );
+    ORDER BY
+      total_lines_counted DESC
+  `);
 
 
   // ============================================================
-  // 3. TOTAL PRODUCTOS ÚNICOS CONTADOS
-  // SOLO DEL WAREHOUSE
+  // 3. TOTAL DE PRODUCTOS ÚNICOS CONTADOS
+  // SIN IMPORTAR WAREHOUSE
   // ============================================================
 
-  const countedProductsResult =
-    await client.query(
-      `
-      SELECT
-        COUNT(
-          DISTINCT ibl.product_sku
-        )::int AS total_counted
+  const countedProductsResult = await client.query(`
+    SELECT
+      COUNT(
+        DISTINCT ibl.product_sku
+      )::int AS total_counted
 
-      FROM inventory_by_location ibl
+    FROM inventory_by_location ibl
 
-      JOIN warehouses w
-        ON w.id = ibl.warehouse_id
+    WHERE
+      ibl.counted_by IS NOT NULL
 
-      WHERE
-        w.erp_warehouse_id = $1
-
-        AND ibl.counted_by IS NOT NULL
-
-        AND ibl.counted_at IS NOT NULL
-      `,
-      [
-        erpWarehouseId
-      ]
-    );
+      AND ibl.counted_at IS NOT NULL
+  `);
 
 
-  const total =
-    Number(
-      countedProductsResult
-        .rows[0]
-        ?.total_counted || 0
-    );
+  const total = Number(
+    countedProductsResult
+      .rows[0]
+      ?.total_counted || 0
+  );
 
 
   console.log(
@@ -179,36 +144,33 @@ export async function emitInventorySummary(client) {
 
   // ============================================================
   // 4. TOTAL PRODUCTOS A CONTAR
-  // SNAPSHOT DE ESA SESIÓN ESPECÍFICA
+  // SNAPSHOT DE LA SESIÓN ACTUAL
   // ============================================================
 
-  const totalProductsResult =
-    await client.query(
-      `
-      SELECT
-        COUNT(*)::int AS total_products
+  const totalProductsResult = await client.query(
+    `
+    SELECT
+      COUNT(*)::int AS total_products
 
-      FROM erp_inventory_snapshot
+    FROM erp_inventory_snapshot
 
-      WHERE
-        session_inventory_id = $1
-      `,
-      [
-        sessionId
-      ]
-    );
+    WHERE session_inventory_id = $1
+    `,
+    [
+      sessionId
+    ]
+  );
 
 
-  const totalProducts =
-    Number(
-      totalProductsResult
-        .rows[0]
-        ?.total_products || 0
-    );
+  const totalProducts = Number(
+    totalProductsResult
+      .rows[0]
+      ?.total_products || 0
+  );
 
 
   console.log(
-    "TOTAL DE LÍNEAS DEL SNAPSHOT:",
+    "TOTAL DE PRODUCTOS DEL SNAPSHOT:",
     totalProducts
   );
 
@@ -217,9 +179,7 @@ export async function emitInventorySummary(client) {
   // 5. SI NO HAY CONTEOS
   // ============================================================
 
-  if (
-    summaryResult.rows.length === 0
-  ) {
+  if (summaryResult.rows.length === 0) {
 
     const response = {
       success: true,
@@ -243,7 +203,7 @@ export async function emitInventorySummary(client) {
 
 
   // ============================================================
-  // 6. PARTICIPACIÓN TOTAL USUARIOS
+  // 6. TOTAL DE PARTICIPACIÓN DE USUARIOS
   // ============================================================
 
   const totalUserParticipation =
@@ -344,7 +304,6 @@ export async function emitInventorySummary(client) {
 
   return response;
 }
-
 
 
 

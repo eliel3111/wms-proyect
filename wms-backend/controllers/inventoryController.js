@@ -615,7 +615,7 @@ export async function startInventoryAdjustment(
 
     console.log("");
     console.log(
-      "🟥🟥🟥 ========================================"
+      "🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦========================================"
     );
     console.log(
       "📦 INICIANDO PROCESO DE AJUSTE DE INVENTARIO"
@@ -858,13 +858,14 @@ export async function startInventoryAdjustment(
 
 
 
+    
     // ============================================================
-    // PRODUCTOS CONTADOS
-    // ============================================================
+// PRODUCTOS CONTADOS
+// ============================================================
 
-    const countedProductsResult =
-      await client.query(
-        `
+const countedProductsResult =
+  await client.query(
+    `
     WITH counted AS (
       SELECT
         ibl.product_sku,
@@ -874,24 +875,14 @@ export async function startInventoryAdjustment(
             ibl.inventory_quantity,
             0
           )
-        )::numeric
-          AS total_inventory_qty
+        )::numeric AS total_inventory_qty
 
       FROM inventory_by_location ibl
 
-      JOIN warehouses w
-        ON w.id =
-           ibl.warehouse_id
-
       WHERE
-        w.erp_warehouse_id =
-          $2
+        ibl.counted_by IS NOT NULL
 
-        AND ibl.counted_by
-          IS NOT NULL
-
-        AND ibl.counted_at
-          IS NOT NULL
+        AND ibl.counted_at IS NOT NULL
 
       GROUP BY
         ibl.product_sku
@@ -934,15 +925,12 @@ export async function startInventoryAdjustment(
       FROM counted c
 
       JOIN products p
-        ON p.sku =
-           c.product_sku
+        ON p.sku = c.product_sku
 
       LEFT JOIN erp_inventory_snapshot eis
-        ON eis.item_id =
-           p.erp_id
+        ON eis.item_id = p.erp_id
 
-       AND eis.session_inventory_id =
-           $1
+       AND eis.session_inventory_id = $1
 
       WHERE
         p.erp_id IS NOT NULL
@@ -1036,11 +1024,10 @@ export async function startInventoryAdjustment(
       product_no_exist,
       wms_counted
     `,
-        [
-          sessionId,
-          erpWarehouseId
-        ]
-      );
+    [
+      sessionId
+    ]
+  );
 
 
     const countedProducts =
@@ -1701,6 +1688,9 @@ RETURNING *
       "COMMIT"
     );
 
+console.log(
+      "🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦========================================"
+    );
 
     committed = true;
 
@@ -1884,8 +1874,8 @@ export async function startInventoryAdjustmentZero(
   try {
 
     console.log("");
-    console.log(
-      "🟥🟥🟥 ========================================"
+console.log(
+      "🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦========================================"
     );
     console.log(
       "📦 INICIANDO PROCESO DE AJUSTE DE INVENTARIO"
@@ -2151,19 +2141,9 @@ export async function startInventoryAdjustmentZero(
 
       FROM inventory_by_location ibl
 
-      JOIN warehouses w
-        ON w.id =
-           ibl.warehouse_id
-
-      WHERE
-        w.erp_warehouse_id =
-          $2
-
-        AND ibl.counted_by
-          IS NOT NULL
-
-        AND ibl.counted_at
-          IS NOT NULL
+WHERE
+  ibl.counted_by IS NOT NULL
+  AND ibl.counted_at IS NOT NULL
 
       GROUP BY
         ibl.product_sku
@@ -2309,9 +2289,8 @@ export async function startInventoryAdjustmentZero(
       wms_counted
     `,
         [
-          sessionId,
-          erpWarehouseId
-        ]
+  sessionId
+]
       );
 
 
@@ -2541,7 +2520,11 @@ FROM missing
     );
 
 
-    if (
+  // ============================================================
+// NO HAY PRODUCTOS PARA AJUSTAR A CERO
+// ============================================================
+
+if (
   reportLines.length === 0
 ) {
 
@@ -2551,74 +2534,14 @@ FROM missing
   );
 
   console.log(
-    "📦 SE ACTUALIZARÁN A CERO LAS LÍNEAS NO CONTADAS DEL WMS"
+    "ℹ️ NO SE REALIZARÁ NINGÚN CAMBIO EN EL WMS"
   );
 
-
-  // ========================================================
-  // ACTUALIZAR WMS LOCAL
-  // ========================================================
-
-  const wmsResult =
-    await client.query(
-      `
-      UPDATE inventory_by_location ibl
-
-      SET
-        qty_on_hand = 0.000,
-
-        qty_reserved = 0.000,
-
-        updated_at = NOW()
-
-      FROM warehouses w
-
-      WHERE
-  w.id = ibl.warehouse_id
-
-  AND w.erp_warehouse_id = $1
-
-  AND ibl.counted_by IS NULL
-
-  AND ibl.counted_at IS NULL
-
-  AND (
-    COALESCE(
-      ibl.qty_on_hand,
-      0
-    ) <> 0
-
-    OR COALESCE(
-      ibl.qty_reserved,
-      0
-    ) <> 0
-  )
-
-      RETURNING
-        ibl.id,
-        ibl.product_sku,
-        ibl.location_id,
-        ibl.qty_on_hand
-      `,
-      [
-        erpWarehouseId
-      ]
-    );
-
-
-  console.log(
-    "✅ LÍNEAS WMS PUESTAS EN CERO:",
-    wmsResult.rows.length
-  );
-
-
-  // ========================================================
-  // COMMIT
-  // ========================================================
 
   await client.query(
     "COMMIT"
   );
+
 
   committed = true;
 
@@ -2632,10 +2555,10 @@ FROM missing
       success: true,
 
       title:
-        "Inventario actualizado",
+        "Sin productos pendientes",
 
       message:
-        "No había productos pendientes para ajustar a cero en Citrus. Las líneas no contadas del WMS fueron actualizadas correctamente.",
+        "No existen productos pendientes para ajustar a cero.",
 
       data: {
 
@@ -2650,15 +2573,13 @@ FROM missing
           0,
 
         wmsLinesUpdated:
-          wmsResult.rows.length
+          0
 
       }
 
     });
 
 }
-
-
 
 
 
@@ -3906,59 +3827,95 @@ export async function createInventorySession(req, res) {
 
     await client.query("BEGIN");
 
-    // =====================================
-    // VALIDAR SESIÓN ACTIVA
-    // =====================================
+   // =====================================
+// VALIDAR SESIÓN ACTIVA
+// =====================================
 
-    console.log("🔍 BUSCANDO SESIONES ACTIVAS");
+console.log("🔍 BUSCANDO SESIONES ACTIVAS");
 
-    const activeSessionResult = await client.query(`
-      SELECT
-        id,
-        code,
-        status
-      FROM inventory_sessions
-      WHERE status IN ('draft', 'in-progress', 'review')
-      LIMIT 1
-    `);
+const activeSessionResult = await client.query(`
+  SELECT
+    id,
+    code,
+    status
+  FROM inventory_sessions
+  WHERE status IN ('draft', 'in-progress', 'review')
+  LIMIT 1
+`);
 
-    if (activeSessionResult.rowCount > 0) {
+if (activeSessionResult.rowCount > 0) {
 
-      const activeSession = activeSessionResult.rows[0];
+  const activeSession =
+    activeSessionResult.rows[0];
 
-      console.log(
-        "⛔ SESIÓN ACTIVA:",
-        activeSession.code
-      );
+  console.log(
+    "⛔ SESIÓN ACTIVA:",
+    activeSession.code
+  );
+
+  await client.query("ROLLBACK");
+
+  return res.status(200).json({
+    success: false,
+    title: "Sesión activa encontrada",
+    message:
+      `Ya existe una sesión de inventario activa: ${activeSession.code}.`
+  });
+}
+
+console.log("✅ NO HAY SESIONES ACTIVAS");
 
 
+// =====================================
+// 🧹 LIMPIAR CONTEO ANTERIOR COMPLETO
+// =====================================
 
-      await client.query("ROLLBACK");
+console.log("");
+console.log("🧹 LIMPIANDO CONTEO ANTERIOR");
+console.log(
+  "📦 PREPARANDO INVENTORY_BY_LOCATION PARA NUEVO CONTEO"
+);
 
-      return res.status(200).json({
-        success: false,
-        title: "Sesión activa encontrada",
-        message:
-          `Ya existe una sesión de inventario activa: ${activeSession.code}.`
-      });
-    }
+const cleanInventoryResult =
+  await client.query(
+    `
+    UPDATE inventory_by_location
 
-    console.log("✅ NO HAY SESIONES ACTIVAS");
+    SET
+      inventory_quantity = NULL,
+      counted_by = NULL,
+      counted_at = NULL,
+      old_qty_on_hand = NULL,
+      updated_at = NOW()
 
-    // =====================================
-    // OBTENER CONFIGURACIÓN
-    // =====================================
+    WHERE
+         inventory_quantity IS NOT NULL
+      OR counted_by IS NOT NULL
+      OR counted_at IS NOT NULL
+      OR old_qty_on_hand IS NOT NULL
+    `
+  );
 
-    console.log("🏢 BUSCANDO EMPRESA ACTIVA");
+console.log(
+  "✅ LÍNEAS DE INVENTARIO LIMPIADAS:",
+  cleanInventoryResult.rowCount
+);
 
-    const companyResult = await client.query(`
-      SELECT
-        inventory_adjustment_mode
-      FROM companies
-      WHERE is_active = true
-      ORDER BY created_at ASC
-      LIMIT 1
-    `);
+
+// =====================================
+// OBTENER CONFIGURACIÓN
+// =====================================
+
+console.log("🏢 BUSCANDO EMPRESA ACTIVA");
+
+const companyResult = await client.query(`
+  SELECT
+    inventory_adjustment_mode
+  FROM companies
+  WHERE is_active = true
+  ORDER BY created_at ASC
+  LIMIT 1
+`);
 
     if (companyResult.rowCount === 0) {
 
