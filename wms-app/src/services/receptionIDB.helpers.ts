@@ -2,7 +2,7 @@ import { openReceptionDB, RECEPCION_STORE } from "./indexeddb";
 
 // GUARDAR recepción
 export async function saveReceptionIDB(data: {
-  id: number;
+  id: string;
   purchase_order_number: string;
   lines: any[];
 }) {
@@ -29,7 +29,7 @@ export async function saveReceptionIDB(data: {
 }
 
 // LEER recepción por orden de compra
-export async function getReceptionByPOId(poId: number) {
+export async function getReceptionByPOId(poId: string) {
   const db = await openReceptionDB();
 
   return new Promise<any>((resolve, reject) => {
@@ -48,7 +48,7 @@ export async function getReceptionByPOId(poId: number) {
   });
 }
 
-export async function deleteReceptionByPOId(poId: number): Promise<void> {
+export async function deleteReceptionByPOId(poId: string): Promise<void> {
   const db = await openReceptionDB();
 
   return new Promise((resolve, reject) => {

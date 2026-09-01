@@ -1,10 +1,16 @@
 .rs__control {
-  height: 52px;
-  padding: 0 12px;
+  min-height: 52px;
+  height: auto;
+
+  padding: 4px 12px;
+
   border-radius: 10px;
   border: 1px solid #ccc;
+
   font-size: 18px;
   outline: none;
+
+  background-color: white;
 }
 .input-label {
   font-size: 20px;
@@ -37,6 +43,7 @@
 /* 📱 MOBILE */
 @media (max-width: 768px) {
   .rs__control {
-    height: 58px;
+    min-height: 58px;
+    height: auto;
   }
 }

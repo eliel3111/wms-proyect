@@ -1,5 +1,10 @@
-import { useParams } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+    useEffect,
+    useState,
+    useRef,
+    useMemo
+} from "react";
 import { getReceptionByPOId, saveReceptionIDB, deleteReceptionByPOId } from "../services/receptionIDB.helpers.ts";
 import apiClient from "../services/apiClient.ts";
 import "../styles/OrdenCompra.css"
@@ -32,7 +37,31 @@ type Filter = "all" | "read" | "unread";
 
 export default function OrdenCompra() {
     /* 1️⃣ Obtener ID desde la URL */
-    const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
+
+    const poIdsParam = searchParams.get("poIds");
+
+    const poIds = useMemo(() => {
+
+        if (!poIdsParam) {
+            return [];
+        }
+
+        return poIdsParam
+            .split(",")
+            .map((id) => Number(id))
+            .filter(
+                (id) =>
+                    Number.isInteger(id) &&
+                    id > 0
+            );
+
+    }, [poIdsParam]);
+
+    console.log(
+        "📦 PO IDs recibidos:",
+        poIds
+    );
 
     /* 2️⃣ Estados principales */
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,8 +73,12 @@ export default function OrdenCompra() {
     /*const [countQty, setCountQty] = useState<number>(0);*/
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [poNumber, setPoNumber] = useState<string>("");
-    const [purchaseOrderId, setPurchaseOrderId] = useState<number | null>(null);
+    const [poNumbers, setPoNumbers] =
+        useState<string[]>([]);
+    const [
+        purchaseOrderIds,
+        setPurchaseOrderIds
+    ] = useState<number[]>([]);
     const [filter, setFilter] = useState<Filter>("all");
     const [quantityError, setQuantityError] = useState(false);
     const [shakeKey, setShakeKey] = useState(0);
@@ -81,16 +114,21 @@ export default function OrdenCompra() {
         useState(false);
 
 
-
+    //Obtain the ids from the url and sav them on a state
     useEffect(() => {
-        if (!id) return;
-        console.log("CHECK 1")
-        const poId = Number(id);
-        if (isNaN(poId)) return;
-        //fetchPurchaseOrderById(poId);
-        setPurchaseOrderId(poId);
 
-    }, [id]);
+        if (poIds.length === 0) {
+            return;
+        }
+
+        console.log(
+            "✅ PO IDs válidos:",
+            poIds
+        );
+
+        setPurchaseOrderIds(poIds);
+
+    }, [poIds]);
 
     useEffect(() => {
         console.log("CHECK 2")
@@ -103,113 +141,265 @@ export default function OrdenCompra() {
     }, [selectedIndex]);
 
     useEffect(() => {
-        if (!purchaseOrderId) return;
+
+        if (purchaseOrderIds.length === 0) {
+            return;
+        }
 
         const timeout = setTimeout(() => {
+
+            const receptionKey =
+                purchaseOrderIds.join("-");
+
+
             saveReceptionIDB({
-                id: purchaseOrderId,
-                purchase_order_number: poNumber,
+
+                id: receptionKey,
+
+                purchase_order_number:
+                    poNumbers.join(" / "),
+
                 lines: products,
+
             });
-            console.log("💾 Guardado automático en IndexedDB");
-        }, 2000); // ⏱️ ideal para scanner + input manual
 
-        return () => clearTimeout(timeout);
-    }, [products, purchaseOrderId, poNumber]);
 
+            console.log(
+                "💾 Guardado automático en IndexedDB"
+            );
+
+        }, 2000);
+
+
+        return () =>
+            clearTimeout(timeout);
+
+    }, [
+        products,
+        purchaseOrderIds,
+        poNumbers
+    ]);
 
 
 
     useEffect(() => {
 
-        if (!purchaseOrderId) return;
+        if (purchaseOrderIds.length === 0) {
+            return;
+        }
+
         const loadData = async () => {
+
             setLoading(true);
+            setError(null);
 
             try {
-                // 1️⃣ IndexedDB
-                const local = await getReceptionByPOId(purchaseOrderId);
 
-                if (local) {
-                    console.log("LOCAL VARIABLE", local);
-                    setIdbProducts(local.lines);
-                }
-
-                // 2️⃣ Backend
-                const response = await apiClient.get(`/receiving/${purchaseOrderId}`);
-                console.log("RESPUESTA BASE DE DATOS", response.data);
-                const result = response.data;
-                console.log("CHECK 5")
-                if (!result.success) {
-                    throw new Error(result.message || "Error cargando la orden de compra");
-                    setError("Error cargando la orden de compra");
-                }
-
-                const data = result.data;
-
-                setPoNumber(data.purchase_order_number);
-                setProducts(
-                    prioritizeMissingProducts(data.lines)
+                console.log(
+                    "📦 Cargando órdenes:",
+                    purchaseOrderIds
                 );
 
-                // 3️⃣ Guardar en IndexedDB
-                if (!local?.lines || local.lines.length === 0) {
-                    console.log("CHECK 6")
-                    await saveReceptionIDB({
-                        id: purchaseOrderId,
-                        purchase_order_number: data.purchase_order_number,
-                        lines: data.lines,
-                    });
+                // ====================================================
+                // KEY ÚNICA PARA ESTA RECEPCIÓN MÚLTIPLE
+                // ====================================================
+
+                const receptionKey =
+                    purchaseOrderIds.join("-");
+
+
+                // ====================================================
+                // 1. INDEXEDDB
+                // ====================================================
+
+                const local =
+                    await getReceptionByPOId(
+                        receptionKey
+                    );
+
+
+                if (local) {
+
+                    console.log(
+                        "💾 LOCAL:",
+                        local
+                    );
+
+                    setIdbProducts(
+                        local.lines
+                    );
                 }
 
 
-            } catch (err) {
-                console.error(err);
+                // ====================================================
+                // 2. BACKEND
+                // ====================================================
+
+                const response =
+                    await apiClient.get(
+                        "/receiving/by-ids",
+                        {
+                            params: {
+                                poIds:
+                                    purchaseOrderIds.join(",")
+                            }
+                        }
+                    );
+
+
+                console.log(
+                    "📥 RESPUESTA BACKEND:",
+                    response.data
+                );
+
+
+                const result =
+                    response.data;
+
+
+                if (!result.success) {
+
+                    throw new Error(
+                        result.message ||
+                        "Error cargando órdenes de compra"
+                    );
+                }
+
+
+                const data =
+                    result.data;
+
+
+                // ====================================================
+                // 3. GUARDAR NÚMEROS DE PO
+                // ====================================================
+
+                setPoNumbers(
+                    data.purchase_order_numbers || []
+                );
+
+
+                // ====================================================
+                // 4. PRODUCTOS
+                // ====================================================
+
+                setProducts(
+                    prioritizeMissingProducts(
+                        data.lines || []
+                    )
+                );
+
+
+                // ====================================================
+                // 5. GUARDAR EN INDEXEDDB SI NO EXISTÍA
+                // ====================================================
+
+                if (
+                    !local?.lines ||
+                    local.lines.length === 0
+                ) {
+
+                    await saveReceptionIDB({
+                        id: receptionKey,
+
+                        purchase_order_number:
+                            (
+                                data.purchase_order_numbers ||
+                                []
+                            ).join(" / "),
+
+                        lines:
+                            data.lines || [],
+                    });
+
+
+                    console.log(
+                        "💾 Recepción múltiple guardada en IndexedDB"
+                    );
+                }
+
+
+            } catch (err: any) {
+
+                console.error(
+                    "❌ Error cargando recepción:",
+                    err
+                );
+
+                setError(
+                    err.message ||
+                    "Error cargando las órdenes"
+                );
+
             } finally {
+
                 setLoading(false);
             }
         };
 
+
         loadData();
-    }, [purchaseOrderId]);
+
+    }, [purchaseOrderIds]);
 
 
 
 
 
     useEffect(() => {
-        if (!poNumber || products.length === 0 || idbProducts.length === 0) return;
 
-        // 3️⃣ Crear diccionario sku → received_qty
-        console.log("CHECK 7")
+        if (
+            poNumbers.length === 0 ||
+            products.length === 0 ||
+            idbProducts.length === 0
+        ) {
+            return;
+        }
+
         const receivedMap = new Map(
-            idbProducts.map((p: Product) => [p.sku, p.received_qty])
+            idbProducts.map(
+                (p: Product) => [
+                    p.sku,
+                    p.received_qty
+                ]
+            )
         );
 
-        console.log("DICCIONARIO:", receivedMap);
 
-        // 4️⃣ Mezclar backend + local
-        const mergedProducts = products.map((p: Product) => {
-            const localQty = receivedMap.get(p.sku);
-            //console.log(localQty);
-            //console.log(p.received_qty);
-            return {
-                ...p,
-                received_qty:
-                    typeof localQty === "number"
-                        ? Math.max(localQty, p.received_qty)
-                        : p.received_qty,
-            };
-        });
+        const mergedProducts =
+            products.map(
+                (p: Product) => {
 
+                    const localQty =
+                        receivedMap.get(
+                            p.sku
+                        );
 
-        console.log("RESULTADO:", mergedProducts);
+                    return {
+                        ...p,
+
+                        received_qty:
+                            typeof localQty === "number"
+                                ? Math.max(
+                                    localQty,
+                                    p.received_qty
+                                )
+                                : p.received_qty,
+                    };
+                }
+            );
+
 
         setProducts(
-            prioritizeMissingProducts(mergedProducts)
+            prioritizeMissingProducts(
+                mergedProducts
+            )
         );
 
-    }, [poNumber, idbProducts]);
+    }, [
+        poNumbers,
+        idbProducts
+    ]);
 
 
 
@@ -378,51 +568,51 @@ export default function OrdenCompra() {
     // CERRAR MODAL DE PRODUCTOS REPETIDOS
     // ======================================================
 
-   function closeRepeatedProductsModal() {
+    function closeRepeatedProductsModal() {
 
-    console.log(
-        "❌ Cerrando modal de productos repetidos"
-    );
-
-
-    // Cerrar modal
-    setIsRepeatedModalOpen(false);
+        console.log(
+            "❌ Cerrando modal de productos repetidos"
+        );
 
 
-    // Vaciar productos
-    setRepeatedProducts([]);
+        // Cerrar modal
+        setIsRepeatedModalOpen(false);
 
 
-    // Quitar selección
-    setSelectedIndex(null);
-
-    selectedIndexRef.current =
-        null;
+        // Vaciar productos
+        setRepeatedProducts([]);
 
 
-    // Ninguna línea repetida elegida
-    selectedRepeatedProductIdRef.current =
-        null;
+        // Quitar selección
+        setSelectedIndex(null);
+
+        selectedIndexRef.current =
+            null;
 
 
-    // Limpiar código que abrió el modal
-    repeatedScannedCodeRef.current =
-        "";
+        // Ninguna línea repetida elegida
+        selectedRepeatedProductIdRef.current =
+            null;
 
 
-    // Permitir volver a escanear
-    lastCodeRef.current =
-        "";
+        // Limpiar código que abrió el modal
+        repeatedScannedCodeRef.current =
+            "";
 
 
-    // Limpiar buffer
-    scanBufferRef.current =
-        "";
+        // Permitir volver a escanear
+        lastCodeRef.current =
+            "";
 
 
-    // Reactivar scanner
-    setIsScannerMode(true);
-}
+        // Limpiar buffer
+        scanBufferRef.current =
+            "";
+
+
+        // Reactivar scanner
+        setIsScannerMode(true);
+    }
     // ======================================================
     // SELECCIONAR UNA LÍNEA DE PRODUCTO REPETIDO
     // ======================================================
@@ -885,40 +1075,100 @@ export default function OrdenCompra() {
 
     // FUNCTION TO SAVE RECEPTION TO BACK END
 
-    async function saveReceptionToBackend(receptionStatus: string) {
-        if (!purchaseOrderId) {
-            console.error("❌ purchaseOrderId no existe");
+    async function saveReceptionToBackend(
+        receptionStatus: string
+    ) {
+
+        if (
+            purchaseOrderIds.length === 0
+        ) {
+
+            console.error(
+                "❌ purchaseOrderIds está vacío"
+            );
+
             return;
         }
 
+
         try {
-            const response = await apiClient.post("/receiving/save", {
-                purchase_order_id: purchaseOrderId,
-                purchase_order_number: poNumber,
-                reception_status: receptionStatus,
-                lines: products.map(p => ({
-                    id: Number(p.id),
-                    received_qty: Number(p.received_qty),
-                })),
-            });
+
+            const response =
+                await apiClient.post(
+                    "/receiving/save",
+                    {
+                        purchase_order_ids:
+                            purchaseOrderIds,
+
+                        purchase_order_numbers:
+                            poNumbers,
+
+                        reception_status:
+                            receptionStatus,
+
+                        lines:
+                            products.map(
+                                (p) => ({
+                                    id:
+                                        Number(p.id),
+
+                                    received_qty:
+                                        Number(
+                                            p.received_qty
+                                        ),
+                                })
+                            ),
+                    }
+                );
 
 
-            const result = response.data;
-            console.log("✅ RESPUESTA BACKEND:", result);
+            const result =
+                response.data;
+
+
+            console.log(
+                "✅ RESPUESTA BACKEND:",
+                result
+            );
+
 
             if (!result.success) {
-                throw new Error(result.message || "Error guardando recepción");
+
+                throw new Error(
+                    result.message ||
+                    "Error guardando recepción"
+                );
             }
 
-            // 🧹 BORRAR INDEXEDDB SOLO SI EL BACKEND CONFIRMA
-            await deleteReceptionByPOId(purchaseOrderId);
 
-            console.log("🗑️ IndexedDB limpiado correctamente");
+            // ====================================================
+            // BORRAR INDEXEDDB
+            // ====================================================
+
+            const receptionKey =
+                purchaseOrderIds.join("-");
+
+
+            await deleteReceptionByPOId(
+                receptionKey
+            );
+
+
+            console.log(
+                "🗑️ IndexedDB limpiado correctamente"
+            );
 
 
         } catch (error: any) {
-            console.error("❌ Error guardando recepción:", error);
-            alert("Ocurrió un error al guardar la recepción");
+
+            console.error(
+                "❌ Error guardando recepción:",
+                error
+            );
+
+            alert(
+                "Ocurrió un error al guardar la recepción"
+            );
         }
     }
 
@@ -1220,7 +1470,9 @@ export default function OrdenCompra() {
 
                     {/* DETAILS */}
                     <div className="order-details">
-                        <div className="order-number">{poNumber}</div>
+                        <div className="order-number">
+                            {poNumbers.join(" / ")}
+                        </div>
                         <div className="order-number-title">Orden de Compra</div>
                     </div>
                 </div>
@@ -1243,7 +1495,11 @@ export default function OrdenCompra() {
                     {/* ✅ FINALIZAR */}
                     <button onClick={async () => {
                         await saveReceptionToBackend("in_progress");
-                        navigate(`/validation/${purchaseOrderId}`);
+                        navigate(
+                            `/validation?poIds=${encodeURIComponent(
+                                purchaseOrderIds.join(",")
+                            )}`
+                        );
                     }} className="pill-btn finish-btn">
                         <span className="icon">
                             {/* ICONO CHECK */}
@@ -1424,17 +1680,17 @@ export default function OrdenCompra() {
                                     return (
 
                                         <button
-    key={product.id}
-    type="button"
-    className="repeated-line-card"
-    onClick={() =>
-        selectRepeatedProduct(product)
-    }
-    aria-label={
-        `Seleccionar línea ${index + 1}, ` +
-        `${product.sku}`
-    }
->
+                                            key={product.id}
+                                            type="button"
+                                            className="repeated-line-card"
+                                            onClick={() =>
+                                                selectRepeatedProduct(product)
+                                            }
+                                            aria-label={
+                                                `Seleccionar línea ${index + 1}, ` +
+                                                `${product.sku}`
+                                            }
+                                        >
 
                                             {/* LINE + SKU */}
 

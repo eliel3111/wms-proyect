@@ -4903,70 +4903,7 @@ export async function cancelInventorySession(req, res) {
 
     const cancelledSession = updateResult.rows[0];
 
-    // =====================================
-    // LIMPIAR CONTEOS
-    // =====================================
-
-    console.log(
-      "🧹 LIMPIANDO DATOS DE INVENTARIO"
-    );
-
-    // =====================================
-    // LIMPIAR CONTEOS DEL WAREHOUSE
-    // SELECCIONADO EN ESTA SESIÓN
-    // =====================================
-
-    const erpWarehouseId =
-      Number(
-        session.erp_warehouse_id
-      );
-
-    if (
-      !Number.isInteger(erpWarehouseId) ||
-      erpWarehouseId <= 0
-    ) {
-      throw new Error(
-        `ERP Warehouse ID inválido: ${session.erp_warehouse_id}`
-      );
-    }
-
-    console.log(
-      "🧹 LIMPIANDO DATOS DE INVENTARIO DEL WAREHOUSE:",
-      session.erp_warehouse_id
-    );
-
-    const cleanResult = await client.query(
-      `
-  UPDATE inventory_by_location ibl
-
-  SET
-    inventory_quantity = 0,
-    counted_by = NULL,
-    counted_at = NULL,
-    old_qty_on_hand = NULL,
-    updated_at = NOW()
-
-  FROM warehouses w
-
-  WHERE
-    w.id = ibl.warehouse_id
-
-    AND w.erp_warehouse_id = $1
-  `,
-      [
-        erpWarehouseId
-      ]
-    );
-
-    console.log(
-      "📦 FILAS LIMPIADAS DEL WAREHOUSE:",
-      cleanResult.rowCount
-    );
-
-    console.log(
-      "📦 FILAS LIMPIADAS:",
-      cleanResult.rowCount
-    );
+    
 
     await client.query("COMMIT");
 

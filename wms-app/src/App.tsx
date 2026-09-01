@@ -55,8 +55,14 @@ function App() {
           {/* RECEIVING */}
           <Route path="menu" element={<Menu />} />
           <Route path="receiving" element={<ReceivingSearch />} />
-          <Route path="ordencompra/:id" element={<OrdenCompra />} />
-          <Route path="validation/:id" element={<ReceivingValidation />} />
+          <Route
+            path="ordencompra"
+            element={<OrdenCompra />}
+          />
+          <Route
+            path="validation"
+            element={<ReceivingValidation />}
+          />
           <Route path="receiving/final/:id" element={<ReceivingFinal />} />
 
 

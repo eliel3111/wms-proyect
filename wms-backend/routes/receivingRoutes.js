@@ -30,7 +30,7 @@ router.get(
 );
 
 // Search all the data related to an purschase order.
-router.get("/:poId", authMiddleware, getReceivingByPoId);
+router.get("/by-ids", authMiddleware, getReceivingByPoId);
 
 
 

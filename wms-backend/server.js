@@ -47,10 +47,17 @@ import {
 import axios from "axios";
 import admcloudClient from "./integrations/admcloud/admcloudClient.js";
 import {getAdmCloudProducts} from "./integrations/admcloud/admcloud.items.js";
-
+import {
+  syncAdmCloudWarehouses
+} from "./integrations/admcloud/admcloud.locations.js";
 import {
   syncAdmCloudProducts
 } from "./integrations/admcloud/admcloud.products.processor.js";
+import { startAdmCloudCron } from "./integrations/admcloud/admcloud.cron.js";
+import {syncAdmCloudUoms} from "./integrations/admcloud/admcloud.uom.service.js";
+import {
+  runAdmCloudPurchaseOrdersSync
+} from "./integrations/admcloud/admcloud.purchaseOrders.js";
 
 const app = express();
 
@@ -80,6 +87,50 @@ console.log(resultado);
     console.error(error);
   }
 }
+
+
+//startAdmCloudCron();
+
+app.get(
+  "/test-admcloud-purchase-orders-sync",
+  async (req, res) => {
+
+    try {
+
+      const result =
+        await runAdmCloudPurchaseOrdersSync();
+
+
+      return res.json({
+        success: true,
+        synchronization: result
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "❌ Error sincronizando Purchase Orders Adm Cloud:",
+        error
+      );
+
+
+      return res
+        .status(
+          error.status ||
+          500
+        )
+        .json({
+          success: false,
+
+          message:
+            error.message ||
+            "Error sincronizando Purchase Orders Adm Cloud"
+        });
+    }
+  }
+);
+
 
 
 app.get(
@@ -136,6 +187,42 @@ app.get(
           message:
             error.message ||
             "Error sincronizando productos"
+        });
+    }
+  }
+);
+
+
+app.get(
+  "/test-admcloud-locations",
+  async (req, res) => {
+
+    try {
+
+      const locations =
+        await syncAdmCloudUoms();
+
+      return res.json({
+        success: true,
+        count: locations.length,
+        data: locations,
+      });
+
+    } catch (error) {
+
+      console.error(
+        "❌ Error obteniendo locations de Adm Cloud:",
+        error
+      );
+
+      return res
+        .status(error.status || 500)
+        .json({
+          success: false,
+          message:
+            error.message ||
+            "Error obteniendo locations de Adm Cloud",
+          data: error.data || null,
         });
     }
   }

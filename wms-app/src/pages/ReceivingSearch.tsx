@@ -4,7 +4,7 @@ import "../styles/ReceivingSearch.css";
 import { useEffect, useRef } from "react";
 import { openReceptionDB } from "../services/indexeddb.ts";
 import TextInput from "../components/TextInput.tsx";
-import SelectInput from "../components/SelectInput.tsx";
+import MultiSelectInput from "../components/MultiSelectInput.tsx";
 import apiClient from "../services/apiClient.ts";
 
 export default function ReceivingSearch() {
@@ -51,19 +51,27 @@ export default function ReceivingSearch() {
   }, []);
 
   const navigate = useNavigate();
-  const goToOrder = (id: number) => {
-    navigate(`/ordencompra/${id}`);
-  };
+
+  
+  const goToOrder = (ids: number[]) => {
+  const params = new URLSearchParams();
+
+  params.set("poIds", ids.join(","));
+
+  navigate(`/ordencompra?${params.toString()}`);
+};
 
   type Option = {
     value: number;
     label: string;
   };
 
+  
+
 
 
   //STATES
-  const [selectedPO, setSelectedPO] = useState<Option | null>(null);
+  const [selectedPOs, setSelectedPOs] = useState<Option[]>([]);
   const [invoiceNo, setInvoiceNo] = useState("");
   const [supplier, setSupplier] = useState("");
   const [errors, setErrors] = useState<{ invoiceNo?: string; po?: string }>({});
@@ -73,48 +81,80 @@ export default function ReceivingSearch() {
 
   // Function to habdle button click
   const handleSubmit = async () => {
-    const newErrors: { invoiceNo?: string; po?: string } = {};
+  const newErrors: {
+    invoiceNo?: string;
+    po?: string;
+  } = {};
 
-    if (!selectedPO) newErrors.po = "Orden de compra requerida";
-    //if (!invoiceNo.trim()) newErrors.invoiceNo = "Factura requerida";
-    console.log(errors);
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-    const poId = selectedPO?.label;
+  // selectedPOs es un array.
+  // [] es truthy, así que debes verificar length.
+  if (selectedPOs.length === 0) {
+    newErrors.po = "Orden de compra requerida";
+  }
 
-    setErrors({});
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors);
+    return;
+  }
 
-    try {
+  // [
+  //   { value: 35, label: "OC-000589" },
+  //   { value: 39, label: "OC-000571" }
+  // ]
+  //
+  // ↓
+  //
+  // [35, 39]
 
-      if (!poId) {
-        return;
-      }
+  const poIds = selectedPOs.map(
+    (po) => po.value
+  );
 
-      const response = await apiClient.post("/receiving/by-number", {
-        poNumber: poId,
+  setErrors({});
+
+  try {
+    console.log("📦 PO IDs:", poIds);
+
+    const response = await apiClient.post(
+      "/receiving/by-number",
+      {
+        poIds,
         invoiceNo,
         supplier,
-      });
-
-      // Axios ya parsea el JSON
-      const result = response.data;
-
-      if (!result.success) {
-        throw new Error(result.message || "Error consultando la orden de compra");
       }
-      console.log(result.data.id);
-      goToOrder(result.data.id);
-      if (!result || !result.data) {
-        throw new Error("Respuesta inválida del servidor");
-      }
+    );
 
-    } catch (err: any) {
-      setErrors(err.message);
-      setSelectedPO(null);
+    const result = response.data;
+
+    if (!result.success) {
+      throw new Error(
+        result.message ||
+          "Error consultando las órdenes de compra"
+      );
     }
-  };
+
+    if (!result.data) {
+      throw new Error(
+        "Respuesta inválida del servidor"
+      );
+    }
+
+    // ==========================================================
+    // NAVEGAR CON TODOS LOS IDs
+    // ==========================================================
+
+    goToOrder(poIds);
+
+  } catch (err: any) {
+    setErrors({
+      po:
+        err.message ||
+        "Error consultando las órdenes",
+    });
+
+    setSelectedPOs([]);
+  }
+};
 
   function handleInvoiceFocus() {
     setTimeout(() => {
@@ -144,16 +184,16 @@ export default function ReceivingSearch() {
         {/* TOP SECTION */}
         <div className="section top">
           <div ref={poRef} className="box div-a">
-            <SelectInput
-              label="Orden de Compra"
-              options={poOptions}
-              value={selectedPO}
-              onChange={(selected) => {
-                setSelectedPO(selected);
+            <MultiSelectInput
+  label="Órdenes de Compra"
+  options={poOptions}
+  value={selectedPOs}
+  onChange={(selected) => {
+                setSelectedPOs(selected);
                 setErrors({});
               }}
-              placeholder="Seleccione una orden"
-              required
+  placeholder="Seleccione órdenes"
+   required
               error={errors.po}
               onFocus={() => {
                 poRef.current?.scrollIntoView({
@@ -161,7 +201,8 @@ export default function ReceivingSearch() {
                   block: "center",
                 });
               }}
-            />
+/>
+            
           </div>
           <div className="box div-b">
             <TextInput
