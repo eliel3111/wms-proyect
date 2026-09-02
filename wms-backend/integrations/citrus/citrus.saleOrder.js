@@ -1092,3 +1092,150 @@ export function buildCitrusConducePayload(picking, lines) {
     lines: conduceLines
   };
 }
+
+
+
+export async function fetchSaleOrderById(orderId) {
+  try {
+
+    console.log("");
+    console.log("=======================================");
+    console.log("🔎 BUSCANDO ORDEN DE VENTA EN CITRUS");
+    console.log("🆔 ORDER ID:", orderId);
+    console.log("=======================================");
+
+    const id = Number(orderId);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(`ID inválido: ${orderId}`);
+    }
+
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<BuscarOrdenVenta xmlns="http://tempuri.org/">
+<Id>${id}</Id>
+</BuscarOrdenVenta>
+</soap:Body>
+</soap:Envelope>`;
+
+    const data = await callERPSales(
+      xml,
+      "http://tempuri.org/BuscarOrdenVenta",
+      "BuscarOrdenVenta"
+    );
+
+    // ==========================================
+    // OBTENER SOLAMENTE LA ORDEN
+    // ==========================================
+
+    const order =
+      data?.Data?.OrdenVenta;
+
+    if (!order) {
+      console.log(
+        "❌ Citrus no devolvió OrdenVenta"
+      );
+
+      return null;
+    }
+
+    // ==========================================
+    // PRODUCTOS DE LA ORDEN
+    // ==========================================
+
+    const productos =
+      (order.OrdenVentaDetalle || [])
+        .map((line) => {
+
+          const item =
+            line.Item || {};
+
+          return {
+
+            id:
+              item.Id ??
+              line.ItemId ??
+              null,
+
+            nombre:
+              item.Nombre ??
+              line.ItemDescripcion ??
+              null,
+
+            // El código más útil en Citrus
+            // normalmente será SKU.
+            codigo:
+              item.SKU ||
+              item.CodigoBarra ||
+              item.Referencia ||
+              null,
+
+            descripcion:
+              item.Descripcion ||
+              line.ItemDescripcion ||
+              null,
+
+            cantidad_ordenada:
+              Number(
+                line.ItemCantidad || 0
+              )
+          };
+        });
+
+
+    // ==========================================
+    // RESULTADO LIMPIO
+    // ==========================================
+
+    const result = {
+
+      order_id:
+        order.Id ?? id,
+
+      status:
+        order.Estatus ?? null,
+
+      cliente:
+        order.NombreCliente ??
+        order.Cliente?.Nombre ??
+        null,
+
+      fecha_creacion:
+        order.FechaCreacion ?? null,
+
+      fecha_actualizacion:
+        order.FechaActualizacion ?? null,
+
+      productos
+    };
+
+
+    console.log("");
+    console.log("=======================================");
+    console.log("🍊 ORDEN CITRUS");
+    console.log("=======================================");
+
+    console.log(
+      JSON.stringify(
+        result,
+        null,
+        2
+      )
+    );
+
+    return result;
+
+  } catch (error) {
+
+    console.error(
+      "🔥 ERROR BUSCANDO ORDEN DE VENTA:",
+      error.message
+    );
+
+    throw error;
+  }
+}

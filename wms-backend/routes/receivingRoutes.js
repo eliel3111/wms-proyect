@@ -21,7 +21,9 @@ router.post("/save", authMiddleware, savingReception);
 
 // Get all purschase order lines with differences in an order
 router.get(
-  "/differences/:poId", authMiddleware, getReceivingDifferences
+  "/differences",
+  authMiddleware,
+  getReceivingDifferences
 );
 
 // Search all the reception information for reception

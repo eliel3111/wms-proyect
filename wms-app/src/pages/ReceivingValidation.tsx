@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+    useNavigate,
+    useSearchParams
+} from "react-router-dom";
 import apiClient from "../services/apiClient.ts";
 import "../styles/ReceivingValidation.css";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
@@ -8,6 +11,10 @@ import OrderLineCard from "../components/OrderLineCard.tsx";
 
 type Diferencia = {
     id: number;
+
+    purchase_order_id: number;
+    purchase_order_number: string;
+
     sku: string;
     description: string;
     ordered_qty: number;
@@ -22,8 +29,17 @@ type Diferencia = {
 
 
 export default function ReceivingValidation() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
+     const [searchParams] =
+        useSearchParams();
+
+
+    const navigate =
+        useNavigate();
+
+
+    const poIdsParam =
+        searchParams.get("poIds");
+
 
     const [diferencias, setDiferencias] = useState<Diferencia[]>([]);
     const [loading, setLoading] = useState(true);
@@ -31,45 +47,153 @@ export default function ReceivingValidation() {
 
 
     useEffect(() => {
-        if (!id) return;
 
-        const poId = Number(id);
-        if (isNaN(poId)) return;
 
-        const loadDifferences = async () => {
+    if (!poIdsParam) {
+        return;
+    }
+
+
+    const purchaseOrderIds =
+        poIdsParam
+            .split(",")
+            .map(Number)
+            .filter(
+                (id) =>
+                    Number.isInteger(id) &&
+                    id > 0
+            );
+
+
+    console.log(
+        "📦 PURCHASE ORDER IDS:",
+        purchaseOrderIds
+    );
+
+
+    if (
+        purchaseOrderIds.length === 0
+    ) {
+
+        console.error(
+            "❌ No hay purchase order ids válidos"
+        );
+
+        setLoading(false);
+
+        return;
+    }
+
+
+    const loadDifferences =
+        async () => {
+
             try {
-                const response = await apiClient.get(
-                    `/receiving/differences/${poId}`
+
+                console.log(
+                    "🚀 BUSCANDO DIFERENCIAS DE:",
+                    purchaseOrderIds
                 );
 
-                const result = response.data;
+
+                const response =
+                    await apiClient.get(
+                        "/receiving/differences",
+                        {
+                            params: {
+
+                                poIds:
+                                    purchaseOrderIds.join(",")
+
+                            }
+                        }
+                    );
+
+
+                const result =
+                    response.data;
+
+
+                console.log(
+                    "📥 RESPUESTA BACKEND:",
+                    result
+                );
+
 
                 if (!result.success) {
-                    throw new Error("Error obteniendo diferencias");
+
+                    throw new Error(
+                        result.message ||
+                        "Error obteniendo diferencias"
+                    );
+
                 }
 
-                const diffs: Diferencia[] = result.data.lines;
-                console.log(result.data);
-                console.log("DIFERENCIAS: ", diffs);
-                // 1️⃣ Guardar diferencias en state
-                setDiferencias(diffs);
 
-                // 2️⃣ Si no hay diferencias → ir directo a final
-                if (diffs.length === 0) {
-                    setTimeout(() => {
-                        navigate(`/receiving/final/${poId}`, { replace: true });
-                    }, 5);
+                const diffs:
+                    Diferencia[] =
+                    result.data.lines;
+
+
+                console.log(
+                    "📦 DIFERENCIAS:",
+                    diffs
+                );
+
+
+                setDiferencias(
+                    diffs
+                );
+
+
+
+                if (
+                    diffs.length === 0
+                ) {
+
+                    setTimeout(
+                        () => {
+
+                            navigate(
+                                `/receiving/final?poIds=${encodeURIComponent(
+                                    purchaseOrderIds.join(",")
+                                )}`,
+                                {
+                                    replace: true
+                                }
+                            );
+
+                        },
+                        5
+                    );
+
                 }
+
 
             } catch (error) {
-                console.error(error);
+
+                console.error(
+                    "❌ Error obteniendo diferencias:",
+                    error
+                );
+
+
             } finally {
+
                 setLoading(false);
+
             }
+
         };
 
-        loadDifferences();
-    }, [id, navigate]);
+
+    loadDifferences();
+
+
+}, [
+    poIdsParam,
+    navigate
+]);
 
     if (loading) {
         return <LoadingScreen />;
@@ -117,7 +241,7 @@ export default function ReceivingValidation() {
 
                     <button
                         className="btn-finalize-blue"
-                        onClick={() => navigate(`/receiving/final/${id}`)}
+                        onClick={() => navigate(`/receiving/final/${searchParams}`)}
                     >
                         Finalizar
                     </button>

@@ -24,7 +24,7 @@ import { reserveInventoryForMove } from "./services/pickingBestRoute.js"
 //CITRUS
 import { fetchPurchaseOrdersTest, fetchAllItemsAndSync } from "./integrations/citrus/citrus.items.js";
 import { createConduce } from "./integrations/citrus/citrus.saleOrder.js";
-import {getActiveSaleOrders} from "./integrations/citrus/citrus.saleOrder.js"
+import {getActiveSaleOrders, fetchSaleOrderById} from "./integrations/citrus/citrus.saleOrder.js"
 import {syncAllPurchaseOrders} from "./integrations/citrus/citrus.sync.js";
 import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 import { buscarTodasLasExistenciasAlmacen } from "./integrations/citrus/citrus.erpStockSync.js";
@@ -58,6 +58,9 @@ import {syncAdmCloudUoms} from "./integrations/admcloud/admcloud.uom.service.js"
 import {
   runAdmCloudPurchaseOrdersSync
 } from "./integrations/admcloud/admcloud.purchaseOrders.js";
+import {
+  syncAdmCloudPurchaseOrderLinesByIds
+} from "./integrations/admcloud/admcloud.purchaseOrderDetail.js";
 
 const app = express();
 
@@ -87,9 +90,101 @@ console.log(resultado);
     console.error(error);
   }
 }
+app.use(express.json());
+
+//startAdmCloudCron();.
 
 
-//startAdmCloudCron();
+app.get(
+  "/test-citrus-sale/:id",
+  async (req, res) => {
+    try {
+      const order =
+        await fetchSaleOrderById(
+          req.params.id
+        );
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Orden no encontrada"
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: order
+      });
+
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+);
+
+
+
+app.post(
+  "/test-admcloud-purchase-order-lines",
+  async (req, res) => {
+
+    try {
+
+      const {
+        purchaseOrderIds
+      } = req.body;
+
+
+      console.log("");
+      console.log(
+        "📥 Purchase Order IDs recibidos:",
+        purchaseOrderIds
+      );
+
+
+      const result =
+        await syncAdmCloudPurchaseOrderLinesByIds(
+          purchaseOrderIds
+        );
+
+
+      return res.json({
+
+        success:
+          result.success,
+
+        data:
+          result
+
+      });
+
+
+    } catch (error) {
+
+      console.error(
+        "❌ Error sincronizando detalles Adm Cloud:",
+        error
+      );
+
+
+      return res
+        .status(500)
+        .json({
+
+          success: false,
+
+          message:
+            error.message
+
+        });
+
+    }
+
+  }
+);
 
 app.get(
   "/test-admcloud-purchase-orders-sync",
@@ -393,7 +488,7 @@ app.get("/test-purchase-orders", async (req, res) => {
     data
   });
 });
-app.use(express.json());
+
 
 /* ==================================================
    TEST CREAR CONDUCE

@@ -3,6 +3,8 @@ import "./OrderLineCard.css";
 /* Tipos base */
 type Product = {
   id: number;
+  purchase_order_id: Number;
+  purchase_order_number: string;
   sku: string;
   description: string;
   ordered_qty: number;
@@ -81,17 +83,17 @@ export default function OrderLineCard({
       </div>
 
       <div className="line-desc">
-        {line.erp_name} - {line.description}
+        {line.erp_name} 
 
         <br />
 
-        <strong>PN:</strong>{" "}
-        {line.erp_sku  ?? "N/A"}
+        <strong>CI:</strong>{" "}
+        {line.sku  ?? "N/A"}
 
         {" | "}
 
-        <strong>ID:</strong>{" "}
-        {line.erp_id ?? "N/A"}
+        <strong>OC:</strong>{" "}
+        {line.purchase_order_number ?? "N/A"}
       </div>
 
       <div className="line-qty">

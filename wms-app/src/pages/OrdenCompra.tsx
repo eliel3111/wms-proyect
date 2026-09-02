@@ -21,6 +21,8 @@ import { useModal } from "../context/ModalContext";
 /* Tipos base */
 type Product = {
     id: number;
+    purchase_order_id: Number;
+    purchase_order_number: string;
     sku: string;
     description: string;
     ordered_qty: number;

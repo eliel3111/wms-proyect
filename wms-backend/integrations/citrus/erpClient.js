@@ -267,132 +267,325 @@ export async function callERPPurchase(endpoint, soapAction, xmlBody) {
 
 
 
-// 🔥 SOLO PARA VENTAS
-export async function callERPSales(xmlBody) {
+// ======================================================
+// CITRUS - SALES
+// Sirve para:
+// BuscarOrdenesVentas
+// BuscarOrdenVenta
+// ======================================================
+
+export async function callERPSales(
+  xmlBody,
+  soapAction = "http://tempuri.org/BuscarOrdenesVentas",
+  methodName = "BuscarOrdenesVentas"
+) {
   try {
+
     let auth = await getERPAuth();
 
     const url =
-      "https://testapi.citrus.com.do/40/Facturacion/OrdenVentaService.asmx";
+      "https://api.citrus.com.do/40/Facturacion/OrdenVentaService.asmx";
 
-    const soapAction = "http://tempuri.org/BuscarOrdenesVentas";
+    console.log("");
+    console.log("=======================================");
+    console.log("🍊 CALL ERP SALES");
+    console.log("🌐 URL:", url);
+    console.log("📡 SOAP ACTION:", soapAction);
+    console.log("🧩 METHOD:", methodName);
+    console.log("=======================================");
 
-    /* ===============================
-       📡 REQUEST
-    =============================== */
     const response = await axios({
       method: "post",
       url,
       data: xmlBody,
+
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: soapAction,
-        Authorization: auth.token.trim(),
-        UsuarioTicketId: String(auth.ticket).trim(),
+
+        SOAPAction: `"${soapAction}"`,
+
+        Authorization:
+          auth.token.trim(),
+
+        UsuarioTicketId:
+          String(auth.ticket).trim(),
       },
+
       timeout: 20000,
-      transformRequest: [(data) => data],
+
+      transformRequest: [
+        data => data
+      ],
     });
 
-    /* ===============================
-       🔥 XML → JSON
-    =============================== */
-    const parsed = await parseStringPromise(response.data, {
-      explicitArray: false,
-      ignoreAttrs: true,
-    });
 
-    const envelopeKey = Object.keys(parsed)[0];
-    const bodyKey = Object.keys(parsed[envelopeKey])[0];
-    const body = parsed[envelopeKey][bodyKey];
+    // ==========================================
+    // XML → JSON
+    // ==========================================
 
-    /* ===============================
-       🔥 RESPONSE VENTAS
-    =============================== */
-    const responseNode = body["BuscarOrdenesVentasResponse"];
+    const parsed =
+      await parseStringPromise(
+        response.data,
+        {
+          explicitArray: false,
+          ignoreAttrs: true,
+        }
+      );
+
+
+    const envelopeKey =
+      Object.keys(parsed)[0];
+
+    const bodyKey =
+      Object.keys(
+        parsed[envelopeKey]
+      )[0];
+
+    const body =
+      parsed[envelopeKey][bodyKey];
+
+
+    // ==========================================
+    // RESPONSE DINÁMICO
+    // ==========================================
+
+    const responseName =
+      `${methodName}Response`;
+
+    const resultName =
+      `${methodName}Result`;
+
+
+    console.log(
+      "🔎 BUSCANDO RESPONSE:",
+      responseName
+    );
+
+    console.log(
+      "🔎 BUSCANDO RESULT:",
+      resultName
+    );
+
+
+    const responseNode =
+      body[responseName];
+
 
     if (!responseNode) {
-      console.log("❌ No existe BuscarOrdenesVentasResponse");
-      console.log(JSON.stringify(body, null, 2));
+
+      console.log(
+        `❌ No existe ${responseName}`
+      );
+
+      console.log(
+        JSON.stringify(
+          body,
+          null,
+          2
+        )
+      );
+
       return null;
     }
 
-    const raw = responseNode["BuscarOrdenesVentasResult"];
+
+    const raw =
+      responseNode[resultName];
+
 
     if (!raw) {
-      console.log("❌ No existe BuscarOrdenesVentasResult");
+
+      console.log(
+        `❌ No existe ${resultName}`
+      );
+
       return null;
     }
 
-    /* ===============================
-       🔥 STRING → JSON
-    =============================== */
+
+    // ==========================================
+    // STRING JSON → OBJECT
+    // ==========================================
+
     let data;
 
-    if (typeof raw === "string" && raw.trim().startsWith("{")) {
-      data = JSON.parse(raw);
+    if (
+      typeof raw === "string" &&
+      raw.trim().startsWith("{")
+    ) {
+
+      data =
+        JSON.parse(raw);
+
     } else {
+
       data = raw;
+
     }
 
-    /* ===============================
-       🔁 RELOGIN AUTO
-    =============================== */
-    if (data?.SesionExpirada === 1 || data?.TicketInvalido === 1) {
-      console.log("🔄 ERP SALES session expired → re-login");
 
-      auth = await refreshERPToken();
+    // ==========================================
+    // SESIÓN EXPIRADA
+    // ==========================================
 
-      const retry = await axios.post(url, xmlBody, {
-        headers: {
-          "Content-Type": "text/xml; charset=utf-8",
-          SOAPAction: soapAction,
-          Authorization: auth.token.trim(),
-          UsuarioTicketId: String(auth.ticket).trim(),
-        },
-      });
+    if (
+      data?.SesionExpirada === 1 ||
+      data?.TicketInvalido === 1
+    ) {
 
-      const parsedRetry = await parseStringPromise(retry.data, {
-        explicitArray: false,
-        ignoreAttrs: true,
-      });
+      console.log(
+        "🔄 ERP SALES session expired → re-login"
+      );
 
-      const envelopeRetry = Object.keys(parsedRetry)[0];
-      const bodyRetryKey = Object.keys(parsedRetry[envelopeRetry])[0];
-      const bodyRetry = parsedRetry[envelopeRetry][bodyRetryKey];
+      auth =
+        await refreshERPToken();
+
+
+      const retry =
+        await axios({
+          method: "post",
+
+          url,
+
+          data: xmlBody,
+
+          headers: {
+
+            "Content-Type":
+              "text/xml; charset=utf-8",
+
+            SOAPAction:
+              `"${soapAction}"`,
+
+            Authorization:
+              auth.token.trim(),
+
+            UsuarioTicketId:
+              String(auth.ticket).trim(),
+          },
+
+          timeout: 20000,
+
+          transformRequest: [
+            data => data
+          ],
+        });
+
+
+      const parsedRetry =
+        await parseStringPromise(
+          retry.data,
+          {
+            explicitArray: false,
+            ignoreAttrs: true,
+          }
+        );
+
+
+      const envelopeRetry =
+        Object.keys(
+          parsedRetry
+        )[0];
+
+      const bodyRetryKey =
+        Object.keys(
+          parsedRetry[
+            envelopeRetry
+          ]
+        )[0];
+
+      const bodyRetry =
+        parsedRetry[
+          envelopeRetry
+        ][bodyRetryKey];
+
 
       const responseRetry =
-        bodyRetry["BuscarOrdenesVentasResponse"];
+        bodyRetry[
+          responseName
+        ];
+
+
+      if (!responseRetry) {
+
+        console.log(
+          `❌ No existe ${responseName} en retry`
+        );
+
+        return null;
+      }
+
 
       const rawRetry =
-        responseRetry["BuscarOrdenesVentasResult"];
+        responseRetry[
+          resultName
+        ];
 
-      if (typeof rawRetry === "string") {
-        return JSON.parse(rawRetry);
+
+      if (!rawRetry) {
+
+        console.log(
+          `❌ No existe ${resultName} en retry`
+        );
+
+        return null;
       }
+
+
+      if (
+        typeof rawRetry === "string" &&
+        rawRetry
+          .trim()
+          .startsWith("{")
+      ) {
+
+        return JSON.parse(
+          rawRetry
+        );
+      }
+
 
       return rawRetry;
     }
 
-    /* ===============================
-       ✅ RESULT
-    =============================== */
+
+    console.log(
+      "✅ ERP SALES RESPONSE OK"
+    );
+
+
     return data;
 
+
   } catch (error) {
-    console.log("🔴 ERP SALES ERROR:");
+
+    console.log("");
+    console.log(
+      "🔴 ERP SALES ERROR:"
+    );
 
     if (error.response) {
-      console.log("STATUS:", error.response.status);
-      console.log("BODY:", error.response.data);
+
+      console.log(
+        "STATUS:",
+        error.response.status
+      );
+
+      console.log(
+        "BODY:",
+        error.response.data
+      );
+
     } else {
-      console.log(error.message);
+
+      console.log(
+        error.message
+      );
     }
 
     throw error;
   }
 }
-
 
 // 🔥 SOLO PARA CREAR CONDUCE
 export async function callERPCreateConduce(xmlBody) {

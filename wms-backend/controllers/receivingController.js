@@ -11,6 +11,9 @@ import {
   alegraPurchaseOrdersService
 } from "../integrations/alegra/alegraItemService.js";
 import { syncAlegraPurchaseOrderLines } from "../integrations/alegra/alegra.purcharseOrderLines.js"
+import {
+  syncAdmCloudPurchaseOrderLinesByIds
+} from "../integrations/admcloud/admcloud.purchaseOrderDetail.js";
 
 
 /*
@@ -1034,108 +1037,411 @@ export async function gettingReceptionLocation(req, res) {
 
 // Get all purchase order lines with differences in an order
 export async function getReceivingDifferences(req, res) {
-  const { poId } = req.params;
 
-  if (!poId) {
+  const { poIds } = req.query;
+
+
+  // ============================================================
+  // VALIDAR QUERY PARAM
+  // ============================================================
+
+  if (!poIds) {
+
     return res.status(400).json({
+
       success: false,
-      message: "PURCHASE_ORDER_ID_REQUIRED",
+
+      title:
+        "Orden de Compra requerida",
+
+      message:
+        "Debe enviar al menos una orden de compra.",
+
     });
+
   }
 
-  const purchaseOrderId = Number(poId);
 
-  if (isNaN(purchaseOrderId)) {
+  // ============================================================
+  // CONVERTIR:
+  //
+  // "38,36"
+  //
+  // ↓
+  //
+  // [38, 36]
+  // ============================================================
+
+  const purchaseOrderIds =
+    String(poIds)
+      .split(",")
+      .map(Number)
+      .filter(
+        (id) =>
+          Number.isInteger(id) &&
+          id > 0
+      );
+
+
+  console.log("");
+  console.log(
+    "📦 ========================================"
+  );
+
+  console.log(
+    "📦 GET RECEIVING DIFFERENCES"
+  );
+
+  console.log(
+    "📦 PURCHASE ORDER IDS:",
+    purchaseOrderIds
+  );
+
+  console.log(
+    "📦 ========================================"
+  );
+
+
+  // ============================================================
+  // VALIDAR IDS
+  // ============================================================
+
+  if (
+    purchaseOrderIds.length === 0
+  ) {
+
     return res.status(400).json({
+
       success: false,
-      message: "INVALID_PURCHASE_ORDER_ID",
+
+      title:
+        "Orden de Compra inválida",
+
+      message:
+        "No se recibieron IDs válidos.",
+
     });
+
   }
+
 
   try {
-    /* 1️⃣ Validar orden de compra */
-    const poResult = await db.query(
-      `
-            SELECT id, purchase_order_number, status
-            FROM purchase_orders
-            WHERE id = $1
-            LIMIT 1
-            `,
-      [purchaseOrderId]
+
+    // ============================================================
+    // 1. BUSCAR TODAS LAS PURCHASE ORDERS
+    // ============================================================
+
+    const poResult =
+      await db.query(
+        `
+        SELECT
+          id,
+          purchase_order_number,
+          status
+
+        FROM purchase_orders
+
+        WHERE id =
+          ANY($1::bigint[])
+
+        ORDER BY id
+        `,
+        [
+          purchaseOrderIds
+        ]
+      );
+
+
+    console.log(
+      "📦 PURCHASE ORDERS ENCONTRADAS:",
+      poResult.rows
     );
 
-    if (poResult.rowCount === 0) {
+
+    // ============================================================
+    // 2. VALIDAR QUE EXISTAN TODAS
+    // ============================================================
+
+    if (
+      poResult.rowCount !==
+      purchaseOrderIds.length
+    ) {
+
+      const foundIds =
+        poResult.rows.map(
+          (order) =>
+            Number(order.id)
+        );
+
+
+      const missingIds =
+        purchaseOrderIds.filter(
+          (id) =>
+            !foundIds.includes(id)
+        );
+
+
+      console.log(
+        "❌ PURCHASE ORDERS NO ENCONTRADAS:",
+        missingIds
+      );
+
+
       return res.status(404).json({
+
         success: false,
-        message: "PURCHASE_ORDER_NOT_FOUND",
+
+        title:
+          "Orden de Compra no disponible",
+
+        message:
+          missingIds.length === 1
+            ? `La orden de compra con ID ${missingIds[0]} no existe.`
+            : `Las órdenes de compra ${missingIds.join(", ")} no existen.`,
+
+        missingIds,
+
       });
+
     }
 
-    const purchaseOrder = poResult.rows[0];
 
-    /* 2️⃣ Validar status = 'partial' */
-    if (purchaseOrder.status !== "partial") {
+    // ============================================================
+    // 3. VALIDAR QUE TODAS ESTÉN PARTIAL
+    // ============================================================
+
+    const notPartialOrder =
+      poResult.rows.find(
+        (order) =>
+          String(order.status)
+            .trim()
+            .toLowerCase()
+          !== "partial"
+      );
+
+
+    if (notPartialOrder) {
+
+      console.log(
+        "❌ PURCHASE ORDER NO ESTÁ PARTIAL:",
+        notPartialOrder
+      );
+
+
       return res.status(409).json({
+
         success: false,
-        message: "PURCHASE_ORDER_NOT_PARTIAL",
+
+        title:
+          "Orden de Compra no disponible",
+
+        message:
+          `La orden ${notPartialOrder.purchase_order_number} no está en estado partial.`,
+
+        data: {
+
+          id:
+            Number(
+              notPartialOrder.id
+            ),
+
+          purchase_order_number:
+            notPartialOrder.purchase_order_number,
+
+          status:
+            notPartialOrder.status,
+
+        },
+
       });
+
     }
 
-    /* 3️⃣ Buscar líneas con diferencias */
-    const linesResult = await db.query(
-      `
-  SELECT
-      pol.id,
-      pol.sku,
-      pol.description,
-      pol.ordered_qty,
-      pol.received_qty,
-      pol.difference_qty,
-      pol.product_exists,
 
-      p.erp_name,
-      p.erp_sku,
-      p.erp_id
+    // ============================================================
+    // 4. BUSCAR LÍNEAS CON DIFERENCIAS
+    // ============================================================
 
-  FROM purchase_order_lines pol
+    const linesResult =
+      await db.query(
+        `
+        SELECT
 
-  LEFT JOIN products p
-      ON p.sku = pol.sku
+          pol.id,
 
-  WHERE pol.purchase_order_id = $1
-    AND pol.ordered_qty <> pol.received_qty
+          -- PO A LA QUE PERTENECE LA LÍNEA
+          pol.purchase_order_id,
+          po.purchase_order_number,
 
-  ORDER BY pol.id ASC
-  `,
-      [purchaseOrderId]
+          pol.sku,
+          pol.description,
+          pol.ordered_qty,
+          pol.received_qty,
+          pol.difference_qty,
+          pol.product_exists,
+
+          p.erp_name,
+          p.erp_sku,
+          p.erp_id
+
+        FROM purchase_order_lines pol
+
+        JOIN purchase_orders po
+          ON po.id =
+             pol.purchase_order_id
+
+        LEFT JOIN products p
+          ON p.sku =
+             pol.sku
+
+        WHERE
+          pol.purchase_order_id =
+            ANY($1::bigint[])
+
+          AND
+          pol.ordered_qty <>
+          pol.received_qty
+
+        ORDER BY
+          pol.purchase_order_id,
+          pol.id
+        `,
+        [
+          purchaseOrderIds
+        ]
+      );
+
+
+    console.log(
+      "📦 LÍNEAS CON DIFERENCIAS:",
+      linesResult.rows
     );
 
-    /* 5️⃣ Enriquecer líneas */
-    const enrichedLines = linesResult.rows.map(line => ({
-      ...line,
-      barcodes: "NO-NEEDED"
-    }));
 
-    console.log(enrichedLines);
+    // ============================================================
+    // 5. ENRIQUECER LÍNEAS
+    // ============================================================
 
-    /* 4️⃣ Respuesta */
+    const enrichedLines =
+      linesResult.rows.map(
+        (line) => ({
+
+          id:
+            Number(line.id),
+
+          purchase_order_id:
+            Number(
+              line.purchase_order_id
+            ),
+
+          purchase_order_number:
+            line.purchase_order_number,
+
+          sku:
+            line.sku,
+
+          description:
+            line.description,
+
+          ordered_qty:
+            Number(
+              line.ordered_qty ?? 0
+            ),
+
+          received_qty:
+            Number(
+              line.received_qty ?? 0
+            ),
+
+          difference_qty:
+            Number(
+              line.difference_qty ?? 0
+            ),
+
+          product_exists:
+            line.product_exists,
+
+          barcodes:
+            [],
+
+          erp_name:
+            line.erp_name || null,
+
+          erp_sku:
+            line.erp_sku || null,
+
+          erp_id:
+            line.erp_id
+              ? Number(line.erp_id)
+              : null,
+
+        })
+      );
+
+
+    // ============================================================
+    // 6. OBTENER NÚMEROS DE LAS PURCHASE ORDERS
+    // ============================================================
+
+    const purchaseOrderNumbers =
+      poResult.rows.map(
+        (order) =>
+          order.purchase_order_number
+      );
+
+
+    console.log(
+      "✅ DIFERENCIAS FINALES:",
+      enrichedLines
+    );
+
+
+    // ============================================================
+    // 7. RESPONDER
+    // ============================================================
+
     return res.status(200).json({
+
       success: true,
+
       data: {
-        purchase_order_id: purchaseOrder.id,
-        purchase_order_number: purchaseOrder.purchase_order_number,
-        lines: enrichedLines,
+
+        purchase_order_ids:
+          purchaseOrderIds,
+
+        purchase_order_numbers:
+          purchaseOrderNumbers,
+
+        lines:
+          enrichedLines,
+
       },
+
     });
+
 
   } catch (error) {
-    console.error("Error validating receiving:", error);
+
+    console.error(
+      "❌ Error validating receiving:",
+      error
+    );
+
 
     return res.status(500).json({
+
       success: false,
-      message: "ERROR_VALIDATING_RECEIVING",
+
+      title:
+        "Error obteniendo diferencias",
+
+      message:
+        "ERROR_VALIDATING_RECEIVING",
+
     });
+
   }
+
 }
 
 
@@ -1143,143 +1449,752 @@ export async function getReceivingDifferences(req, res) {
 // Save received quantities in the data base
 export async function savingReception(req, res) {
 
+  console.log("");
+  console.log("🚀 ========================================");
   console.log("🚀 HIT /receiving/save");
-  console.log("HEADERS:", req.headers);
-  console.log("BODY:", req.body);
+  console.log("🚀 ========================================");
 
-  const client = await db.connect();
+  console.log(
+    "BODY:",
+    req.body
+  );
+
+
+  // ============================================================
+  // RECIBIR DATA
+  // ============================================================
+
+  const {
+    purchase_order_ids,
+    purchase_order_numbers,
+    reception_status,
+    lines,
+  } = req.body;
+
+
+  // ============================================================
+  // NORMALIZAR IDS
+  //
+  // ["35", 39]
+  //
+  // ↓
+  //
+  // [35, 39]
+  // ============================================================
+
+  const purchaseOrderIds =
+    Array.isArray(purchase_order_ids)
+      ? [
+          ...new Set(
+            purchase_order_ids.map(
+              (id) => Number(id)
+            )
+          ),
+        ]
+      : [];
+
+
+  console.log(
+    "📦 PURCHASE ORDER IDS:",
+    purchaseOrderIds
+  );
+
+
+  console.log(
+    "📦 PURCHASE ORDER NUMBERS:",
+    purchase_order_numbers
+  );
+
+
+  console.log(
+    "📌 RECEPTION STATUS:",
+    reception_status
+  );
+
+
+  console.log(
+    "📦 LINES:",
+    lines
+  );
+
+
+  // ============================================================
+  // VALIDACIONES BÁSICAS
+  // ============================================================
+
+  if (
+    purchaseOrderIds.length === 0 ||
+    !Array.isArray(lines)
+  ) {
+
+    return res.status(400).json({
+
+      success: false,
+
+      title:
+        "Datos incompletos",
+
+      message:
+        "Debe enviar al menos una orden de compra y sus líneas.",
+
+    });
+
+  }
+
+
+  // ============================================================
+  // VALIDAR IDS
+  // ============================================================
+
+  const invalidPurchaseOrderId =
+    purchaseOrderIds.some(
+      (id) =>
+        !Number.isInteger(id) ||
+        id <= 0
+    );
+
+
+  if (invalidPurchaseOrderId) {
+
+    return res.status(400).json({
+
+      success: false,
+
+      title:
+        "Orden de Compra inválida",
+
+      message:
+        "Una o más órdenes tienen un ID inválido.",
+
+    });
+
+  }
+
+
+  // ============================================================
+  // VALIDAR LÍNEAS
+  // ============================================================
+
+  if (lines.length === 0) {
+
+    return res.status(400).json({
+
+      success: false,
+
+      title:
+        "Recepción sin líneas",
+
+      message:
+        "No hay líneas para actualizar.",
+
+    });
+
+  }
+
+
+  for (const line of lines) {
+
+    if (
+      typeof line.id !== "number" ||
+      typeof line.received_qty !== "number" ||
+      !Number.isFinite(line.received_qty) ||
+      line.received_qty < 0
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        title:
+          "Línea inválida",
+
+        message:
+          "Una o más líneas tienen un formato inválido.",
+
+      });
+
+    }
+
+  }
+
+
+  // ============================================================
+  // CONEXIÓN
+  // ============================================================
+
+  const client =
+    await db.connect();
+
 
   try {
-    const {
-      purchase_order_id,
-      purchase_order_number,
-      reception_status,
-      lines,
-    } = req.body;
 
-    console.log("🚨🚨🚨🚨 ALERTA SAVE SAVE", req.body);
-
-    /* ---------------- VALIDACIONES ---------------- */
-
-    if (!purchase_order_id || !purchase_order_number || !Array.isArray(lines)) {
-      return res.status(400).json({
-        success: false,
-        message: "Datos incompletos",
-      });
-    }
-
-    console.log(reception_status);
-
-    if (lines.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No hay líneas para actualizar",
-      });
-    }
-
-    for (const line of lines) {
-      if (
-        typeof line.id !== "number" ||
-        typeof line.received_qty !== "number" ||
-        line.received_qty < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Formato inválido en líneas",
-        });
-      }
-    }
-
-    /* ---------------- INICIO TRANSACCIÓN ---------------- */
-
-    await client.query("BEGIN");
-
-    /* ---------------- VALIDAR ORDEN ---------------- */
-
-    const poResult = await client.query(
-      `
-      SELECT id, status
-      FROM purchase_orders
-      WHERE id = $1 AND purchase_order_number = $2
-      FOR UPDATE
-      `,
-      [purchase_order_id, purchase_order_number]
-    );
-
-    if (poResult.rowCount === 0) {
-      throw new Error("Orden de compra no encontrada");
-    }
-
-    /* ---------------- ACTUALIZAR STATUS ---------------- */
-    if (poResult.rows[0].status !== "partial") {
-      await client.query(
-        `
-      UPDATE purchase_orders
-      SET status = 'partial'
-      WHERE id = $1
-      `,
-        [purchase_order_id]
-      );
-    }
-
-    if (reception_status === "paused") {
-      await db.query(
-        `
-        UPDATE receipts
-        SET status = 'paused'
-        WHERE purchase_order_id = $1
-          AND status = 'in_progress'
-        `,
-        [purchase_order_id]
-      );
-    }
-
-
-    /* ---------------- UPDATE MASIVO DE LÍNEAS ---------------- */
-
-    /**
-     * Construimos arrays para un solo UPDATE usando UNNEST
-     */
-    const lineIds = lines.map(l => l.id);
-    const receivedQtys = lines.map(l => l.received_qty);
+    // ============================================================
+    // INICIAR TRANSACCIÓN
+    // ============================================================
 
     await client.query(
-      `
-      UPDATE purchase_order_lines pol
-      SET received_qty = data.received_qty
-      FROM (
-        SELECT
-          UNNEST($1::BIGINT[]) AS id,
-          UNNEST($2::NUMERIC[]) AS received_qty
-      ) AS data
-      WHERE pol.id = data.id
-        AND pol.purchase_order_id = $3
-      `,
-      [lineIds, receivedQtys, purchase_order_id]
+      "BEGIN"
     );
 
-    /* ---------------- COMMIT ---------------- */
 
-    await client.query("COMMIT");
+    // ============================================================
+    // 1. BUSCAR Y BLOQUEAR TODAS LAS PURCHASE ORDERS
+    // ============================================================
 
-    return res.json({
+    const poResult =
+      await client.query(
+        `
+        SELECT
+          id,
+          purchase_order_number,
+          status
+
+        FROM purchase_orders
+
+        WHERE id =
+          ANY($1::bigint[])
+
+        FOR UPDATE
+        `,
+        [
+          purchaseOrderIds
+        ]
+      );
+
+
+    console.log("");
+    console.log(
+      "🔒 PURCHASE ORDERS BLOQUEADAS:"
+    );
+
+    console.log(
+      poResult.rows
+    );
+
+
+    // ============================================================
+    // 2. VALIDAR QUE EXISTAN TODAS
+    // ============================================================
+
+    if (
+      poResult.rowCount !==
+      purchaseOrderIds.length
+    ) {
+
+      const foundIds =
+        poResult.rows.map(
+          (order) =>
+            Number(order.id)
+        );
+
+
+      const missingIds =
+        purchaseOrderIds.filter(
+          (id) =>
+            !foundIds.includes(id)
+        );
+
+
+      console.log(
+        "❌ PURCHASE ORDERS NO ENCONTRADAS:",
+        missingIds
+      );
+
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+
+      return res.status(404).json({
+
+        success: false,
+
+        title:
+          "Orden de Compra no disponible",
+
+        message:
+          missingIds.length === 1
+            ? `La orden de compra con ID ${missingIds[0]} no existe.`
+            : `Las órdenes de compra ${missingIds.join(", ")} no existen.`,
+
+        missingIds,
+
+      });
+
+    }
+
+
+    console.log(
+      "✅ TODAS LAS PURCHASE ORDERS EXISTEN"
+    );
+
+
+    // ============================================================
+    // 3. PONER TODAS LAS POs EN PARTIAL
+    //
+    // Solo modifica las que todavía no están partial.
+    // ============================================================
+
+    const updatePoStatusResult =
+      await client.query(
+        `
+        UPDATE purchase_orders
+
+        SET status = 'partial'
+
+        WHERE id =
+          ANY($1::bigint[])
+
+          AND status IS DISTINCT FROM 'partial'
+
+        RETURNING
+          id,
+          purchase_order_number,
+          status
+        `,
+        [
+          purchaseOrderIds
+        ]
+      );
+
+
+    console.log(
+      "📌 POs CAMBIADAS A PARTIAL:",
+      updatePoStatusResult.rows
+    );
+
+
+    // ============================================================
+    // 4. SI LA RECEPCIÓN SE ESTÁ PAUSANDO
+    // ============================================================
+
+    let receiptId = null;
+
+
+    if (
+      reception_status === "paused"
+    ) {
+
+      console.log("");
+      console.log(
+        "⏸ BUSCANDO RECEPCIÓN PARA PAUSAR..."
+      );
+
+
+      // ==========================================================
+      // BUSCAR RECEIPT ACTIVO QUE PERTENEZCA EXACTAMENTE
+      // A ESTE CONJUNTO DE PURCHASE ORDERS
+      //
+      // Ejemplo:
+      //
+      // request:
+      // [35,39]
+      //
+      // Receipt:
+      // 35,39
+      //
+      // ✅ match
+      //
+      // Receipt:
+      // 35,39,42
+      //
+      // ❌ no es el mismo conjunto
+      // ==========================================================
+
+      const receiptResult =
+        await client.query(
+          `
+          SELECT
+            r.id,
+            r.receipt_code,
+            r.status
+
+          FROM receipts r
+
+          WHERE
+            r.status NOT IN (
+              'completed',
+              'abandoned'
+            )
+
+            AND r.id IN (
+
+              SELECT
+                rpo.receipt_id
+
+              FROM receipt_purchase_orders rpo
+
+              GROUP BY
+                rpo.receipt_id
+
+              HAVING
+
+                COUNT(
+                  DISTINCT rpo.purchase_order_id
+                ) = $2
+
+                AND
+
+                COUNT(
+                  DISTINCT rpo.purchase_order_id
+                ) FILTER (
+
+                  WHERE
+                    rpo.purchase_order_id =
+                    ANY($1::bigint[])
+
+                ) = $2
+            )
+
+          FOR UPDATE
+
+          LIMIT 1
+          `,
+          [
+            purchaseOrderIds,
+            purchaseOrderIds.length
+          ]
+        );
+
+
+      // ==========================================================
+      // NO EXISTE RECEIPT RELACIONADO
+      // ==========================================================
+
+      if (
+        receiptResult.rowCount === 0
+      ) {
+
+        console.log(
+          "❌ NO EXISTE RECEPCIÓN ACTIVA PARA:",
+          purchaseOrderIds
+        );
+
+
+        await client.query(
+          "ROLLBACK"
+        );
+
+
+        return res.status(404).json({
+
+          success: false,
+
+          title:
+            "Recepción no encontrada",
+
+          message:
+            "No existe una recepción activa relacionada con estas órdenes de compra.",
+
+        });
+
+      }
+
+
+      receiptId =
+        Number(
+          receiptResult.rows[0].id
+        );
+
+
+      console.log(
+        "📥 RECEIPT ENCONTRADO:",
+        receiptResult.rows[0]
+      );
+
+
+      // ==========================================================
+      // MARCAR RECEPCIÓN COMO PAUSED
+      // ==========================================================
+
+      const pauseReceiptResult =
+        await client.query(
+          `
+          UPDATE receipts
+
+          SET status = 'paused'
+
+          WHERE id = $1
+
+          RETURNING
+            id,
+            receipt_code,
+            status
+          `,
+          [
+            receiptId
+          ]
+        );
+
+
+      console.log(
+        "⏸ RECEPCIÓN PAUSADA:",
+        pauseReceiptResult.rows[0]
+      );
+
+    }
+
+
+    // ============================================================
+    // 5. PREPARAR UPDATE MASIVO DE LAS LÍNEAS
+    // ============================================================
+
+    const lineIds =
+      lines.map(
+        (line) =>
+          Number(line.id)
+      );
+
+
+    const receivedQtys =
+      lines.map(
+        (line) =>
+          Number(
+            line.received_qty
+          )
+      );
+
+
+    console.log("");
+    console.log(
+      "📦 LINE IDS:",
+      lineIds
+    );
+
+
+    console.log(
+      "📦 RECEIVED QTYS:",
+      receivedQtys
+    );
+
+
+    // ============================================================
+    // 6. ACTUALIZAR LÍNEAS DE TODAS LAS PURCHASE ORDERS
+    // ============================================================
+
+    const updateLinesResult =
+      await client.query(
+        `
+        UPDATE purchase_order_lines pol
+
+        SET
+          received_qty =
+            data.received_qty
+
+        FROM (
+
+          SELECT
+            UNNEST(
+              $1::BIGINT[]
+            ) AS id,
+
+            UNNEST(
+              $2::NUMERIC[]
+            ) AS received_qty
+
+        ) AS data
+
+        WHERE
+          pol.id = data.id
+
+          AND pol.purchase_order_id =
+            ANY($3::bigint[])
+
+        RETURNING
+          pol.id,
+          pol.purchase_order_id,
+          pol.sku,
+          pol.received_qty
+        `,
+        [
+          lineIds,
+          receivedQtys,
+          purchaseOrderIds
+        ]
+      );
+
+
+    console.log("");
+    console.log(
+      "✅ LÍNEAS ACTUALIZADAS:"
+    );
+
+
+    console.log(
+      updateLinesResult.rows
+    );
+
+
+    // ============================================================
+    // 7. VERIFICAR QUE TODAS LAS LÍNEAS FUERON ACTUALIZADAS
+    // ============================================================
+
+    if (
+      updateLinesResult.rowCount !==
+      lineIds.length
+    ) {
+
+      const updatedLineIds =
+        updateLinesResult.rows.map(
+          (line) =>
+            Number(line.id)
+        );
+
+
+      const missingLineIds =
+        lineIds.filter(
+          (id) =>
+            !updatedLineIds.includes(id)
+        );
+
+
+      console.log(
+        "❌ LÍNEAS NO ACTUALIZADAS:",
+        missingLineIds
+      );
+
+
+      throw new Error(
+        `LINES_NOT_FOUND_OR_NOT_IN_SELECTED_PURCHASE_ORDERS: ${missingLineIds.join(",")}`
+      );
+
+    }
+
+
+    // ============================================================
+    // 8. COMMIT
+    // ============================================================
+
+    await client.query(
+      "COMMIT"
+    );
+
+
+    console.log("");
+    console.log(
+      "✅ ========================================"
+    );
+
+    console.log(
+      "✅ RECEPCIÓN GUARDADA"
+    );
+
+    console.log(
+      "📦 PURCHASE ORDERS:",
+      purchaseOrderIds
+    );
+
+    console.log(
+      "📥 RECEIPT ID:",
+      receiptId
+    );
+
+    console.log(
+      "📌 STATUS:",
+      reception_status
+    );
+
+    console.log(
+      "✅ ========================================"
+    );
+
+
+    // ============================================================
+    // RESPUESTA
+    // ============================================================
+
+    return res.status(200).json({
+
       success: true,
-      message: "Recepción guardada correctamente",
+
+      message:
+        "Recepción guardada correctamente",
+
+      data: {
+
+        purchase_order_ids:
+          purchaseOrderIds,
+
+        purchase_order_numbers:
+          poResult.rows.map(
+            (order) =>
+              order.purchase_order_number
+          ),
+
+        receipt_id:
+          receiptId,
+
+        reception_status,
+
+        updated_lines:
+          updateLinesResult.rowCount,
+
+      },
+
     });
+
 
   } catch (error) {
-    await client.query("ROLLBACK");
 
-    console.error("❌ Error confirmando recepción:", error);
+    // ============================================================
+    // ROLLBACK
+    // ============================================================
+
+    try {
+
+      await client.query(
+        "ROLLBACK"
+      );
+
+    } catch (rollbackError) {
+
+      console.error(
+        "❌ Error ejecutando ROLLBACK:",
+        rollbackError
+      );
+
+    }
+
+
+    console.error("");
+    console.error(
+      "❌ ========================================"
+    );
+
+    console.error(
+      "❌ ERROR GUARDANDO RECEPCIÓN"
+    );
+
+    console.error(
+      error
+    );
+
+    console.error(
+      "❌ ========================================"
+    );
+
 
     return res.status(500).json({
+
       success: false,
-      message: error.message || "Error interno del servidor",
+
+      title:
+        "Error guardando recepción",
+
+      message:
+        error.message ||
+        "Error interno del servidor",
+
     });
+
   } finally {
+
     client.release();
+
   }
-};
+
+}
 
 
 
@@ -2137,7 +3052,6 @@ return res.status(200).json({
 
 
 
-
 // ============================================================
 // CONFIRMAR VARIAS ÓRDENES DE COMPRA POR ID
 // ============================================================
@@ -2148,7 +3062,7 @@ export async function confirmingIdOrder(req, res) {
     poIds,
     invoiceNo,
     supplier,
-  } = req.body;
+  } = req.body ?? {};
 
   const userId = req.user.id;
 
@@ -2161,96 +3075,202 @@ export async function confirmingIdOrder(req, res) {
 
 
   // ============================================================
-  // 1. VALIDAR QUE LLEGUE UN ARRAY
+  // 1. VALIDAR ARRAY
   // ============================================================
 
-  if (!Array.isArray(poIds) || poIds.length === 0) {
+  if (
+    !Array.isArray(poIds) ||
+    poIds.length === 0
+  ) {
 
     return res.status(400).json({
       success: false,
       title: "Orden de Compra requerida",
-      message: "Debe seleccionar al menos una orden de compra.",
+      message:
+        "Debe seleccionar al menos una orden de compra.",
     });
-
   }
 
 
   // ============================================================
-  // 2. NORMALIZAR IDS
-  //
-  // ["35", "39", "37"]
-  //
-  // ↓
-  //
-  // [35, 39, 37]
+  // 2. NORMALIZAR IDs
   // ============================================================
 
   const normalizedPoIds = [
     ...new Set(
-      poIds.map((id) => Number(id))
+      poIds.map(
+        (id) => Number(id)
+      )
     ),
   ];
 
 
   // ============================================================
-  // 3. VALIDAR QUE TODOS LOS IDS SEAN VÁLIDOS
+  // 3. VALIDAR IDs
   // ============================================================
 
-  const invalidId = normalizedPoIds.some(
-    (id) =>
-      !Number.isInteger(id) ||
-      id <= 0
-  );
+  const invalidId =
+    normalizedPoIds.some(
+      (id) =>
+        !Number.isInteger(id) ||
+        id <= 0
+    );
 
 
   if (invalidId) {
 
     return res.status(400).json({
       success: false,
-      title: "Orden de Compra no disponible",
-      message: "Una o más órdenes tienen un ID inválido.",
+      title:
+        "Orden de Compra no disponible",
+      message:
+        "Una o más órdenes tienen un ID inválido.",
     });
-
   }
 
 
   // ============================================================
-  // CONEXIÓN
+  // 4. SINCRONIZAR LÍNEAS DESDE ADM CLOUD
+  //
+  // MUY IMPORTANTE:
+  // HACER ESTO ANTES DEL BEGIN / FOR UPDATE
   // ============================================================
 
-  const client = await db.connect();
+  let admCloudSyncResult;
 
 
   try {
 
-    // ============================================================
-    // TRANSACCIÓN
-    // ============================================================
-
-    await client.query("BEGIN");
-
-
-    // ============================================================
-    // 4. BUSCAR TODAS LAS ÓRDENES
-    // ============================================================
-
-    const ordersResult = await client.query(
-      `
-      SELECT
-        id,
-        purchase_order_number,
-        supplier_name,
-        invoice_numbers,
-        status
-
-      FROM purchase_orders
-
-      WHERE id = ANY($1::bigint[])
-
-      FOR UPDATE
-      `,
-      [normalizedPoIds]
+    console.log("");
+    console.log("☁️ ========================================");
+    console.log("☁️ SINCRONIZANDO DETALLES ADM CLOUD");
+    console.log(
+      "📥 WMS PO IDs:",
+      normalizedPoIds
     );
+    console.log("☁️ ========================================");
+
+
+    admCloudSyncResult =
+      await syncAdmCloudPurchaseOrderLinesByIds(
+        normalizedPoIds
+      );
+
+
+    console.log("");
+    console.log(
+      "✅ RESULTADO SYNC ADM CLOUD:"
+    );
+
+    console.dir(
+      admCloudSyncResult,
+      {
+        depth: null
+      }
+    );
+
+
+    // ==========================================================
+    // SI ALGUNA OC FALLÓ → NO CONTINUAR RECEPCIÓN
+    // ==========================================================
+
+    if (!admCloudSyncResult.success) {
+
+      return res
+        .status(409)
+        .json({
+
+          success: false,
+
+          title:
+            "Error sincronizando órdenes",
+
+          message:
+            "Una o más órdenes no pudieron sincronizarse con Adm Cloud.",
+
+          synchronization:
+            admCloudSyncResult,
+
+        });
+    }
+
+
+  } catch (error) {
+
+    console.error("");
+    console.error(
+      "❌ ERROR SINCRONIZANDO ADM CLOUD:"
+    );
+    console.error(error);
+
+
+    return res
+      .status(
+        error.status || 500
+      )
+      .json({
+
+        success: false,
+
+        title:
+          "Error sincronizando órdenes",
+
+        message:
+          error.message ||
+          "No fue posible sincronizar las órdenes con Adm Cloud.",
+
+      });
+  }
+
+
+  // ============================================================
+  // 5. AHORA ABRIR CONEXIÓN DE RECEIVING
+  // ============================================================
+
+  const client =
+    await db.connect();
+
+  let transactionStarted =
+    false;
+
+
+  try {
+
+    // ==========================================================
+    // 6. BEGIN
+    // ==========================================================
+
+    await client.query(
+      "BEGIN"
+    );
+
+    transactionStarted =
+      true;
+
+
+    // ==========================================================
+    // 7. BUSCAR Y BLOQUEAR TODAS LAS ÓRDENES
+    // ==========================================================
+
+    const ordersResult =
+      await client.query(
+        `
+        SELECT
+          id,
+          purchase_order_number,
+          supplier_name,
+          invoice_numbers,
+          status
+
+        FROM purchase_orders
+
+        WHERE id =
+          ANY($1::bigint[])
+
+        FOR UPDATE
+        `,
+        [normalizedPoIds]
+      );
 
 
     console.log(
@@ -2259,9 +3279,9 @@ export async function confirmingIdOrder(req, res) {
     );
 
 
-    // ============================================================
-    // 5. VALIDAR QUE TODAS EXISTAN
-    // ============================================================
+    // ==========================================================
+    // 8. VALIDAR QUE TODAS EXISTAN
+    // ==========================================================
 
     if (
       ordersResult.rowCount !==
@@ -2270,13 +3290,15 @@ export async function confirmingIdOrder(req, res) {
 
       const foundIds =
         ordersResult.rows.map(
-          (order) => Number(order.id)
+          (order) =>
+            Number(order.id)
         );
 
 
       const missingIds =
         normalizedPoIds.filter(
-          (id) => !foundIds.includes(id)
+          (id) =>
+            !foundIds.includes(id)
         );
 
 
@@ -2286,45 +3308,47 @@ export async function confirmingIdOrder(req, res) {
       );
 
 
-      await client.query("ROLLBACK");
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transactionStarted =
+        false;
 
 
-      return res.status(404).json({
+      return res
+        .status(404)
+        .json({
 
-        success: false,
+          success: false,
 
-        title:
-          "Orden de Compra no disponible",
+          title:
+            "Orden de Compra no disponible",
 
-        message:
-          "Una o más órdenes de compra no existen.",
+          message:
+            "Una o más órdenes de compra no existen.",
 
-        missingIds,
+          missingIds,
 
-      });
-
+        });
     }
 
 
-    // ============================================================
-    // 6. VALIDAR QUE TODAS ESTÉN ACTIVAS
-    //
-    // SI UNA ESTÁ:
-    //
-    // completed
-    // abandoned
-    //
-    // NO SE PROCESA NINGUNA
-    // ============================================================
+    // ==========================================================
+    // 9. VALIDAR STATUS
+    // ==========================================================
 
     const unavailableOrder =
       ordersResult.rows.find(
         (order) => {
 
           const status =
-            String(order.status)
+            String(
+              order.status
+            )
               .trim()
               .toLowerCase();
+
 
           return (
             status === "completed" ||
@@ -2341,44 +3365,52 @@ export async function confirmingIdOrder(req, res) {
       console.log(
         "❌ ORDEN NO DISPONIBLE:"
       );
+
       console.log(
         "📦 Orden:",
         unavailableOrder.purchase_order_number
       );
+
       console.log(
         "📌 Status:",
         unavailableOrder.status
       );
 
 
-      await client.query("ROLLBACK");
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transactionStarted =
+        false;
 
 
-      return res.status(409).json({
+      return res
+        .status(409)
+        .json({
 
-        success: false,
+          success: false,
 
-        title:
-          "Orden de Compra no disponible",
+          title:
+            "Orden de Compra no disponible",
 
-        message:
-          `La orden ${unavailableOrder.purchase_order_number} no está activa.`,
+          message:
+            `La orden ${unavailableOrder.purchase_order_number} no está activa.`,
 
-        data: {
+          data: {
 
-          id:
-            unavailableOrder.id,
+            id:
+              unavailableOrder.id,
 
-          label:
-            unavailableOrder.purchase_order_number,
+            label:
+              unavailableOrder.purchase_order_number,
 
-          status:
-            unavailableOrder.status,
+            status:
+              unavailableOrder.status,
 
-        },
+          },
 
-      });
-
+        });
     }
 
 
@@ -2387,20 +3419,26 @@ export async function confirmingIdOrder(req, res) {
       "✅ TODAS LAS ÓRDENES ESTÁN ACTIVAS"
     );
 
+
     console.log(
       ordersResult.rows.map(
         (order) => ({
-          id: order.id,
-          po: order.purchase_order_number,
-          status: order.status,
+          id:
+            order.id,
+
+          po:
+            order.purchase_order_number,
+
+          status:
+            order.status,
         })
       )
     );
 
 
-    // ============================================================
-    // 7. PREPARAR CAMPOS PARA UPDATE
-    // ============================================================
+    // ==========================================================
+    // 10. PREPARAR CAMPOS PARA UPDATE
+    // ==========================================================
 
     const fields = [];
     const values = [];
@@ -2408,9 +3446,9 @@ export async function confirmingIdOrder(req, res) {
     let idx = 1;
 
 
-    // ============================================================
-    // PROVEEDOR
-    // ============================================================
+    // ==========================================================
+    // SUPPLIER
+    // ==========================================================
 
     if (supplier) {
 
@@ -2418,16 +3456,17 @@ export async function confirmingIdOrder(req, res) {
         `supplier_name = TRIM(UPPER($${idx}))`
       );
 
-      values.push(supplier);
+      values.push(
+        supplier
+      );
 
       idx++;
-
     }
 
 
-    // ============================================================
-    // FACTURA
-    // ============================================================
+    // ==========================================================
+    // INVOICE
+    // ==========================================================
 
     if (invoiceNo) {
 
@@ -2447,41 +3486,49 @@ export async function confirmingIdOrder(req, res) {
       `);
 
 
-      values.push(invoiceNo);
+      values.push(
+        invoiceNo
+      );
 
       idx++;
-
     }
 
 
-    // ============================================================
-    // 8. SI NO HAY SUPPLIER NI INVOICE
-    //
-    // MISMO COMPORTAMIENTO QUE TU FUNCIÓN ORIGINAL:
-    //
-    // SOLO CONFIRMAR QUE LAS ÓRDENES EXISTEN Y ESTÁN ACTIVAS
-    // ============================================================
+    // ==========================================================
+    // 11. SI NO HAY CAMPOS PARA MODIFICAR
+    // ==========================================================
 
-    if (fields.length === 0) {
+    if (
+      fields.length === 0
+    ) {
 
-      await client.query("COMMIT");
+      await client.query(
+        "COMMIT"
+      );
+
+      transactionStarted =
+        false;
 
 
-      return res.status(200).json({
+      return res
+        .status(200)
+        .json({
 
-        success: true,
+          success: true,
 
-        data:
-          ordersResult.rows,
+          data:
+            ordersResult.rows,
 
-      });
+          admCloudSynchronization:
+            admCloudSyncResult,
 
+        });
     }
 
 
-    // ============================================================
-    // 9. ACTUALIZAR TODAS LAS ÓRDENES
-    // ============================================================
+    // ==========================================================
+    // 12. UPDATE PURCHASE ORDERS
+    // ==========================================================
 
     const updateQuery = `
       UPDATE purchase_orders
@@ -2502,7 +3549,9 @@ export async function confirmingIdOrder(req, res) {
     `;
 
 
-    values.push(normalizedPoIds);
+    values.push(
+      normalizedPoIds
+    );
 
 
     const updatedOrders =
@@ -2519,15 +3568,16 @@ export async function confirmingIdOrder(req, res) {
     );
 
 
-    // ============================================================
-    // 10. PROCESAR RECEIPT PARA CADA ORDEN
-    // ============================================================
+    // ==========================================================
+    // 13. PROCESAR RECEIPTS
+    // ==========================================================
 
     const receipts = [];
 
 
     for (
-      const order of updatedOrders.rows
+      const order
+      of updatedOrders.rows
     ) {
 
       const purchaseOrderId =
@@ -2550,9 +3600,9 @@ export async function confirmingIdOrder(req, res) {
       );
 
 
-      // ==========================================================
-      // 11. BUSCAR RECEPCIÓN ACTIVA
-      // ==========================================================
+      // ========================================================
+      // 14. BUSCAR RECEIPT ACTIVO
+      // ========================================================
 
       const receiptResult =
         await client.query(
@@ -2564,7 +3614,8 @@ export async function confirmingIdOrder(req, res) {
 
           FROM receipts
 
-          WHERE purchase_order_id = $1
+          WHERE
+            purchase_order_id = $1
 
             AND status NOT IN (
               'completed',
@@ -2581,12 +3632,13 @@ export async function confirmingIdOrder(req, res) {
       let receiptCode;
 
 
-      // ==========================================================
-      // 12. SI NO EXISTE RECEPCIÓN → CREAR
-      // ==========================================================
+      // ========================================================
+      // 15. NO EXISTE RECEIPT → CREAR
+      // ========================================================
 
       if (
-        receiptResult.rowCount === 0
+        receiptResult.rowCount ===
+        0
       ) {
 
         console.log(
@@ -2598,9 +3650,9 @@ export async function confirmingIdOrder(req, res) {
         );
 
 
-        // ========================================================
-        // OBTENER SEQUENCE
-        // ========================================================
+        // ======================================================
+        // SEQUENCE
+        // ======================================================
 
         const seqResult =
           await client.query(
@@ -2625,33 +3677,31 @@ export async function confirmingIdOrder(req, res) {
           `${year}-${nextNumber}`;
 
 
-        // ========================================================
-        // CREAR RECEIPT
-        // ========================================================
+        // ======================================================
+        // INSERT RECEIPT
+        // ======================================================
 
         const createReceipt =
           await client.query(
             `
-            INSERT INTO receipts (
-
+            INSERT INTO receipts
+            (
               receipt_code,
               purchase_order_id,
               operator_id,
               status,
               started_at,
               invoice
-
             )
 
-            VALUES (
-
+            VALUES
+            (
               $1,
               $2,
               $3,
               'in_progress',
               NOW(),
               $4
-
             )
 
             RETURNING
@@ -2685,21 +3735,22 @@ export async function confirmingIdOrder(req, res) {
           "📄 Receipt Code:",
           receiptCode
         );
-
       }
 
 
-      // ==========================================================
-      // 13. SI YA EXISTE → REUTILIZAR
-      // ==========================================================
+      // ========================================================
+      // 16. YA EXISTE RECEIPT → REUTILIZAR
+      // ========================================================
 
       else {
 
         receiptId =
           receiptResult.rows[0].id;
 
+
         receiptCode =
-          receiptResult.rows[0]
+          receiptResult
+            .rows[0]
             .receipt_code;
 
 
@@ -2713,9 +3764,9 @@ export async function confirmingIdOrder(req, res) {
         );
 
 
-        // ========================================================
-        // ACTUALIZAR FACTURA
-        // ========================================================
+        // ======================================================
+        // ACTUALIZAR FACTURA DEL RECEIPT
+        // ======================================================
 
         if (invoiceNo) {
 
@@ -2723,9 +3774,11 @@ export async function confirmingIdOrder(req, res) {
             `
             UPDATE receipts
 
-            SET invoice = $1
+            SET
+              invoice = $1
 
-            WHERE id = $2
+            WHERE
+              id = $2
             `,
             [
               invoiceNo,
@@ -2738,15 +3791,13 @@ export async function confirmingIdOrder(req, res) {
             "📄 Factura actualizada:",
             invoiceNo
           );
-
         }
-
       }
 
 
-      // ==========================================================
-      // 14. GUARDAR RESULTADO
-      // ==========================================================
+      // ========================================================
+      // GUARDAR RESULTADO
+      // ========================================================
 
       receipts.push({
 
@@ -2760,15 +3811,19 @@ export async function confirmingIdOrder(req, res) {
         receiptCode,
 
       });
-
     }
 
 
-    // ============================================================
-    // 15. COMMIT
-    // ============================================================
+    // ==========================================================
+    // 17. COMMIT
+    // ==========================================================
 
-    await client.query("COMMIT");
+    await client.query(
+      "COMMIT"
+    );
+
+    transactionStarted =
+      false;
 
 
     console.log("");
@@ -2795,36 +3850,58 @@ export async function confirmingIdOrder(req, res) {
     );
 
 
-    // ============================================================
-    // 16. RESPUESTA FINAL
-    // ============================================================
+    // ==========================================================
+    // 18. RESPONSE
+    // ==========================================================
 
-    return res.status(200).json({
+    return res
+      .status(200)
+      .json({
 
-      success: true,
+        success: true,
 
-      message:
-        "PURCHASE_ORDERS_CONFIRMED",
+        message:
+          "PURCHASE_ORDERS_CONFIRMED",
 
-      data: {
+        data: {
 
-        orders:
-          updatedOrders.rows,
+          orders:
+            updatedOrders.rows,
 
-        receipts,
+          receipts,
 
-      },
+          admCloudSynchronization:
+            admCloudSyncResult,
 
-    });
+        },
+
+      });
 
 
   } catch (error) {
 
-    // ============================================================
-    // ERROR → DESHACER TODO
-    // ============================================================
+    // ==========================================================
+    // ERROR
+    // ==========================================================
 
-    await client.query("ROLLBACK");
+    if (transactionStarted) {
+
+      try {
+
+        await client.query(
+          "ROLLBACK"
+        );
+
+      } catch (
+        rollbackError
+      ) {
+
+        console.error(
+          "❌ Error ejecutando ROLLBACK:",
+          rollbackError
+        );
+      }
+    }
 
 
     console.error("");
@@ -2843,30 +3920,48 @@ export async function confirmingIdOrder(req, res) {
     );
 
 
-    return res.status(500).json({
+    return res
+      .status(500)
+      .json({
 
-      success: false,
+        success: false,
 
-      title:
-        "Error confirmando órdenes",
+        title:
+          "Error confirmando órdenes",
 
-      message:
-        "ERROR_CONFIRMING_ORDERS",
+        message:
+          error.message ||
+          "ERROR_CONFIRMING_ORDERS",
 
-    });
+      });
 
 
   } finally {
 
-    // ============================================================
+    // ==========================================================
     // LIBERAR CONEXIÓN
-    // ============================================================
+    // ==========================================================
 
     client.release();
-
   }
-
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

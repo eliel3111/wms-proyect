@@ -1,18 +1,18 @@
 import axios from "axios";
 import { parseStringPromise } from "xml2js";
 
-const ERP_URL = "https://testapi.citrus.com.do/40/Seguridad/SeguridadService.asmx";
+/*const ERP_URL = "https://testapi.citrus.com.do/40/Seguridad/SeguridadService.asmx";*/
 
-/*const ERP_URL = "https://api.citrus.com.do/40/Seguridad/SeguridadService.asmx";*/
+const ERP_URL = "https://api.citrus.com.do/40/Seguridad/SeguridadService.asmx";
 
 // 🔐 credenciales ERP
-const ERP_USER = "api";
+/*onst ERP_USER = "api";
 const ERP_PASS = "Ap4RkXUp1TxU";
-const ERP_COMPANY = "garlascontrol2";
+const ERP_COMPANY = "garlascontrol2";*/
 
-/*const ERP_USER = "api";
+const ERP_USER = "api";
 const ERP_PASS = "8jZ0u5puIBlC9nMu";
-const ERP_COMPANY = "garlascontrol";*/
+const ERP_COMPANY = "garlascontrol";
 
 // 🧠 memoria interna
 let session = {
