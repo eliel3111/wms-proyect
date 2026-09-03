@@ -63,7 +63,10 @@ function App() {
             path="validation"
             element={<ReceivingValidation />}
           />
-          <Route path="receiving/final/:id" element={<ReceivingFinal />} />
+          <Route
+            path="receiving/final"
+            element={<ReceivingFinal />}
+          />
 
 
           {/* PUTAWAY */}

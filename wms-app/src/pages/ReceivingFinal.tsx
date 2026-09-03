@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import "../styles/ReceivingFinal.css"
 import apiClient from "../services/apiClient";
@@ -12,17 +12,35 @@ type ReceivingLocation = {
 };
 
 type CloseReceivingPayload = {
-    purchaseOrderId: number;
+    purchaseOrderIds: number[];
     receivingLocationId: number;
 };
 
 export default function ReceivingFinal() {
-    const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
+
+    const poIdsParam = searchParams.get("poIds");
+
+    const purchaseOrderIds = String(poIdsParam || "")
+        .split(",")
+        .map(Number)
+        .filter(
+            (id) =>
+                Number.isInteger(id) &&
+                id > 0
+        );
+
+    console.log(
+        "📦 FINAL PURCHASE ORDER IDS:",
+        purchaseOrderIds
+    );
+
+
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement>(null);
     const [loading, setLoading] = useState(true);
     const [locations, setLocations] = useState<ReceivingLocation[]>([]);
-    
+
     const [confirmation, setConfirmation] = useState<{
         show: boolean;
         receiptCode: string;
@@ -65,7 +83,7 @@ export default function ReceivingFinal() {
 
             } catch (err: any) {
                 // Error de red o 500
-                
+
                 console.error(err);
             } finally {
                 setLoading(false);
@@ -96,7 +114,7 @@ export default function ReceivingFinal() {
             console.log(locationFound.code);
             console.log(typeof (locationFound.code));
             const result = await closeReceiving({
-                purchaseOrderId: Number(id),
+                purchaseOrderIds,
                 receivingLocationId: Number(locationFound.id),
             });
             console.log("RESULTADO: ", result.success);
@@ -116,7 +134,7 @@ export default function ReceivingFinal() {
                 onCloseCallback: focusScannerInput, // 👈 AQUÍ
             });
 
-        } 
+        }
 
         // 🧹 limpiar input para el próximo scan
         e.currentTarget.value = "";
@@ -125,7 +143,11 @@ export default function ReceivingFinal() {
 
     // FUNCTION: To save reception
     async function closeReceiving(payload: CloseReceivingPayload) {
-        const response = await apiClient.post("/receiving/close", payload);
+        const response = await apiClient.post(
+            "/receiving/close",
+            payload
+        );
+
         return response.data;
     }
 
@@ -141,18 +163,18 @@ export default function ReceivingFinal() {
         return <LoadingScreen />;
     }
 
-    
+
     if (confirmation.show) {
-           return <ConfirmationScreen
-                title="¡RECEPCIÓN CERRADA!"
-                message={`Recepción ${confirmation.receiptCode} completada. RECUERDE HACER EL PUTAWAY!`}
-                autoCloseMs={3000}
-                onFinish={() => {
-                    navigate("/menu");
-                }}
-            />
-        
-            }
+        return <ConfirmationScreen
+            title="¡RECEPCIÓN CERRADA!"
+            message={`Recepción ${confirmation.receiptCode} completada. RECUERDE HACER EL PUTAWAY!`}
+            autoCloseMs={3000}
+            onFinish={() => {
+                navigate("/menu");
+            }}
+        />
+
+    }
 
     return (
         <div className="page-receiving-final">

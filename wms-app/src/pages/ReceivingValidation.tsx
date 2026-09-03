@@ -240,11 +240,15 @@ export default function ReceivingValidation() {
                     </div>
 
                     <button
-                        className="btn-finalize-blue"
-                        onClick={() => navigate(`/receiving/final/${searchParams}`)}
-                    >
-                        Finalizar
-                    </button>
+  className="btn-finalize-blue"
+  onClick={() =>
+    navigate(
+      `/receiving/final?poIds=${encodeURIComponent(poIdsParam || "")}`
+    )
+  }
+>
+  Finalizar
+</button>
                 </div>
 
             </div>
