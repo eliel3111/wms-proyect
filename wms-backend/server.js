@@ -30,6 +30,7 @@ import { startCitrusCron } from "./integrations/citrus/citrus.cron.js";
 import { buscarTodasLasExistenciasAlmacen } from "./integrations/citrus/citrus.erpStockSync.js";
 import cron from "node-cron";
 
+
 //ALEGRA
 import { alegraItemsService, alegraItemCategoriesService, alegraWarehousesService } from "./integrations/alegra/alegraItemService.js";
 import {
@@ -59,10 +60,11 @@ import {
   runAdmCloudPurchaseOrdersSync
 } from "./integrations/admcloud/admcloud.purchaseOrders.js";
 import {
-  syncAdmCloudPurchaseOrderLinesByIds
+  syncAdmCloudPurchaseOrderLinesByIds, getAdmCloudPurchaseOrderDetail
 } from "./integrations/admcloud/admcloud.purchaseOrderDetail.js";
 
 const app = express();
+
 
 
 async function ejecutarAjusteManual() {
@@ -93,6 +95,9 @@ console.log(resultado);
 app.use(express.json());
 
 //startAdmCloudCron();.
+
+
+
 
 
 app.get(
@@ -128,61 +133,70 @@ app.get(
 
 
 app.post(
-  "/test-admcloud-purchase-order-lines",
+  "/test-admcloud-purchase-order-detail",
   async (req, res) => {
-
     try {
 
       const {
-        purchaseOrderIds
+        purchaseOrderId
       } = req.body;
+
+
+      if (!purchaseOrderId) {
+        return res.status(400).json({
+          success: false,
+          message: "purchaseOrderId es requerido"
+        });
+      }
 
 
       console.log("");
       console.log(
-        "📥 Purchase Order IDs recibidos:",
-        purchaseOrderIds
+        "📥 Purchase Order ID recibido:",
+        purchaseOrderId
       );
 
 
-      const result =
-        await syncAdmCloudPurchaseOrderLinesByIds(
-          purchaseOrderIds
+      const purchaseOrder =
+        await getAdmCloudPurchaseOrderDetail(
+          purchaseOrderId
         );
 
 
-      return res.json({
+      console.log("");
+      console.log("==========================================");
+      console.log("📦 PURCHASE ORDER COMPLETA");
+      console.log("==========================================");
 
-        success:
-          result.success,
+      console.dir(
+        purchaseOrder,
+        {
+          depth: null,
+          colors: true
+        }
+      );
 
-        data:
-          result
 
+      return res.status(200).json({
+        success: true,
+        data: purchaseOrder
       });
 
 
     } catch (error) {
 
       console.error(
-        "❌ Error sincronizando detalles Adm Cloud:",
+        "❌ Error buscando Purchase Order:",
         error
       );
 
 
-      return res
-        .status(500)
-        .json({
-
-          success: false,
-
-          message:
-            error.message
-
-        });
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
 
     }
-
   }
 );
 
@@ -421,7 +435,7 @@ console.log("🎉 Todos los batches procesados");
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-//startCitrusCron();
+startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {

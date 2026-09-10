@@ -16,7 +16,7 @@ export async function getActiveSaleOrders() {
   let clientDb = null;
 
   try {
-    console.log("🚀 Sync SALE ORDERS iniciado");
+   // console.log("🚀 Sync SALE ORDERS iniciado");
     //🟨🟨
     lock = await lockSyncControl(model);
 
@@ -35,7 +35,7 @@ export async function getActiveSaleOrders() {
 
     const orders = saleOrders || [];
 
-    console.log("🟨 TOTAL ORDER VENTA ERP: ", orders.length);
+    //console.log("🟨 TOTAL ORDER VENTA ERP: ", orders.length);
 
     if (orders.length === 0) {
       console.log("⚠️ ERP no devolvió órdenes");
@@ -61,11 +61,11 @@ export async function getActiveSaleOrders() {
       // 🔹 UPSERT
       for (const so of orders) {
         //🟨🟨      
-        console.log("🟥 ORDEN: ", so);
+      // console.log("🟥 ORDEN: ", so);
         const picking = await syncSalesOrder(clientDb, so);
-        console.log("PICKING COMPLETO QUE SALE DE syncSalesOrder: ", picking);
+       /* console.log("PICKING COMPLETO QUE SALE DE syncSalesOrder: ", picking);
         console.log("🆔 ID:", picking.id);
-        console.log("📦 NAME:", picking.name);
+        console.log("📦 NAME:", picking.name)*/;
 
         // 🔥 sync líneas (AQUÍ ESTÁ LA MAGIA)
         await syncSalesOrderLines(clientDb, so, picking.id);
@@ -80,7 +80,7 @@ export async function getActiveSaleOrders() {
         const maxWriteDateDate =
           new Date(maxWriteDate);
 
-        console.log(
+        /*console.log(
           "writeDateDate:",
           writeDateDate.toISOString()
         );
@@ -88,7 +88,7 @@ export async function getActiveSaleOrders() {
         console.log(
           "maxWriteDateDate:",
           maxWriteDateDate.toISOString()
-        );
+        );*/
 
         if (
           writeDate &&
@@ -117,7 +117,7 @@ export async function getActiveSaleOrders() {
       /* ==========================
          ✅ SUCCESS
       ========================== */
-      console.log("LAST WRITE DATE: ", maxWriteDate);
+      //console.log("LAST WRITE DATE: ", maxWriteDate);
       await clientDb.query(
         `
         UPDATE sync_control
@@ -374,32 +374,46 @@ async function syncSalesOrder(clientDb, order) {
     const erp_cliente_id = order.ClienteId ?? null;
     const erp_direccion_cliente = order.DireccionCliente ?? null;
 
-    // 🔹 Estado
-    const newState =
-      order.Estatus === "C"
-        ? "cancel"
-        : order.Estatus === "F"
-          ? "done"
-          : null;
+  const newState =
+  order.Estatus === "C"
+    ? "cancel"
+    : order.Estatus === "F"
+      ? "done"
+      : order.Estatus === "A" || order.Estatus === "X"
+        ? "draft"
+        : null;
 
-    console.log("🟥🟨 ESTATUS ERP:", order.Estatus);
-    console.log("🟥🟨 ESTATUS WMS:", newState);
+console.log("🟥🟨 ESTATUS ERP:", order.Estatus);
+console.log("🟥🟨 ESTATUS WMS:", newState);
 
 
+/* =========================
+   1️⃣ UPDATE
+========================= */
 
-    /* =========================
-       1️⃣ UPDATE
-    ========================= */
-
-    const updateResult = await clientDb.query(`
+const updateResult = await clientDb.query(`
   UPDATE stock_picking
   SET
     sale_id = $1,
+
     state = CASE
-          WHEN $2::varchar IS NOT NULL
-          THEN $2::varchar
-          ELSE state
-        END,
+      -- C siempre pasa a cancel
+      WHEN $2 = 'cancel'
+        THEN 'cancel'
+
+      -- F siempre pasa a done
+      WHEN $2 = 'done'
+        THEN 'done'
+
+      -- A o X pasan a draft SOLO si actualmente NO está done
+      WHEN $2 = 'draft'
+        AND state <> 'done'
+        THEN 'draft'
+
+      -- En cualquier otro caso conserva el estado actual
+      ELSE state
+    END,
+
     erp_location_id = $3,
     erp_location_dest_id = $4,
     order_name = $5,
@@ -408,30 +422,33 @@ async function syncSalesOrder(clientDb, order) {
     erp_direccion_cliente = $8,
     erp_tienda_id = $9,
     erp_vendedor_id = $10
+
   WHERE erp_id = $11
-  RETURNING id, order_name
+
+  RETURNING id, order_name, state
 `, [
-      saleId,
-      newState,
-      locationId,
-      locationDestId,
-      saleName,
-      supplierName,
-      erp_cliente_id,
-      erp_direccion_cliente,
-      erp_tienda_id,
-      erp_vendedor_id,
-      erpId
-    ]);
+  saleId,
+  newState,
+  locationId,
+  locationDestId,
+  saleName,
+  supplierName,
+  erp_cliente_id,
+  erp_direccion_cliente,
+  erp_tienda_id,
+  erp_vendedor_id,
+  erpId
+]);
 
-    if (updateResult.rowCount > 0) {
-      console.log("♻️ PICKING ACTUALIZADO");
+if (updateResult.rowCount > 0) {
+  console.log("♻️ PICKING ACTUALIZADO");
 
-      return {
-        id: updateResult.rows[0].id,
-        name: updateResult.rows[0].order_name
-      };
-    }
+  return {
+    id: updateResult.rows[0].id,
+    name: updateResult.rows[0].order_name,
+    state: updateResult.rows[0].state
+  };
+}
 
     /* =========================
        2️⃣ INSERT
@@ -757,7 +774,7 @@ console.log("🗑️ Movimientos eliminados:", deleteResult.rows);
            3️⃣ UPDATE
         ===================================== */
 
-        if (moveExists) {
+                   if (moveExists) {
           console.log("🟦 UPDATE MOVE:", erp_move_id);
 
           const currentReservedQty = Number(currentMove.reserved_qty || 0);
@@ -942,37 +959,37 @@ export async function createConduce(payloadERP) {
       .toISOString()
       .slice(0, 19);
 
-    console.log("🟨 PAYLOAD ERP:");
-    console.log(JSON.stringify(payloadERP, null, 2));
+      console.log("🟨 PAYLOAD ERP:");
+console.log(JSON.stringify(payloadERP, null, 2));
 
-    if (
-      !payloadERP.ConduceDetalles ||
-      !Array.isArray(payloadERP.ConduceDetalles) ||
-      payloadERP.ConduceDetalles.length === 0
-    ) {
-      return {
-        success: false,
-        title: "Sin líneas",
-        message: "El conduce no tiene líneas para enviar"
-      };
-    }
+if (
+  !payloadERP.ConduceDetalles ||
+  !Array.isArray(payloadERP.ConduceDetalles) ||
+  payloadERP.ConduceDetalles.length === 0
+) {
+  return {
+    success: false,
+    title: "Sin líneas",
+    message: "El conduce no tiene líneas para enviar"
+  };
+}
 
     // 🔹 2. Construir detalles dinámicamente
-    const detallesXML = payloadERP.ConduceDetalles.map(det => {
+   const detallesXML = payloadERP.ConduceDetalles.map(det => {
 
-      console.log("🟦 DETALLE:");
-      console.log(det);
+  console.log("🟦 DETALLE:");
+  console.log(det);
 
-      return `<ConduceDetalle>
+  return  `<ConduceDetalle>
 <ItemId>${det.ItemId}</ItemId>
 <ItemNombre>${det.ItemNombre ?? ''}</ItemNombre>
 <ItemCantidad>${det.ItemCantidad}</ItemCantidad>
 </ConduceDetalle>`;
-    }).join("");
+}).join("");
 
     // 🔹 3. Construir XML SOAP
     const xml =
-      `<?xml version="1.0" encoding="utf-8"?>
+`<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
 xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -984,7 +1001,7 @@ xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <ClienteDireccion>${payloadERP.ClienteDireccion ?? ''}</ClienteDireccion>
 <Fecha>${fecha}</Fecha>
 <Estatus>${payloadERP.Estatus}</Estatus>
-<TiendaId>${payloadERP.TiendaId}</TiendaId>
+<TiendaId>${payloadERP.BodegaId}</TiendaId>
 <VendedorId>${payloadERP.VendedorId}</VendedorId>
 <Nota>${payloadERP.Nota ?? ''}</Nota>
 <OrdenVentaId>${payloadERP.OrdenVentaId}</OrdenVentaId>
@@ -998,32 +1015,137 @@ ${detallesXML}
 
     console.log("🟨 XML CONDUCE:", xml);
 
-    // 🔹 4. Llamar ERP SOAP
-    const data = await callERPCreateConduce(xml);
+  // 🔹 4. Llamar ERP SOAP
+const data =
+  await callERPCreateConduce(xml);
 
-    // 🔹 5. Validar respuesta
-    if (!data || data.Success === 0) {
 
-      console.log("🟥 ERP ERROR:", data?.Mensaje);
+// ==========================================
+// ERROR CITRUS
+// ==========================================
 
-      return {
-        success: false,
-        title: "ERP_ERROR",
-        message: data?.Mensaje || "Error desconocido del ERP",
-        data
-      };
-    }
+if (
+  !data ||
+  Number(data.Success) !== 1 ||
+  Number(data.Error) === 1
+) {
 
-    console.log("🟩 CONDUCE CREADO:", data);
+  console.log(
+    "🟥 ERP ERROR:",
+    data?.Mensaje
+  );
 
-    return data;
+  return {
+    success: false,
+
+    code:
+      "CITRUS_CREATE_CONDUCE_FAILED",
+
+    title:
+      "Error creando conduce",
+
+    message:
+      data?.Mensaje ||
+      "Error desconocido del ERP",
+
+    citrus:
+      data || null
+  };
+}
+
+
+// ==========================================
+// OBTENER ID REAL DEL CONDUCE
+// ==========================================
+
+const conduceId =
+  Number(data?.Data?.Conduce?.Id);
+
+
+if (!conduceId) {
+
+  console.log(
+    "🟥 Citrus creó el conduce pero no encontramos su ID"
+  );
+
+  console.log(
+    "📦 DATA:",
+    JSON.stringify(data, null, 2)
+  );
+
+  return {
+    success: false,
+
+    code:
+      "CITRUS_CONDUCE_ID_MISSING",
+
+    title:
+      "ID de conduce no encontrado",
+
+    message:
+      "Citrus indicó que el conduce fue creado, pero no se pudo obtener el ID del conduce.",
+
+    citrus:
+      data
+  };
+}
+
+
+// ==========================================
+// SUCCESS
+// ==========================================
+
+console.log(
+  "🟩 CONDUCE CREADO CORRECTAMENTE"
+);
+
+console.log(
+  "🆔 CONDUCE ID:",
+  conduceId
+);
+
+
+return {
+  success: true,
+
+  code:
+    "CONDUCE_CREATED",
+
+  title:
+    "Conduce creado",
+
+  message:
+    data.Mensaje || "OK",
+
+  conduceId,
+
+  citrus:
+    data
+};
 
   } catch (error) {
 
-    console.error("🟥 createConduce error:", error.message);
+  console.error(
+    "🟥 createConduce error:",
+    error.message
+  );
 
-    return null;
-  }
+  return {
+    success: false,
+
+    code:
+      "CREATE_CONDUCE_ERROR",
+
+    title:
+      "Error creando conduce",
+
+    message:
+      error.message,
+
+    citrus:
+      null
+  };
+}
 }
 
 
@@ -1035,63 +1157,287 @@ export function buildCitrusConducePayload(picking, lines) {
 
   const conduceLines = [];
 
+  // =====================================================
+  // 1️⃣ VALIDAR Y PREPARAR LÍNEAS
+  // =====================================================
+
   for (const line of lines) {
     const qtyDone = Number(line.qty_done || 0);
     const qtyPlanned = Number(line.product_uom_qty || 0);
+    const warehouseId = Number(line.erp_warehouse_id);
 
     console.log("🔍 Revisando línea:", {
       lineId: line.id,
       sku: line.sku,
       qtyDone,
-      qtyPlanned
+      qtyPlanned,
+      warehouseId
     });
+
+    // =====================================================
+    // VALIDAR CANTIDAD
+    // =====================================================
 
     if (qtyDone > qtyPlanned) {
       return {
         success: false,
         title: "Cantidad inválida",
-        message: `El producto ${line.sku} tiene qty_done mayor que la cantidad requerida`
+        message:
+          `El producto ${line.sku} tiene qty_done mayor que la cantidad requerida`
       };
     }
 
-    if (qtyDone > 0) {
-      conduceLines.push({
-        ItemId: line.erp_id,
-        ItemNombre: line.description,
-        ItemCantidad: qtyDone
-      });
+    // =====================================================
+    // SOLO LÍNEAS REALMENTE DESPACHADAS
+    // =====================================================
+
+    if (qtyDone <= 0) {
+      continue;
     }
+
+    // =====================================================
+    // VALIDAR BODEGA
+    // =====================================================
+
+    if (!warehouseId) {
+
+  return {
+    success: false,
+    code: "ERP_WAREHOUSE_MISSING",
+    title: "Bodega ERP no encontrada",
+    message:
+      `La línea ${line.id} del producto ${line.sku} no tiene erp_warehouse_id en su stock_move`
+  };
+}
+
+    if (![1, 2].includes(warehouseId)) {
+      return {
+        success: false,
+        code: "WAREHOUSE_NOT_SUPPORTED",
+        title: "Bodega no válida",
+        message:
+          `La línea ${line.id} pertenece a la bodega ${warehouseId}. Solo se permiten las bodegas 1 y 2.`
+      };
+    }
+
+    // =====================================================
+    // CREAR DETALLE INTERNO
+    // =====================================================
+
+    conduceLines.push({
+      ItemId: line.erp_id,
+      ItemNombre: line.description,
+      ItemCantidad: qtyDone,
+
+      // 🔥 USADO INTERNAMENTE PARA AGRUPAR
+      WarehouseId: warehouseId
+    });
   }
+
+
+  // =====================================================
+  // 2️⃣ VALIDAR QUE HAYA ALGO PARA DESPACHAR
+  // =====================================================
 
   if (conduceLines.length === 0) {
     return {
       success: false,
+      code: "ERP_EMPTY_CONDUCE",
       title: "Sin productos despachados",
-      message: "Todas las líneas tienen cantidad despachada en cero"
+      message:
+        "Todas las líneas tienen cantidad despachada en cero"
     };
   }
 
-  const payload = {
-    ClienteId: picking.erp_cliente_id,
-    ClienteNombre: picking.erp_cliente,
-    ClienteDireccion: picking.erp_direccion_cliente,
-    TiendaId: picking.erp_tienda_id,
-    VendedorId: picking.erp_vendedor_id,
-    OrdenVentaId: picking.sale_id,
-    Estatus: "A",
-    Fecha: new Date().toISOString().slice(0, 19),
-    Nota: `Conduce generado desde WMS para picking ${picking.name}`,
-    ConduceDetalles: conduceLines
-  };
 
-  console.log("✅ [CITRUS] Payload generado:", payload);
+  // =====================================================
+  // 3️⃣ VALIDACIONES DEL PICKING
+  // =====================================================
+
+  if (!picking.erp_cliente_id) {
+    return {
+      success: false,
+      code: "ERP_CUSTOMER_MISSING",
+      title: "ERROR EN CITRUS - Cliente no encontrado",
+      message:
+        "La orden de venta no tiene información de cliente para generar el conduce. Por favor introducir el cliente en la orden de venta."
+    };
+  }
+
+  if (!picking.erp_cliente) {
+    return {
+      success: false,
+      code: "ERP_CUSTOMER_NAME_MISSING",
+      title: "ERROR EN CITRUS - Nombre de cliente faltante",
+      message:
+        "La orden de venta no tiene nombre de cliente."
+    };
+  }
+
+  if (!picking.erp_tienda_id) {
+    return {
+      success: false,
+      code: "ERP_STORE_MISSING",
+      title: "ERROR EN CITRUS - Tienda no configurada",
+      message:
+        "La orden de venta no tiene una tienda asignada."
+    };
+  }
+
+  if (!picking.erp_vendedor_id) {
+    return {
+      success: false,
+      code: "ERP_SELLER_MISSING",
+      title: "ERROR EN CITRUS - Vendedor no configurado",
+      message:
+        "La orden de venta no tiene un vendedor asignado."
+    };
+  }
+
+  if (!picking.sale_id) {
+    return {
+      success: false,
+      code: "ERP_SALE_ORDER_MISSING",
+      title: "ERROR EN CITRUS - Orden de venta inválida",
+      message:
+        "No se encontró el número de orden de venta asociado al picking."
+    };
+  }
+
+
+  // =====================================================
+  // 4️⃣ DIVIDIR POR BODEGA
+  // =====================================================
+
+  const conduceLinesBodega1 = conduceLines.filter(
+    line => line.WarehouseId === 1
+  );
+
+  const conduceLinesBodega2 = conduceLines.filter(
+    line => line.WarehouseId === 2
+  );
+
+  console.log(
+    "🏭 Líneas bodega 1:",
+    conduceLinesBodega1
+  );
+
+  console.log(
+    "🏭 Líneas bodega 2:",
+    conduceLinesBodega2
+  );
+
+
+  // =====================================================
+  // 5️⃣ CREAR PAYLOADS
+  // =====================================================
+
+  const payloads = [];
+
+  const fecha = new Date()
+    .toISOString()
+    .slice(0, 19);
+
+
+  // =====================================================
+  // BODEGA 1
+  // =====================================================
+
+  if (conduceLinesBodega1.length > 0) {
+
+    const detallesBodega1 =
+      conduceLinesBodega1.map(line => ({
+        ItemId: line.ItemId,
+        ItemNombre: line.ItemNombre,
+        ItemCantidad: line.ItemCantidad
+      }));
+
+    const payload1 = {
+      ClienteId: picking.erp_cliente_id,
+      ClienteNombre: picking.erp_cliente,
+      ClienteDireccion:
+        picking.erp_direccion_cliente,
+
+      TiendaId: picking.erp_tienda_id,
+      VendedorId: picking.erp_vendedor_id,
+
+      OrdenVentaId: picking.sale_id,
+
+      Estatus: "A",
+      Fecha: fecha,
+
+      Nota:
+        `Conduce generado desde WMS para picking ${picking.name}`,
+
+      ConduceDetalles: detallesBodega1,
+
+      // Solo WMS. createConduce no lo envía en el XML.
+      BodegaId: 1
+    };
+
+    payloads.push(payload1);
+  }
+
+
+  // =====================================================
+  // BODEGA 2
+  // =====================================================
+
+  if (conduceLinesBodega2.length > 0) {
+
+    const detallesBodega2 =
+      conduceLinesBodega2.map(line => ({
+        ItemId: line.ItemId,
+        ItemNombre: line.ItemNombre,
+        ItemCantidad: line.ItemCantidad
+      }));
+
+    const payload2 = {
+      ClienteId: picking.erp_cliente_id,
+      ClienteNombre: picking.erp_cliente,
+      ClienteDireccion:
+        picking.erp_direccion_cliente,
+
+      TiendaId: picking.erp_tienda_id,
+      VendedorId: picking.erp_vendedor_id,
+
+      OrdenVentaId: picking.sale_id,
+
+      Estatus: "A",
+      Fecha: fecha,
+
+      Nota:
+        `Conduce generado desde WMS para picking ${picking.name}`,
+
+      ConduceDetalles: detallesBodega2,
+
+      // Solo WMS. createConduce no lo envía en el XML.
+      BodegaId: 2
+    };
+
+    payloads.push(payload2);
+  }
+
+
+  console.log(
+    "✅ [CITRUS] Payloads generados:",
+    payloads
+  );
+
+
+  // =====================================================
+  // 6️⃣ RESULTADO
+  // =====================================================
 
   return {
     success: true,
-    payload,
+    payloads,
     lines: conduceLines
   };
 }
+
+
+
 
 
 
@@ -1216,7 +1562,7 @@ xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 
     console.log("");
     console.log("=======================================");
-    console.log("🍊 ORDEN CITRUS");
+    console.log("🍊 ORDEN CITRUS", order.OrdenVentaDetalle );
     console.log("=======================================");
 
     console.log(
@@ -1239,3 +1585,4 @@ xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     throw error;
   }
 }
+

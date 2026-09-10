@@ -54,6 +54,13 @@ export default function PickingRoute() {
     const isModalOpenRef = useRef(false);
     const [goNext, setGoNext] = useState(false);
     const [canEdit, setCanEdit] = useState(false);
+    const [isOriginModalOpen, setIsOriginModalOpen] = useState(false);
+
+    const [originLine, setOriginLine] =
+        useState<StockMoveLine | null>(null);
+
+    const [selectedOriginWarehouseId, setSelectedOriginWarehouseId] =
+        useState<number>(1);
 
     const [fromLocation, setFromLocation] = useState<Location | null>(null);
     const fromLocationRef = useRef<Location | null>(null);
@@ -75,7 +82,7 @@ export default function PickingRoute() {
     const qtyRef = useRef<string>("");
 
     //State de error de location rojo
-   // const [locationError, setLocationError] = useState(false);
+    //const [locationError, setLocationError] = useState(false);
 
     function logScannerState(label: string, scanned?: string) {
         console.log(`🧪 ${label}`, {
@@ -225,7 +232,7 @@ export default function PickingRoute() {
                 lastScannerKeyTimeRef.current = 0;
                 return;
             }
-closeModal();
+            closeModal();
             // =====================================================
             // 2. Si la ruta no está iniciada, no acumular teclas
             // =====================================================
@@ -282,15 +289,15 @@ closeModal();
 
                         handleScanLocation(data.data);
 
-                      /*  if (data.data.code !== currentLineRef.current?.code) {
-                            setLocationError(true);
-
-                            setTimeout(() => {
-                                setLocationError(false);
-                            }, 2000);
-
-                            return;
-                        }*/
+                        /*  if (data.data.code !== currentLineRef.current?.code) {
+                              setLocationError(true);
+  
+                              setTimeout(() => {
+                                  setLocationError(false);
+                              }, 2000);
+  
+                              return;
+                          }*/
                     }
 
                     // 🔵 ES PRODUCTO
@@ -473,6 +480,78 @@ closeModal();
     }
 
 
+    //Function to open the origin modal
+    function handleOrigin(line: StockMoveLine) {
+
+        console.log("📍 VER ORIGEN:", line);
+
+        setOriginLine(line);
+
+        setIsOriginModalOpen(true);
+    }
+
+    //function to close the origin modal
+    function handleCloseOrigin() {
+        setIsOriginModalOpen(false);
+        setOriginLine(null);
+    }
+
+
+    async function handleSelectOriginWarehouse(warehouseId: number) {
+
+        if (!originLine) {
+            return;
+        }
+
+        console.log("🏬 WAREHOUSE SELECCIONADO:", warehouseId);
+        console.log("📦 MOVE ID:", originLine.move_id);
+
+        // actualizar visualmente
+        setSelectedOriginWarehouseId(warehouseId);
+
+        try {
+
+            const response = await apiClient.post(
+                "/picking/update-origin-warehouse",
+                {
+                    moveId: originLine.move_id,
+                    warehouseId: warehouseId,
+                }
+            );
+
+            console.log("✅ UPDATE ORIGIN RESPONSE:", response.data);
+
+            if (!response.data.success) {
+
+                openModal({
+                    title: response.data.title || "Error",
+                    message:
+                        response.data.message ||
+                        "No se pudo actualizar el origen."
+                });
+
+                return;
+            }
+
+            // cerrar modal de origen
+            setIsOriginModalOpen(false);
+            setOriginLine(null);
+
+        } catch (error) {
+
+            console.error(
+                "❌ ERROR ACTUALIZANDO ORIGEN:",
+                error
+            );
+
+            openModal({
+                title: "Error",
+                message: "No se pudo actualizar el origen del movimiento."
+            });
+        }
+    }
+
+
 
 
 
@@ -504,8 +583,8 @@ closeModal();
             code: pickingLine.code,
         };
 
-        setFromLocation(location);
-        fromLocationRef.current = location;
+        //setFromLocation(location);
+        //fromLocationRef.current = location;
 
         // =========================
         // PRODUCT
@@ -516,7 +595,7 @@ closeModal();
             description: pickingLine.description,
         };
 
-        setSelectedProduct(product);
+        //setSelectedProduct(product);
 
         // =========================
         // QTY
@@ -558,10 +637,10 @@ closeModal();
             }
 
             // 🔴 VALIDAR QTY
-            if (Number(qtyRef.current) <= 0) {
+            if (Number(qtyRef.current) < 0) {
                 openModal({
                     title: "Cantidad inválida",
-                    message: "La cantidad debe ser mayor a 0"
+                    message: "La cantidad debe ser mayor o igual a 0"
                 });
                 return;
             }
@@ -777,7 +856,7 @@ closeModal();
                     <div>Descripción</div>
                     <div>Cantidad</div>
                     <div>Diferencia</div>
-                    <div className="editar">Editar</div>
+                    <div className="editar">Acciones</div>
                 </div>
 
                 <div className="lines-list">
@@ -797,6 +876,10 @@ closeModal();
                                 key={line.id}
                                 editable={true}
                                 onEdit={() => handleEditLine(line.id)}
+
+                                onOrigin={() => handleOrigin(line)}
+
+
                                 line={{
                                     id: Number(line.product_id),
                                     sku: line.sku,
@@ -836,13 +919,12 @@ closeModal();
                     <div className="transfer-card">
 
                         {/* ORIGEN */}
-                       <section
-    className={`pick-user-location-card ${
-        !fromLocation
-            ? "pick-user-location-empty"
-            : ""
-    }`}
->
+                        <section
+                            className={`pick-user-location-card ${!fromLocation
+                                ? "pick-user-location-empty"
+                                : ""
+                                }`}
+                        >
                             <span className="pick-user-location-label">
                                 Lea la ubicación:
                             </span>
@@ -929,18 +1011,77 @@ closeModal();
                             </button>
 
                             {qty !== "" && Number(qty) >= 0 && (
-  <button
-    className="btn btn-save pop-in"
-    onClick={sendModal}
-  >
-    Siguiente
-  </button>
-)}
+                                <button
+                                    className="btn btn-save pop-in"
+                                    onClick={sendModal}
+                                >
+                                    Siguiente
+                                </button>
+                            )}
                         </section>
                     </div>
                 </div>
 
             </ScanModal>
+
+
+
+            {/*MODAL ORIGEN*/}
+            {isOriginModalOpen && originLine && (
+                <div
+                    className="origin-modal-overlay"
+                    onClick={handleCloseOrigin}
+                >
+                    <div
+                        className="origin-modal"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+
+                        <div className="origin-modal-header">
+
+                            <h3>Origen</h3>
+
+                            <button
+                                type="button"
+                                className="origin-modal-close"
+                                onClick={handleCloseOrigin}
+                            >
+                                ×
+                            </button>
+
+                        </div>
+
+
+                        <div className="origin-modal-body">
+
+                            <button
+                                type="button"
+                                className={`origin-option-btn ${selectedOriginWarehouseId === 2
+                                        ? "origin-option-selected"
+                                        : ""
+                                    }`}
+                                onClick={() => handleSelectOriginWarehouse(2)}
+                            >
+                                PARA ORDENAR
+                            </button>
+
+
+                            <button
+                                type="button"
+                                className={`origin-option-btn ${selectedOriginWarehouseId === 1
+                                        ? "origin-option-selected"
+                                        : ""
+                                    }`}
+                                onClick={() => handleSelectOriginWarehouse(1)}
+                            >
+                                PARA DESPACHAR
+                            </button>
+
+                        </div>
+
+                    </div>
+                </div>
+            )}
 
         </div>
 

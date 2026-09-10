@@ -284,7 +284,7 @@ export async function callERPSales(
     let auth = await getERPAuth();
 
     const url =
-      "https://api.citrus.com.do/40/Facturacion/OrdenVentaService.asmx";
+      "https://testapi.citrus.com.do/40/Facturacion/OrdenVentaService.asmx";
 
     console.log("");
     console.log("=======================================");
@@ -587,6 +587,7 @@ export async function callERPSales(
   }
 }
 
+
 // 🔥 SOLO PARA CREAR CONDUCE
 export async function callERPCreateConduce(xmlBody) {
 
@@ -595,7 +596,10 @@ export async function callERPCreateConduce(xmlBody) {
     let auth = await getERPAuth();
 
     const url =
-      "https://testapi.citrus.com.do/40/Facturacion/ConduceService.asmx";
+      "https://api.citrus.com.do/40/Facturacion/ConduceService.asmx";
+
+/*const url =
+      "https://testapi.citrus.com.do/40/Facturacion/ConduceService.asmx";*/
 
     const soapAction =
       "http://tempuri.org/CrearConduce";
@@ -625,14 +629,21 @@ export async function callERPCreateConduce(xmlBody) {
        🔥 RAW RESPONSE
     =============================== */
 
-    console.log("🟩 ERP STATUS:");
-    console.log(response.status);
+    console.log("======================================");
+console.log("🟩 CREATE CONDUCE - HTTP RESPONSE");
+console.log("======================================");
 
-    console.log("🟩 ERP HEADERS:");
-    console.log(response.headers);
+console.log("🟩 STATUS:");
+console.log(response.status);
 
-    console.log("🟩 ERP RAW RESPONSE:");
-    console.log(response.data);
+console.log("🟩 STATUS TEXT:");
+console.log(response.statusText);
+
+console.log("🟩 HEADERS:");
+console.dir(response.headers, { depth: null });
+
+console.log("🟩 RAW RESPONSE:");
+console.log(response.data);
 
     // 🔥 RESPONSE VACÍA
     if (!response.data || response.data.trim() === "") {
@@ -654,11 +665,23 @@ export async function callERPCreateConduce(xmlBody) {
       }
     );
 
-    console.log(
-      "🟩 ERP PARSED:",
-      JSON.stringify(parsed, null, 2)
-    );
+    console.log("======================================");
+console.log("🟩 CREATE CONDUCE - PARSED XML");
+console.log("======================================");
 
+console.dir(parsed, { depth: null });
+
+console.log(
+  "🟩 PARSED JSON:"
+);
+
+console.log(
+  JSON.stringify(
+    parsed,
+    null,
+    2
+  )
+);
     const envelopeKey = Object.keys(parsed)[0];
 
     const bodyKey =
@@ -886,6 +909,475 @@ export async function callERPCreateConduce(xmlBody) {
 }
 
 
+
+
+export async function callERPCancelConduce(xmlBody) {
+
+  try {
+
+    let auth = await getERPAuth();
+
+    const url =
+      "https://testapi.citrus.com.do/40/Facturacion/ConduceService.asmx";
+
+    const soapAction =
+      "http://tempuri.org/CancelarConduce";
+
+
+    console.log("");
+    console.log("======================================");
+    console.log("🟥 CALL ERP CANCEL CONDUCE");
+    console.log("🌐 URL:", url);
+    console.log("📡 SOAP ACTION:", soapAction);
+    console.log("======================================");
+
+    console.log("🟥 XML CANCEL CONDUCE:");
+    console.log(xmlBody);
+
+
+    // ==========================================
+    // REQUEST
+    // ==========================================
+
+    const response = await axios({
+  method: "post",
+  url,
+  data: xmlBody,
+  headers: {
+    "Content-Type": "text/xml; charset=utf-8",
+    SOAPAction: soapAction,
+    Authorization: auth.token.trim(),
+    UsuarioTicketId: String(auth.ticket).trim()
+  },
+  timeout: 20000,
+  transformRequest: [(data) => data]
+});
+
+
+    // ==========================================
+    // RAW RESPONSE
+    // ==========================================
+
+    console.log("🟥 ERP CANCEL STATUS:");
+    console.log(response.status);
+
+    console.log("🟥 ERP CANCEL HEADERS:");
+    console.log(response.headers);
+
+    console.log("🟥 ERP CANCEL RAW RESPONSE:");
+    console.log(response.data);
+
+
+    // ==========================================
+    // RESPONSE VACÍA
+    // ==========================================
+
+    if (
+      !response.data ||
+      response.data.trim() === ""
+    ) {
+
+      console.log(
+        "❌ ERP CANCEL RESPONSE VACÍA"
+      );
+
+      return null;
+    }
+
+
+    // ==========================================
+    // XML → JSON
+    // ==========================================
+
+    const parsed =
+      await parseStringPromise(
+        response.data,
+        {
+          explicitArray: false,
+          ignoreAttrs: true
+        }
+      );
+
+
+    console.log(
+      "🟥 ERP CANCEL PARSED:"
+    );
+
+    console.log(
+      JSON.stringify(
+        parsed,
+        null,
+        2
+      )
+    );
+
+
+    // ==========================================
+    // ENVELOPE / BODY DINÁMICO
+    // ==========================================
+
+    const envelopeKey =
+      Object.keys(parsed)[0];
+
+    const bodyKey =
+      Object.keys(
+        parsed[envelopeKey]
+      )[0];
+
+    const body =
+      parsed[envelopeKey][bodyKey];
+
+
+    // ==========================================
+    // SOAP FAULT
+    // ==========================================
+
+    const fault =
+      body["soap:Fault"] ||
+      body["Fault"] ||
+      body["s:Fault"];
+
+
+    if (fault) {
+
+      console.log(
+        "🟥 CANCEL CONDUCE SOAP FAULT:"
+      );
+
+      console.log(
+        JSON.stringify(
+          fault,
+          null,
+          2
+        )
+      );
+
+      return {
+        success: false,
+
+        type:
+          "SOAP_FAULT",
+
+        fault
+      };
+    }
+
+
+    // ==========================================
+    // CancelarConduceResponse
+    // ==========================================
+
+    const responseNode =
+      body[
+        "CancelarConduceResponse"
+      ];
+
+
+    if (!responseNode) {
+
+      console.log(
+        "❌ No existe CancelarConduceResponse"
+      );
+
+      console.log(
+        JSON.stringify(
+          body,
+          null,
+          2
+        )
+      );
+
+      return null;
+    }
+
+
+    // ==========================================
+    // CancelarConduceResult
+    // ==========================================
+
+    const raw =
+      responseNode[
+        "CancelarConduceResult"
+      ];
+
+
+    if (
+      raw === undefined ||
+      raw === null
+    ) {
+
+      console.log(
+        "❌ No existe CancelarConduceResult"
+      );
+
+      console.log(
+        JSON.stringify(
+          responseNode,
+          null,
+          2
+        )
+      );
+
+      return null;
+    }
+
+
+    console.log(
+      "🟥 RAW CancelarConduceResult:"
+    );
+
+    console.log(raw);
+
+
+    // ==========================================
+    // STRING JSON → OBJECT
+    // ==========================================
+
+    let data;
+
+
+    if (
+      typeof raw === "string" &&
+      raw
+        .trim()
+        .startsWith("{")
+    ) {
+
+      try {
+
+        data =
+          JSON.parse(raw);
+
+      } catch {
+
+        data = raw;
+      }
+
+    } else {
+
+      data = raw;
+    }
+
+
+    console.log(
+      "🟥 CANCEL CONDUCE DATA:"
+    );
+
+    console.dir(
+      data,
+      {
+        depth: null
+      }
+    );
+
+
+    // ==========================================
+    // SESSION EXPIRED
+    // ==========================================
+
+    if (
+      data?.SesionExpirada === 1 ||
+      data?.TicketInvalido === 1
+    ) {
+
+      console.log(
+        "🔄 ERP CANCEL CONDUCE session expired → re-login"
+      );
+
+
+      auth =
+        await refreshERPToken();
+
+
+      // ==========================================
+      // RETRY
+      // ==========================================
+
+      const retry =
+        await axios({
+
+          method: "post",
+
+          url,
+
+          data: xmlBody,
+
+          headers: {
+
+            "Content-Type":
+              "text/xml; charset=utf-8",
+
+            SOAPAction:
+              soapAction,
+
+            Authorization:
+              auth.token.trim(),
+
+            UsuarioTicketId:
+              String(
+                auth.ticket
+              ).trim()
+          },
+
+          timeout: 20000,
+
+          transformRequest: [
+            data => data
+          ]
+        });
+
+
+      console.log(
+        "🟥 ERP CANCEL RETRY STATUS:",
+        retry.status
+      );
+
+
+      console.log(
+        "🟥 ERP CANCEL RETRY RAW:"
+      );
+
+      console.log(
+        retry.data
+      );
+
+
+      const parsedRetry =
+        await parseStringPromise(
+          retry.data,
+          {
+            explicitArray: false,
+            ignoreAttrs: true
+          }
+        );
+
+
+      const envelopeRetry =
+        Object.keys(
+          parsedRetry
+        )[0];
+
+
+      const bodyRetryKey =
+        Object.keys(
+          parsedRetry[
+            envelopeRetry
+          ]
+        )[0];
+
+
+      const bodyRetry =
+        parsedRetry[
+          envelopeRetry
+        ][bodyRetryKey];
+
+
+      const responseRetry =
+        bodyRetry[
+          "CancelarConduceResponse"
+        ];
+
+
+      if (!responseRetry) {
+
+        console.log(
+          "❌ No existe CancelarConduceResponse en retry"
+        );
+
+        return null;
+      }
+
+
+      const rawRetry =
+        responseRetry[
+          "CancelarConduceResult"
+        ];
+
+
+      if (
+        rawRetry === undefined ||
+        rawRetry === null
+      ) {
+
+        console.log(
+          "❌ No existe CancelarConduceResult en retry"
+        );
+
+        return null;
+      }
+
+
+      if (
+        typeof rawRetry ===
+          "string" &&
+        rawRetry
+          .trim()
+          .startsWith("{")
+      ) {
+
+        try {
+
+          return JSON.parse(
+            rawRetry
+          );
+
+        } catch {
+
+          return rawRetry;
+        }
+      }
+
+
+      return rawRetry;
+    }
+
+
+    // ==========================================
+    // FINAL
+    // ==========================================
+
+    return data;
+
+
+  } catch (error) {
+
+    console.log("");
+    console.log(
+      "🔴 ERP CANCEL CONDUCE ERROR:"
+    );
+
+
+    if (error.response) {
+
+      console.log(
+        "STATUS:",
+        error.response.status
+      );
+
+      console.log(
+        "HEADERS:",
+        error.response.headers
+      );
+
+      console.log(
+        "BODY:",
+        error.response.data
+      );
+
+    } else {
+
+      console.log(
+        "ERROR:",
+        error.message
+      );
+    }
+
+
+    throw error;
+  }
+}
+
+
 // 🔥 SOLO PARA EXISTENCIA ALMACÉN
 export async function callERPExistenciaAlmacen(xmlBody) {
   try {
@@ -1032,6 +1524,11 @@ console.log("🟨 xml", xmlBody);
     throw error;
   }
 }
+
+
+
+
+
 
 
 

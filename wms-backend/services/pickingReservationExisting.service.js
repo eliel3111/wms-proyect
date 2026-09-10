@@ -1,10 +1,12 @@
 import { getPickingConfig } from "../services/pickingBestRoute.js";
 
-export async function reserveMissingQtyForExistingMoveLines(client, move) {
-  const stockMove = move.moves?.[0];
-
+export async function reserveMissingQtyForExistingMoveLines(
+  client,
+  move,
+  stockMove
+) {
   if (!stockMove) {
-    throw new Error("El producto no tiene stock_move asociado");
+    throw new Error("Debe enviar stockMove");
   }
 
   const moveId = stockMove.move_id;
@@ -191,7 +193,7 @@ if (diffQty > 0) {
     console.log("🟠 CASO 3: La orden bajó");
     console.log("🟠 Cantidad a liberar:", qtyToRelease);
 
-
+    
 
 
 
@@ -200,7 +202,10 @@ console.log("OPEN RESERVED LINES:", openReservedLines);
 console.log("requiredQty:", requiredQty);
 console.log("qtyToRelease:", qtyToRelease);
 
-const required = Number(requiredQty);
+const required = Math.max(
+  Number(requiredQty) - Number(processedQty),
+  0
+);
 
 // Ordenar de mayor a menor para intentar encontrar una sola línea primero
 const sortedLines = [...openReservedLines].sort(
@@ -729,7 +734,7 @@ async function releaseReservationFromInventory(client, stockMoveLine, qtyToRelea
   });
 
 
-
+  
 
   const product = await getProductSkuByProductId(
     client,
@@ -1185,17 +1190,17 @@ async function createAndReservePotentialMoveLines(client, {
 async function updateStockMoveReservedQtyAndState(client, moveId, requiredQty) {
   const query = `
     SELECT
-      COALESCE(SUM(CASE
-        WHEN COALESCE(qty_done, 0) > 0
-        THEN qty_done
-        ELSE 0
+      COALESCE(SUM(CASE 
+        WHEN COALESCE(qty_done, 0) > 0 
+        THEN qty_done 
+        ELSE 0 
       END), 0) AS done_qty,
 
-      COALESCE(SUM(CASE
-        WHEN COALESCE(qty_done, 0) = 0
+      COALESCE(SUM(CASE 
+        WHEN COALESCE(qty_done, 0) = 0 
          AND COALESCE(state, '') != 'cancel'
-        THEN product_uom_qty
-        ELSE 0
+        THEN product_uom_qty 
+        ELSE 0 
       END), 0) AS reserved_open_qty
     FROM stock_move_line
     WHERE move_id = $1
@@ -1243,7 +1248,3 @@ async function updateStockMoveReservedQtyAndState(client, moveId, requiredQty) {
     state,
   };
 }
-
-
-
-

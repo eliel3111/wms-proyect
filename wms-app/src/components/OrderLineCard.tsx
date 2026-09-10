@@ -3,8 +3,8 @@ import "./OrderLineCard.css";
 /* Tipos base */
 type Product = {
   id: number;
-  purchase_order_id: Number;
-  purchase_order_number: string;
+  purchase_order_id?: Number;
+  purchase_order_number?: string;
   sku: string;
   description: string;
   ordered_qty: number;
@@ -17,18 +17,20 @@ type Product = {
   erp_id?: number;
 };
 
-type Props = {
-  line: Product;
-  validation?: boolean;
-  editable?: boolean;
-  onEdit?: () => void;
-};
+type Props = { 
+  line: Product; 
+  validation?: boolean; 
+  editable?: boolean; 
+  onEdit?: () => void; 
+  onOrigin?: () => void;
+}; 
 
-export default function OrderLineCard({
-  line,
-  validation = false,
-  editable = false,
+export default function OrderLineCard({ 
+  line, 
+  validation = false, 
+  editable = false, 
   onEdit,
+  onOrigin,
 }: Props) {
   /*
    * Cantidad acumulada antes de esta recepción.
@@ -110,14 +112,25 @@ export default function OrderLineCard({
         {Math.trunc(differenceQty)}
       </div>
 
-      {editable && (
-        <button
-          className="line-edit-btn"
-          onClick={onEdit}
-        >
-          Editar
-        </button>
-      )}
+      {editable && ( 
+  <div className="line-actions">
+    <button 
+      type="button"
+      className="line-edit-btn" 
+      onClick={onEdit} 
+    > 
+      Editar 
+    </button>
+
+    <button
+      type="button"
+      className="line-origin-btn"
+      onClick={onOrigin}
+    >
+      Origen
+    </button>
+  </div>
+)} 
     </div>
   );
 }
