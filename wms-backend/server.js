@@ -62,6 +62,14 @@ import {
 import {
   syncAdmCloudPurchaseOrderLinesByIds, getAdmCloudPurchaseOrderDetail
 } from "./integrations/admcloud/admcloud.purchaseOrderDetail.js";
+//create conduce
+import {
+  createAdmCloudReception
+} from "./integrations/admcloud/admcloud.reception.js";
+//Confirm recepcion
+import {
+  confirmAdmCloudReceptionById
+} from "./integrations/admcloud/admcloud.reception.js";
 
 const app = express();
 
@@ -97,7 +105,188 @@ app.use(express.json());
 //startAdmCloudCron();.
 
 
+//confirm recepcion with ID
+app.get(
+  "/test-admcloud-reception/:id",
+  async (req, res) => {
 
+    try {
+
+      // ========================================================
+      // 1. RECIBIR ID
+      // ========================================================
+
+      const receptionId =
+        String(
+          req.params.id || ""
+        ).trim();
+
+
+      console.log("");
+      console.log(
+        "🧪 ========================================"
+      );
+
+      console.log(
+        "🧪 TEST ADM CLOUD RECEPTION"
+      );
+
+      console.log(
+        "🆔 Reception ID:",
+        receptionId
+      );
+
+      console.log(
+        "🧪 ========================================"
+      );
+
+
+      // ========================================================
+      // 2. VALIDAR
+      // ========================================================
+
+      if (
+        !receptionId
+      ) {
+
+        return res
+          .status(400)
+          .json({
+
+            success: false,
+
+            title:
+              "Reception ID requerido",
+
+            message:
+              "Debe enviar el ID de la recepción de ADM Cloud."
+
+          });
+
+      }
+
+
+      // ========================================================
+      // 3. LLAMAR SERVICIO
+      // ========================================================
+
+      const result =
+        await confirmAdmCloudReceptionById(
+          receptionId
+        );
+
+
+      // ========================================================
+      // 4. NO EXISTE
+      // ========================================================
+
+      if (
+        !result.exists
+      ) {
+
+        return res
+          .status(404)
+          .json({
+
+            success: true,
+
+            exists: false,
+
+            receptionId:
+              result.receptionId,
+
+            message:
+              "La recepción no existe en ADM Cloud.",
+
+            reception:
+              null
+
+          });
+
+      }
+
+
+      // ========================================================
+      // 5. EXISTE
+      // ========================================================
+
+      return res
+        .status(200)
+        .json({
+
+          success: true,
+
+          exists: true,
+
+          receptionId:
+            result.receptionId,
+
+          message:
+            "La recepción existe en ADM Cloud.",
+
+          reception:
+            result.reception
+
+        });
+
+
+    } catch (
+      error
+    ) {
+
+      console.error("");
+      console.error(
+        "❌ ========================================"
+      );
+
+      console.error(
+        "❌ ERROR TEST ADM RECEPTION"
+      );
+
+      console.error(
+        error
+      );
+
+      console.error(
+        "❌ ========================================"
+      );
+
+
+      return res
+        .status(
+          Number(
+            error?.status
+          ) ||
+          500
+        )
+        .json({
+
+          success: false,
+
+          exists: null,
+
+          title:
+            "Error consultando recepción",
+
+          code:
+            error?.code ||
+            "ADM_RECEPTION_TEST_ERROR",
+
+          message:
+            error?.message ||
+            "No fue posible consultar la recepción en ADM Cloud.",
+
+          admData:
+            error?.admData ||
+            error?.data ||
+            null
+
+        });
+
+    }
+
+  }
+);
 
 
 app.get(
@@ -338,7 +527,87 @@ app.get(
 );
 
 
+//Create conduce
+app.post(
+  "/test-admcloud-reception",
+  async (req, res) => {
 
+    try {
+
+      console.log("");
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "🧪 TEST CREATE ADM CLOUD RECEPTION"
+      );
+
+      console.log(
+        "========================================"
+      );
+
+
+      console.log(
+        "📥 BODY:"
+      );
+
+      console.dir(
+        req.body,
+        {
+          depth: null
+        }
+      );
+
+
+      const result =
+        await createAdmCloudReception(
+          req.body
+        );
+
+
+      return res
+        .status(200)
+        .json({
+
+          success: true,
+
+          message:
+            "Reception creada correctamente en Adm Cloud",
+
+          data:
+            result
+
+        });
+
+
+    } catch (error) {
+
+      console.error("");
+      console.error(
+        "❌ ERROR TEST ADM CLOUD RECEPTION:"
+      );
+
+      console.error(
+        error
+      );
+
+
+      return res
+        .status(400)
+        .json({
+
+          success: false,
+
+          message:
+            error.message
+
+        });
+
+    }
+
+  }
+);
 
 //await ejecutarAjusteManual();
 
@@ -435,7 +704,7 @@ console.log("🎉 Todos los batches procesados");
 //🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
 //[CITRUS] SYNC ITEMS AND PURCHASE ORDERS
-startCitrusCron();
+//startCitrusCron();
 
 //Sincroniza todos los productos con el ERO Citrus de prueba
 app.get("/test-sync-items", async (req, res) => {

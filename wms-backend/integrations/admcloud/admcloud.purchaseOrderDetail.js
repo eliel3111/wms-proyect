@@ -617,7 +617,7 @@ export async function syncAdmCloudPurchaseOrderLines(
     );
     console.log(
       "📌 Items recibidos:",
-      rawLines.length
+      rawLines
     );
     console.log("🟥🟥🟥 ========================================");
 
@@ -697,6 +697,9 @@ export async function syncAdmCloudPurchaseOrderLines(
 
 
             return {
+              // ==========================================
+              // IDS
+              // ==========================================
 
               erp_line_id:
                 erpLineId,
@@ -704,8 +707,14 @@ export async function syncAdmCloudPurchaseOrderLines(
               erp_order_id:
                 admCloudOrderId,
 
+              // ItemID de ADM Cloud
               erp_product_id:
                 erpProductId,
+
+
+              // ==========================================
+              // CANTIDAD DE LA ORDEN
+              // ==========================================
 
               qty:
                 toNumber(
@@ -713,38 +722,86 @@ export async function syncAdmCloudPurchaseOrderLines(
                   0
                 ),
 
-              original_line_number:
+
+              // ==========================================
+              // CAMPOS NECESARIOS PARA RECEPTION API
+              // ==========================================
+
+              erp_row_order:
                 toNumber(
                   line?.RowOrder,
                   index + 1
-                ) ||
-                index + 1,
+                ) || index + 1,
 
-              description:
-                line?.Name
-                  ? String(
-                      line.Name
-                    ).trim()
-                  : null,
+              erp_cost:
+                toNumber(
+                  line?.Cost,
+                  0
+                ),
 
-              sku:
-                line?.ItemSKU
-                  ? String(
-                      line.ItemSKU
-                    ).trim()
-                  : null,
+              erp_price:
+                toNumber(
+                  line?.Price,
+                  0
+                ),
 
-              uom_id:
+              erp_uom_id:
                 toTextId(
                   line?.UOMID
                 ),
 
+              erp_row_type:
+                toNumber(
+                  line?.RowType,
+                  0
+                ),
+
+              erp_estimated_delivery_date:
+                line?.EstimatedDeliveryDate ||
+                null,
+
+              erp_exchange_rate:
+                toNumber(
+                  line?.ExchangeRate,
+                  0
+                ),
+
+              erp_warranty_days:
+                toNumber(
+                  line?.WarrantyDays,
+                  0
+                ),
+
+              erp_warranty_units:
+                toNumber(
+                  line?.WarrantyUnits,
+                  0
+                ),
+
+
+              // ==========================================
+              // DATOS WMS / DESCRIPTIVOS
+              // ==========================================
+
+              description:
+                line?.Name
+                  ? String(line.Name).trim()
+                  : null,
+
+              sku:
+                line?.ItemSKU
+                  ? String(line.ItemSKU).trim()
+                  : null,
+
               uom_name:
                 line?.UOMName
-                  ? String(
-                      line.UOMName
-                    ).trim()
+                  ? String(line.UOMName).trim()
                   : null,
+
+
+              // ==========================================
+              // OTROS CAMPOS ADM
+              // ==========================================
 
               completed_qty:
                 toNumber(
@@ -760,7 +817,6 @@ export async function syncAdmCloudPurchaseOrderLines(
 
               closed:
                 line?.Closed === true
-
             };
 
           }
@@ -804,13 +860,11 @@ export async function syncAdmCloudPurchaseOrderLines(
     for (const line of values) {
 
       if (!line.erp_line_id) {
-
-        throw new Error(
-          `Adm Cloud devolvió línea sin ID válido. ` +
-          `Posición: ${line.original_line_number}`
-        );
-
-      }
+  throw new Error(
+    `Adm Cloud devolvió línea sin ID válido. ` +
+    `Posición: ${line.erp_row_order}`
+  );
+}
 
 
       if (
@@ -911,7 +965,7 @@ export async function syncAdmCloudPurchaseOrderLines(
     if (
       localErpOrderId &&
       localErpOrderId !==
-        admCloudOrderId
+      admCloudOrderId
     ) {
 
       throw new Error(
@@ -930,19 +984,31 @@ export async function syncAdmCloudPurchaseOrderLines(
     const wmsResult =
       await clientDb.query(
         `
-        SELECT
-          pol.id,
-          pol.purchase_order_id,
-          pol.erp_order_id,
-          pol.erp_line_id,
-          pol.erp_product_id,
-          pol.line_number,
-          pol.description,
-          pol.ordered_qty,
-          pol.received_qty,
-          pol.sku,
-          pol.product_exists,
-          pol.deleted_erp,
+       SELECT
+  pol.id,
+  pol.purchase_order_id,
+  pol.erp_order_id,
+  pol.erp_line_id,
+  pol.erp_product_id,
+
+  pol.line_number,
+
+  pol.erp_row_order,
+  pol.erp_cost,
+  pol.erp_price,
+  pol.erp_uom_id,
+  pol.erp_row_type,
+  pol.erp_estimated_delivery_date,
+  pol.erp_exchange_rate,
+  pol.erp_warranty_days,
+  pol.erp_warranty_units,
+
+  pol.description,
+  pol.ordered_qty,
+  pol.received_qty,
+  pol.sku,
+  pol.product_exists,
+  pol.deleted_erp,
 
           GREATEST(
             COALESCE(
@@ -959,23 +1025,25 @@ export async function syncAdmCloudPurchaseOrderLines(
 
         FROM purchase_order_lines pol
 
-        LEFT JOIN LATERAL (
+       LEFT JOIN LATERAL (
+  SELECT
+    COALESCE(
+      SUM(rl.received_qty),
+      0
+    )::numeric AS total_received_qty
 
-          SELECT
-            COALESCE(
-              SUM(rl.received_qty),
-              0
-            )::numeric
-              AS total_received_qty
+  FROM receipt_lines rl
 
-          FROM receipt_lines rl
+  INNER JOIN receipts r
+    ON r.id = rl.receipt_id
 
-          WHERE
-            rl.purchase_order_line_id =
-            pol.id
+  WHERE
+    rl.purchase_order_line_id = pol.id
 
-        ) receipts
-          ON TRUE
+    AND r.status = 'completed'
+
+) receipts
+ON TRUE
 
         WHERE
           pol.purchase_order_id = $1
@@ -1039,6 +1107,57 @@ export async function syncAdmCloudPurchaseOrderLines(
           received_qty:
             toNumber(
               line.received_qty,
+              0
+            ),
+
+          erp_row_order:
+            toNumber(
+              line.erp_row_order,
+              0
+            ),
+
+          erp_cost:
+            toNumber(
+              line.erp_cost,
+              0
+            ),
+
+          erp_price:
+            toNumber(
+              line.erp_price,
+              0
+            ),
+
+          erp_uom_id:
+            toTextId(
+              line.erp_uom_id
+            ),
+
+          erp_row_type:
+            toNumber(
+              line.erp_row_type,
+              0
+            ),
+
+          erp_estimated_delivery_date:
+            line.erp_estimated_delivery_date ||
+            null,
+
+          erp_exchange_rate:
+            toNumber(
+              line.erp_exchange_rate,
+              0
+            ),
+
+          erp_warranty_days:
+            toNumber(
+              line.erp_warranty_days,
+              0
+            ),
+
+          erp_warranty_units:
+            toNumber(
+              line.erp_warranty_units,
               0
             ),
 
@@ -1249,7 +1368,7 @@ export async function syncAdmCloudPurchaseOrderLines(
         erpProductId !== null &&
 
         wmsProductId !==
-          erpProductId;
+        erpProductId;
 
 
       matchedWmsIds.add(
@@ -1613,36 +1732,43 @@ export async function syncAdmCloudPurchaseOrderLines(
 
 
       const receiptInfoResult =
-        await clientDb.query(
-          `
-          SELECT
+  await clientDb.query(
+    `
+    SELECT
 
-            COUNT(*)::int
-              AS receipt_count,
+      COUNT(rl.id)::int
+        AS receipt_count,
 
-            COALESCE(
-              SUM(received_qty),
-              0
-            )::numeric
-              AS total_received,
+      COALESCE(
+        SUM(rl.received_qty)
+        FILTER (
+          WHERE r.status = 'completed'
+        ),
+        0
+      )::numeric
+        AS total_received,
 
-            COUNT(*) FILTER (
-              WHERE
-                COALESCE(
-                  received_qty,
-                  0
-                ) > 0
-            )::int
-              AS received_lines_count
-
-          FROM receipt_lines
-
+      COUNT(rl.id)
+        FILTER (
           WHERE
-            purchase_order_line_id =
-            $1
-          `,
-          [wmsLine.id]
-        );
+            r.status = 'completed'
+            AND COALESCE(
+              rl.received_qty,
+              0
+            ) > 0
+        )::int
+        AS received_lines_count
+
+    FROM receipt_lines rl
+
+    INNER JOIN receipts r
+      ON r.id = rl.receipt_id
+
+    WHERE
+      rl.purchase_order_line_id = $1
+    `,
+    [wmsLine.id]
+  );
 
 
       const totalReceived =
@@ -1873,11 +1999,11 @@ export async function syncAdmCloudPurchaseOrderLines(
       const product =
 
         erpLine.erp_product_id !==
-        null
+          null
 
           ? productMap.get(
-              erpLine.erp_product_id
-            )
+            erpLine.erp_product_id
+          )
 
           : null;
 
@@ -1910,59 +2036,134 @@ export async function syncAdmCloudPurchaseOrderLines(
 
 
       const insertResult =
-        await clientDb.query(
-          `
-          INSERT INTO purchase_order_lines
-          (
-            purchase_order_id,
-            line_number,
-            description,
-            ordered_qty,
-            received_qty,
-            deleted_erp,
-            erp_line_id,
-            erp_order_id,
-            erp_product_id,
-            sku,
-            product_exists
-          )
+  await clientDb.query(
+    `
+    INSERT INTO purchase_order_lines
+    (
+      purchase_order_id,
+      line_number,
+      description,
+      ordered_qty,
+      received_qty,
+      deleted_erp,
 
-          VALUES
-          (
-            $1,
-            $2,
-            $3,
-            $4,
-            0,
-            FALSE,
-            $5,
-            $6,
-            $7,
-            $8,
-            $9
-          )
+      erp_line_id,
+      erp_order_id,
+      erp_product_id,
 
-          RETURNING
-            id,
-            erp_line_id,
-            erp_product_id,
-            sku,
-            ordered_qty
-          `,
-          [
-            purchaseOrderId,
-            String(
-              maxLineNumber
-            ),
-            description,
-            erpLine.qty,
-            erpLine.erp_line_id,
-            erpLine.erp_order_id,
-            erpLine.erp_product_id,
-            sku,
-            productExists
-          ]
-        );
+      erp_row_order,
+      erp_cost,
+      erp_price,
+      erp_uom_id,
+      erp_row_type,
+      erp_estimated_delivery_date,
+      erp_exchange_rate,
+      erp_warranty_days,
+      erp_warranty_units,
+
+      sku,
+      product_exists
+    )
+
+    VALUES
+    (
+      $1,
+      $2,
+      $3,
+      $4,
+      0,
+      FALSE,
+
+      $5,
+      $6,
+      $7,
+
+      $8,
+      $9,
+      $10,
+      $11,
+      $12,
+      $13,
+      $14,
+      $15,
+      $16,
+
+      $17,
+      $18
+    )
+
+    RETURNING
+      id,
+      erp_line_id,
+      erp_product_id,
+      erp_row_order,
+      erp_cost,
+      erp_price,
+      erp_uom_id,
+      erp_row_type,
+      erp_estimated_delivery_date,
+      erp_exchange_rate,
+      erp_warranty_days,
+      erp_warranty_units,
+      sku,
+      ordered_qty
+    `,
+    [
+      // $1
+      purchaseOrderId,
+
+      // $2
+      String(maxLineNumber),
+
+      // $3
+      description,
+
+      // $4
+      erpLine.qty,
+
+      // $5
+      erpLine.erp_line_id,
+
+      // $6
+      erpLine.erp_order_id,
+
+      // $7
+      erpLine.erp_product_id,
+
+      // $8 RowOrder
+      erpLine.erp_row_order,
+
+      // $9 Cost
+      erpLine.erp_cost,
+
+      // $10 Price
+      erpLine.erp_price,
+
+      // $11 UOMID
+      erpLine.erp_uom_id,
+
+      // $12 RowType
+      erpLine.erp_row_type,
+
+      // $13 EstimatedDeliveryDate
+      erpLine.erp_estimated_delivery_date,
+
+      // $14 ExchangeRate
+      erpLine.erp_exchange_rate,
+
+      // $15 WarrantyDays
+      erpLine.erp_warranty_days,
+
+      // $16 WarrantyUnits
+      erpLine.erp_warranty_units,
+
+      // $17
+      sku,
+
+      // $18
+      productExists
+    ]
+  );
 
 
       if (
@@ -1998,11 +2199,11 @@ export async function syncAdmCloudPurchaseOrderLines(
       const product =
 
         erpLine.erp_product_id !==
-        null
+          null
 
           ? productMap.get(
-              erpLine.erp_product_id
-            )
+            erpLine.erp_product_id
+          )
 
           : null;
 
@@ -2069,12 +2270,12 @@ export async function syncAdmCloudPurchaseOrderLines(
         product
 
           ? product
-              .product_exists ===
-            true
+            .product_exists ===
+          true
 
           : wmsLine
-              .product_exists ===
-            true;
+            .product_exists ===
+          true;
 
 
       const newErpLineId =
@@ -2089,6 +2290,58 @@ export async function syncAdmCloudPurchaseOrderLines(
         erpLine.erp_product_id;
 
 
+        const newErpRowOrder =
+  toNumber(
+    erpLine.erp_row_order,
+    0
+  );
+
+const newErpCost =
+  toNumber(
+    erpLine.erp_cost,
+    0
+  );
+
+const newErpPrice =
+  toNumber(
+    erpLine.erp_price,
+    0
+  );
+
+const newErpUomId =
+  toTextId(
+    erpLine.erp_uom_id
+  );
+
+const newErpRowType =
+  toNumber(
+    erpLine.erp_row_type,
+    0
+  );
+
+const newErpEstimatedDeliveryDate =
+  erpLine.erp_estimated_delivery_date ||
+  null;
+
+const newErpExchangeRate =
+  toNumber(
+    erpLine.erp_exchange_rate,
+    0
+  );
+
+const newErpWarrantyDays =
+  toNumber(
+    erpLine.erp_warranty_days,
+    0
+  );
+
+const newErpWarrantyUnits =
+  toNumber(
+    erpLine.erp_warranty_units,
+    0
+  );
+
+
 
       // ======================================================
       // DETECTAR CAMBIOS
@@ -2096,45 +2349,104 @@ export async function syncAdmCloudPurchaseOrderLines(
 
       const changed =
 
-        toNumber(
-          wmsLine.ordered_qty,
-          0
-        ) !==
-          newOrderedQty ||
+  toNumber(
+    wmsLine.ordered_qty,
+    0
+  ) !==
+    newOrderedQty ||
 
-        toNumber(
-          wmsLine.received_qty,
-          0
-        ) !==
-          actualReceived ||
+  toNumber(
+    wmsLine.received_qty,
+    0
+  ) !==
+    actualReceived ||
 
-        toTextId(
-          wmsLine.erp_line_id
-        ) !==
-          newErpLineId ||
+  toTextId(
+    wmsLine.erp_line_id
+  ) !==
+    newErpLineId ||
 
-        toTextId(
-          wmsLine.erp_order_id
-        ) !==
-          newErpOrderId ||
+  toTextId(
+    wmsLine.erp_order_id
+  ) !==
+    newErpOrderId ||
 
-        toTextId(
-          wmsLine.erp_product_id
-        ) !==
-          newErpProductId ||
+  toTextId(
+    wmsLine.erp_product_id
+  ) !==
+    newErpProductId ||
 
-        wmsLine.description !==
-          newDescription ||
+  // =====================================
+  // NUEVOS CAMPOS
+  // =====================================
 
-        wmsLine.sku !==
-          newSku ||
+  toNumber(
+    wmsLine.erp_row_order,
+    0
+  ) !==
+    newErpRowOrder ||
 
-        wmsLine.product_exists !==
-          newProductExists ||
+  toNumber(
+    wmsLine.erp_cost,
+    0
+  ) !==
+    newErpCost ||
 
-        wmsLine.deleted_erp ===
-          true;
+  toNumber(
+    wmsLine.erp_price,
+    0
+  ) !==
+    newErpPrice ||
 
+  toTextId(
+    wmsLine.erp_uom_id
+  ) !==
+    newErpUomId ||
+
+  toNumber(
+    wmsLine.erp_row_type,
+    0
+  ) !==
+    newErpRowType ||
+
+  String(
+    wmsLine.erp_estimated_delivery_date || ""
+  ) !==
+  String(
+    newErpEstimatedDeliveryDate || ""
+  ) ||
+
+  toNumber(
+    wmsLine.erp_exchange_rate,
+    0
+  ) !==
+    newErpExchangeRate ||
+
+  toNumber(
+    wmsLine.erp_warranty_days,
+    0
+  ) !==
+    newErpWarrantyDays ||
+
+  toNumber(
+    wmsLine.erp_warranty_units,
+    0
+  ) !==
+    newErpWarrantyUnits ||
+
+  // =====================================
+
+  wmsLine.description !==
+    newDescription ||
+
+  wmsLine.sku !==
+    newSku ||
+
+  wmsLine.product_exists !==
+    newProductExists ||
+
+  wmsLine.deleted_erp ===
+    true;
 
       if (!changed) {
 
@@ -2176,54 +2488,128 @@ export async function syncAdmCloudPurchaseOrderLines(
 
 
       const updateResult =
-        await clientDb.query(
-          `
-          UPDATE purchase_order_lines
+  await clientDb.query(
+    `
+    UPDATE purchase_order_lines
 
-          SET
-            description = $2,
+    SET
+      description = $2,
 
-            ordered_qty = $3,
+      ordered_qty = $3,
 
-            received_qty = $4,
+      received_qty = $4,
 
-            erp_line_id = $5,
+      erp_line_id = $5,
 
-            erp_order_id = $6,
+      erp_order_id = $6,
 
-            erp_product_id = $7,
+      erp_product_id = $7,
 
-            sku = $8,
+      sku = $8,
 
-            product_exists = $9,
+      product_exists = $9,
 
-            deleted_erp = FALSE
+      erp_row_order = $10,
 
-          WHERE id = $1
+      erp_cost = $11,
 
-          RETURNING
-            id,
-            line_number,
-            erp_line_id,
-            erp_order_id,
-            erp_product_id,
-            sku,
-            ordered_qty,
-            received_qty,
-            deleted_erp
-          `,
-          [
-            wmsLine.id,
-            newDescription,
-            newOrderedQty,
-            actualReceived,
-            newErpLineId,
-            newErpOrderId,
-            newErpProductId,
-            newSku,
-            newProductExists
-          ]
-        );
+      erp_price = $12,
+
+      erp_uom_id = $13,
+
+      erp_row_type = $14,
+
+      erp_estimated_delivery_date = $15,
+
+      erp_exchange_rate = $16,
+
+      erp_warranty_days = $17,
+
+      erp_warranty_units = $18,
+
+      deleted_erp = FALSE
+
+    WHERE id = $1
+
+    RETURNING
+      id,
+      line_number,
+
+      erp_line_id,
+      erp_order_id,
+      erp_product_id,
+
+      erp_row_order,
+      erp_cost,
+      erp_price,
+      erp_uom_id,
+      erp_row_type,
+      erp_estimated_delivery_date,
+      erp_exchange_rate,
+      erp_warranty_days,
+      erp_warranty_units,
+
+      sku,
+      ordered_qty,
+      received_qty,
+      deleted_erp
+    `,
+    [
+      // $1
+      wmsLine.id,
+
+      // $2
+      newDescription,
+
+      // $3
+      newOrderedQty,
+
+      // $4
+      actualReceived,
+
+      // $5
+      newErpLineId,
+
+      // $6
+      newErpOrderId,
+
+      // $7
+      newErpProductId,
+
+      // $8
+      newSku,
+
+      // $9
+      newProductExists,
+
+      // $10
+      newErpRowOrder,
+
+      // $11
+      newErpCost,
+
+      // $12
+      newErpPrice,
+
+      // $13
+      newErpUomId,
+
+      // $14
+      newErpRowType,
+
+      // $15
+      newErpEstimatedDeliveryDate,
+
+      // $16
+      newErpExchangeRate,
+
+      // $17
+      newErpWarrantyDays,
+
+      // $18
+      newErpWarrantyUnits
+    ]
+  );
 
 
       if (
@@ -2248,36 +2634,44 @@ export async function syncAdmCloudPurchaseOrderLines(
       await clientDb.query(
         `
         SELECT
-          pol.id,
-          pol.line_number,
-          pol.erp_line_id,
-          pol.erp_order_id,
-          pol.erp_product_id,
-          pol.sku,
-          pol.ordered_qty,
-          pol.received_qty,
-          pol.deleted_erp
+  pol.id,
+  pol.line_number,
 
-        FROM purchase_order_lines pol
+  pol.erp_line_id,
+  pol.erp_order_id,
+  pol.erp_product_id,
 
-        WHERE
-          pol.purchase_order_id =
-          $1
+  pol.erp_row_order,
+  pol.erp_cost,
+  pol.erp_price,
+  pol.erp_uom_id,
+  pol.erp_row_type,
+  pol.erp_estimated_delivery_date,
+  pol.erp_exchange_rate,
+  pol.erp_warranty_days,
+  pol.erp_warranty_units,
 
-        ORDER BY
-          CASE
-            WHEN
-              pol.line_number ~
-              '^[0-9]+$'
+  pol.sku,
+  pol.description,
+  pol.ordered_qty,
+  pol.received_qty,
+  pol.deleted_erp
 
-            THEN
-              pol.line_number::integer
+FROM purchase_order_lines pol
 
-            ELSE
-              999999999
-          END,
+WHERE
+  pol.purchase_order_id = $1
 
-          pol.id
+ORDER BY
+  CASE
+    WHEN
+      pol.line_number ~ '^[0-9]+$'
+    THEN
+      pol.line_number::integer
+    ELSE
+      999999999
+  END,
+  pol.id
         `,
         [purchaseOrderId]
       );
@@ -2337,7 +2731,7 @@ export async function syncAdmCloudPurchaseOrderLines(
         );
 
       } catch (
-        rollbackError
+      rollbackError
       ) {
 
         console.error(

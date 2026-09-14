@@ -84,6 +84,8 @@ export default function OrdenCompra() {
     const [filter, setFilter] = useState<Filter>("all");
     const [quantityError, setQuantityError] = useState(false);
     const [shakeKey, setShakeKey] = useState(0);
+    const [receiptId, setReceiptId] =
+        useState<number | null>(null);
 
     const qtyInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +94,7 @@ export default function OrdenCompra() {
     const productsRef = useRef<Product[]>([]);
     const lastCodeRef = useRef<string>("");
     const selectedIndexRef = useRef<number | null>(null);
+
 
     const navigate = useNavigate();
 
@@ -270,6 +273,29 @@ export default function OrdenCompra() {
 
                 const data =
                     result.data;
+
+                console.log("🟨🟨🟨 ", data);
+
+                const loadedReceiptId =
+                    Number(
+                        data.receipt_id
+                    );
+
+                if (
+                    Number.isInteger(
+                        loadedReceiptId
+                    ) &&
+                    loadedReceiptId > 0
+                ) {
+                    setReceiptId(
+                        loadedReceiptId
+                    );
+
+                    console.log(
+                        "🧾 Receipt ID guardado:",
+                        loadedReceiptId
+                    );
+                }
 
 
                 // ====================================================
@@ -1084,7 +1110,6 @@ export default function OrdenCompra() {
         if (
             purchaseOrderIds.length === 0
         ) {
-
             console.error(
                 "❌ purchaseOrderIds está vacío"
             );
@@ -1093,7 +1118,62 @@ export default function OrdenCompra() {
         }
 
 
+        if (
+            receiptId === null
+        ) {
+            console.error(
+                "❌ receiptId no está disponible"
+            );
+
+            return;
+        }
+
+
         try {
+
+            // ====================================================
+            // PREPARAR LÍNEAS DE ESTA RECEPCIÓN
+            // ====================================================
+
+            const receptionLines =
+                products.map(
+                    (product) => {
+
+                        const currentReceiptQty =
+                            getDisplayReceived(
+                                product
+                            );
+
+
+                        return {
+                            id:
+                                Number(
+                                    product.id
+                                ),
+
+                            received_qty:
+                                Number(
+                                    currentReceiptQty
+                                ),
+                        };
+
+                    }
+                );
+
+
+            console.log("");
+            console.log(
+                "📦 LÍNEAS A GUARDAR EN RECEIPT_LINES:"
+            );
+
+            console.table(
+                receptionLines
+            );
+
+
+            // ====================================================
+            // ENVIAR AL BACKEND
+            // ====================================================
 
             const response =
                 await apiClient.post(
@@ -1105,21 +1185,14 @@ export default function OrdenCompra() {
                         purchase_order_numbers:
                             poNumbers,
 
+                        receipt_id:
+                            receiptId,
+
                         reception_status:
                             receptionStatus,
 
                         lines:
-                            products.map(
-                                (p) => ({
-                                    id:
-                                        Number(p.id),
-
-                                    received_qty:
-                                        Number(
-                                            p.received_qty
-                                        ),
-                                })
-                            ),
+                            receptionLines,
                     }
                 );
 
@@ -1140,6 +1213,7 @@ export default function OrdenCompra() {
                     result.message ||
                     "Error guardando recepción"
                 );
+
             }
 
 
@@ -1161,6 +1235,9 @@ export default function OrdenCompra() {
             );
 
 
+            return result;
+
+
         } catch (error: any) {
 
             console.error(
@@ -1168,12 +1245,15 @@ export default function OrdenCompra() {
                 error
             );
 
+
             alert(
                 "Ocurrió un error al guardar la recepción"
             );
+
+
+            return null;
         }
     }
-
 
 
 
@@ -1500,7 +1580,7 @@ export default function OrdenCompra() {
                         navigate(
                             `/validation?poIds=${encodeURIComponent(
                                 purchaseOrderIds.join(",")
-                            )}`
+                            )}&receiptId=${receiptId}`
                         );
                     }} className="pill-btn finish-btn">
                         <span className="icon">

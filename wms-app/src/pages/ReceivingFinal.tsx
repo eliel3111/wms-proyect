@@ -13,13 +13,27 @@ type ReceivingLocation = {
 
 type CloseReceivingPayload = {
     purchaseOrderIds: number[];
+    receiptId: number;
     receivingLocationId: number;
 };
-
 export default function ReceivingFinal() {
     const [searchParams] = useSearchParams();
 
     const poIdsParam = searchParams.get("poIds");
+
+    const receiptId =
+        Number(
+            searchParams.get("receiptId")
+        );
+    if (
+        !Number.isInteger(receiptId) ||
+        receiptId <= 0
+    ) {
+        console.error(
+            "❌ receiptId inválido:",
+            receiptId
+        );
+    }
 
     const purchaseOrderIds = String(poIdsParam || "")
         .split(",")
@@ -113,19 +127,106 @@ export default function ReceivingFinal() {
             setLoading(true);
             console.log(locationFound.code);
             console.log(typeof (locationFound.code));
-            const result = await closeReceiving({
-                purchaseOrderIds,
-                receivingLocationId: Number(locationFound.id),
-            });
-            console.log("RESULTADO: ", result.success);
-            if (result.success) {
-                console.log("FUNCIONO")
-                setConfirmation({
-                    show: true,
-                    receiptCode: result.receiptCode
-                });
-                setLoading(false);
-            }
+
+
+
+          const result =
+    await closeReceiving({
+
+        purchaseOrderIds,
+
+        receiptId,
+
+        receivingLocationId:
+            Number(locationFound.id),
+
+    });
+
+
+console.log(
+    "📥 RESULTADO CLOSE RECEIVING:",
+    result
+);
+
+
+// ============================================================
+// SUCCESS
+// ============================================================
+
+if (
+    result.success
+) {
+
+    console.log(
+        "✅ RECEPCIÓN CERRADA"
+    );
+
+
+    setConfirmation({
+
+        show: true,
+
+        receiptCode:
+            result.receiptCode
+
+    });
+
+
+    setLoading(false);
+
+    return;
+
+}
+
+
+// ============================================================
+// ERROR DEVUELTO POR BACKEND
+// ============================================================
+
+console.error(
+    "❌ ERROR DEVUELTO POR BACKEND:"
+);
+
+console.error(
+    "Title:",
+    result.title
+);
+
+console.error(
+    "Message:",
+    result.message
+);
+
+console.error(
+    "Code:",
+    result.code
+);
+
+
+setLoading(false);
+
+
+openModal({
+
+    title:
+        result.title ||
+        "Error cerrando recepción",
+
+    message:
+        result.message ||
+        "No se pudo completar la recepción.",
+
+    onCloseCallback:
+        focusScannerInput
+
+});
+
+
+return;
+
+
+
+
         } else {
 
             openModal({
@@ -142,14 +243,70 @@ export default function ReceivingFinal() {
     }
 
     // FUNCTION: To save reception
-    async function closeReceiving(payload: CloseReceivingPayload) {
-        const response = await apiClient.post(
-            "/receiving/close",
-            payload
-        );
+    async function closeReceiving(
+    payload: CloseReceivingPayload
+) {
+
+    try {
+
+        const response =
+            await apiClient.post(
+                "/receiving/close",
+                payload
+            );
 
         return response.data;
+
+    } catch (error: any) {
+
+        console.error(
+            "❌ ERROR CLOSE RECEIVING:",
+            error
+        );
+
+
+        // ====================================================
+        // EL BACKEND RESPONDIÓ CON:
+        //
+        // {
+        //   success: false,
+        //   title,
+        //   message,
+        //   code
+        // }
+        // ====================================================
+
+        if (
+            error.response?.data
+        ) {
+
+            return error.response.data;
+
+        }
+
+
+        // ====================================================
+        // ERROR DE RED / SERVER NO DISPONIBLE
+        // ====================================================
+
+        return {
+
+            success: false,
+
+            title:
+                "Error de conexión",
+
+            message:
+                "No fue posible comunicarse con el servidor.",
+
+            code:
+                "NETWORK_ERROR"
+
+        };
+
     }
+
+}
 
     function focusScannerInput() {
         setTimeout(() => {

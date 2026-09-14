@@ -29,7 +29,7 @@ type Diferencia = {
 
 
 export default function ReceivingValidation() {
-     const [searchParams] =
+    const [searchParams] =
         useSearchParams();
 
 
@@ -39,6 +39,29 @@ export default function ReceivingValidation() {
 
     const poIdsParam =
         searchParams.get("poIds");
+    const receiptIdParam =
+        searchParams.get("receiptId");
+
+    const receiptId =
+        receiptIdParam
+            ? Number(receiptIdParam)
+            : null;
+
+    console.log(
+        "🧾 RECEIPT ID EN VALIDATION:",
+        receiptId
+    );
+
+    if (
+        receiptId === null ||
+        !Number.isInteger(receiptId) ||
+        receiptId <= 0
+    ) {
+        console.error(
+            "❌ Receipt ID inválido en ReceivingValidation:",
+            receiptId
+        );
+    }
 
 
     const [diferencias, setDiferencias] = useState<Diferencia[]>([]);
@@ -49,151 +72,152 @@ export default function ReceivingValidation() {
     useEffect(() => {
 
 
-    if (!poIdsParam) {
-        return;
-    }
+        if (!poIdsParam) {
+            return;
+        }
 
 
-    const purchaseOrderIds =
-        poIdsParam
-            .split(",")
-            .map(Number)
-            .filter(
-                (id) =>
-                    Number.isInteger(id) &&
-                    id > 0
-            );
+        const purchaseOrderIds =
+            poIdsParam
+                .split(",")
+                .map(Number)
+                .filter(
+                    (id) =>
+                        Number.isInteger(id) &&
+                        id > 0
+                );
 
 
-    console.log(
-        "📦 PURCHASE ORDER IDS:",
-        purchaseOrderIds
-    );
-
-
-    if (
-        purchaseOrderIds.length === 0
-    ) {
-
-        console.error(
-            "❌ No hay purchase order ids válidos"
+        console.log(
+            "📦 PURCHASE ORDER IDS:",
+            purchaseOrderIds
         );
 
-        setLoading(false);
 
-        return;
-    }
+        if (
+            purchaseOrderIds.length === 0
+        ) {
 
+            console.error(
+                "❌ No hay purchase order ids válidos"
+            );
 
-    const loadDifferences =
-        async () => {
+            setLoading(false);
 
-            try {
-
-                console.log(
-                    "🚀 BUSCANDO DIFERENCIAS DE:",
-                    purchaseOrderIds
-                );
+            return;
+        }
 
 
-                const response =
-                    await apiClient.get(
-                        "/receiving/differences",
-                        {
-                            params: {
+        const loadDifferences =
+            async () => {
 
-                                poIds:
-                                    purchaseOrderIds.join(",")
+                try {
 
-                            }
-                        }
+                    console.log(
+                        "🚀 BUSCANDO DIFERENCIAS DE:",
+                        purchaseOrderIds
                     );
 
 
-                const result =
-                    response.data;
+                    const response =
+                        await apiClient.get(
+                            "/receiving/differences",
+                            {
+                                params: {
 
+                                    poIds:
+                                        purchaseOrderIds.join(",")
 
-                console.log(
-                    "📥 RESPUESTA BACKEND:",
-                    result
-                );
-
-
-                if (!result.success) {
-
-                    throw new Error(
-                        result.message ||
-                        "Error obteniendo diferencias"
-                    );
-
-                }
-
-
-                const diffs:
-                    Diferencia[] =
-                    result.data.lines;
-
-
-                console.log(
-                    "📦 DIFERENCIAS:",
-                    diffs
-                );
-
-
-                setDiferencias(
-                    diffs
-                );
-
-
-
-                if (
-                    diffs.length === 0
-                ) {
-
-                    setTimeout(
-                        () => {
-
-                            navigate(
-                                `/receiving/final?poIds=${encodeURIComponent(
-                                    purchaseOrderIds.join(",")
-                                )}`,
-                                {
-                                    replace: true
                                 }
-                            );
+                            }
+                        );
 
-                        },
-                        5
+
+                    const result =
+                        response.data;
+
+
+                    console.log(
+                        "📥 RESPUESTA BACKEND:",
+                        result
                     );
+
+
+                    if (!result.success) {
+
+                        throw new Error(
+                            result.message ||
+                            "Error obteniendo diferencias"
+                        );
+
+                    }
+
+
+                    const diffs:
+                        Diferencia[] =
+                        result.data.lines;
+
+
+                    console.log(
+                        "📦 DIFERENCIAS:",
+                        diffs
+                    );
+
+
+                    setDiferencias(
+                        diffs
+                    );
+
+
+
+                    if (
+                        diffs.length === 0
+                    ) {
+
+                        setTimeout(
+                            () => {
+
+                                navigate(
+                                    `/receiving/final?poIds=${encodeURIComponent(
+                                        purchaseOrderIds.join(",")
+                                    )}&receiptId=${receiptId}`,
+                                    {
+                                        replace: true
+                                    }
+                                );
+
+                            },
+                            5
+                        );
+
+                    }
+
+
+                } catch (error) {
+
+                    console.error(
+                        "❌ Error obteniendo diferencias:",
+                        error
+                    );
+
+
+                } finally {
+
+                    setLoading(false);
 
                 }
 
-
-            } catch (error) {
-
-                console.error(
-                    "❌ Error obteniendo diferencias:",
-                    error
-                );
+            };
 
 
-            } finally {
-
-                setLoading(false);
-
-            }
-
-        };
+        loadDifferences();
 
 
-    loadDifferences();
-
-
-}, [
-    poIdsParam,
-    navigate
-]);
+    }, [
+        poIdsParam,
+        receiptId,
+        navigate
+    ]);
 
     if (loading) {
         return <LoadingScreen />;
@@ -240,15 +264,17 @@ export default function ReceivingValidation() {
                     </div>
 
                     <button
-  className="btn-finalize-blue"
-  onClick={() =>
-    navigate(
-      `/receiving/final?poIds=${encodeURIComponent(poIdsParam || "")}`
-    )
-  }
->
-  Finalizar
-</button>
+                        className="btn-finalize-blue"
+                        onClick={() =>
+                            navigate(
+                                `/receiving/final?poIds=${encodeURIComponent(
+                                    poIdsParam || ""
+                                )}&receiptId=${receiptId}`
+                            )
+                        }
+                    >
+                        Finalizar
+                    </button>
                 </div>
 
             </div>
