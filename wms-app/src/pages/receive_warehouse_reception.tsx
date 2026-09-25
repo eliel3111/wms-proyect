@@ -83,7 +83,7 @@ export default function ReceiveWareTransferStart() {
 
         const timeout = setTimeout(() => {
             saveReceptionIDB({
-                id: pickingId,
+                id: String(pickingId),
                 purchase_order_number: pickName,
                 lines: products,
             });
@@ -105,7 +105,7 @@ export default function ReceiveWareTransferStart() {
             console.log("CHECK 4")
             try {
                 // 1️⃣ IndexedDB
-                const local = await getReceptionByPOId(pickingId);
+                const local = await getReceptionByPOId(String(pickingId));
 
                 if (local) {
                     console.log("LOCAL VARIABLE", local);
@@ -133,7 +133,7 @@ export default function ReceiveWareTransferStart() {
                 if (!local?.lines || local.lines.length === 0) {
                     console.log("CHECK 6")
                     await saveReceptionIDB({
-                        id: pickingId,
+                        id: String(pickingId),
                         purchase_order_number: data.purchase_order_number,
                         lines: data.lines,
                     });
@@ -424,7 +424,7 @@ export default function ReceiveWareTransferStart() {
 
         try {
             const response = await apiClient.post("/warehouse-transfers/save", {
-                picking_id: pickingId,
+                picking_id: String(pickingId),
                 picking_name: pickName,
                 reception_status: receptionStatus,
                 lines: products.map(p => ({
@@ -442,7 +442,7 @@ export default function ReceiveWareTransferStart() {
             }
 
             // 🧹 BORRAR INDEXEDDB SOLO SI EL BACKEND CONFIRMA
-            await deleteReceptionByPOId(pickingId);
+            await deleteReceptionByPOId(String(pickingId));
 
             console.log("🗑️ IndexedDB limpiado correctamente");
 

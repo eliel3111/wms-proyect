@@ -1,15 +1,17 @@
 // src/config/api.ts
 
-const hostname = window.location.hostname;
+let API_URL: string;
 
-console.log("NOMBRE DEL DOMINIO EN EL BROWSER",hostname);
-//PRODUCCION SERVIDOR 
-let API_URL = "http://localhost:3000/api";
-
-/*if (hostname.includes("test")) {
-  API_URL = "https://api-test.sidialwms.com/api";
+if (import.meta.env.PROD) {
+  // PRODUCCIÓN
+  // Nginx recibe /api y lo envía internamente a Node :3000
+  API_URL = "/api";
 } else {
-  API_URL = "https://api.sidialwms.com/api";
-}*/
+  // DESARROLLO
+  // Funciona tanto con localhost como accediendo desde otro equipo de la red
+  API_URL = `http://${window.location.hostname}:3000/api`;
+}
+
+console.log("🌐 API URL:", API_URL);
 
 export default API_URL;

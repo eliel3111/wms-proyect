@@ -1,8 +1,14 @@
-//wms-app/src/services/socket.ts
+// wms-app/src/services/socket.ts
 
 import { io } from "socket.io-client";
 
-const socket = io(import.meta.env.VITE_SOCKET_URL, {
+const SOCKET_URL = import.meta.env.PROD
+  ? window.location.origin
+  : `http://${window.location.hostname}:3000`;
+
+console.log("🔌 SOCKET URL:", SOCKET_URL);
+
+const socket = io(SOCKET_URL, {
   withCredentials: true,
   transports: ["websocket"],
 });

@@ -102,7 +102,7 @@ console.log(resultado);
 }
 app.use(express.json());
 
-//startAdmCloudCron();.
+startAdmCloudCron();
 
 
 //confirm recepcion with ID
@@ -955,7 +955,8 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.1.43:5173",
   "https://wms-proyect.vercel.app",
-  "https://www.sidialwms.com"
+  "https://www.sidialwms.com",
+  "https://senorvino.sidialwms.com"
 ];
 
 app.use(cors({
@@ -999,7 +1000,9 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // luego puedes restringir igual que tu CORS
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 

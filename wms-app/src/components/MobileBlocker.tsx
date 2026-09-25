@@ -1,10 +1,17 @@
-const MobileBlocker = ({ isMobile }) => {
+import type { CSSProperties } from "react";
+
+type MobileBlockerProps = {
+  isMobile: boolean;
+};
+
+const MobileBlocker = ({ isMobile }: MobileBlockerProps) => {
   if (!isMobile) return null;
 
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
         <h1 style={styles.title}>Módulo no disponible</h1>
+
         <p style={styles.text}>
           Este módulo solo puede utilizarse desde una computadora.
         </p>
@@ -13,7 +20,12 @@ const MobileBlocker = ({ isMobile }) => {
   );
 };
 
-const styles = {
+const styles: {
+  overlay: CSSProperties;
+  card: CSSProperties;
+  title: CSSProperties;
+  text: CSSProperties;
+} = {
   overlay: {
     position: "fixed",
     top: 0,
@@ -26,6 +38,7 @@ const styles = {
     justifyContent: "center",
     zIndex: 9999,
   },
+
   card: {
     background: "#ffffff",
     padding: "30px 40px",
@@ -34,11 +47,13 @@ const styles = {
     boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
     maxWidth: "320px",
   },
+
   title: {
     marginBottom: "10px",
     fontSize: "22px",
     color: "#0f172a",
   },
+
   text: {
     fontSize: "14px",
     color: "#475569",
