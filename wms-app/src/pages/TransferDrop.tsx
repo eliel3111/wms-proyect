@@ -107,10 +107,14 @@ export default function TransferPickPage() {
                 console.log("📡 SCAN RECIBIDO:", scanned);
 
                 try {
-                    const res = await apiClient.post("/transfer/scan-product", {
-                        code: scanned,
-                        current_location_id: fromLocationRef.current?.id ?? null
-                    });
+                    const res = await apiClient.post(
+                        "/transfer/scan-drop",
+                        {
+                            code: scanned,
+                            current_location_id:
+                                fromLocationRef.current?.id ?? null
+                        }
+                    );
 
                     const data = res.data;
 
@@ -181,6 +185,30 @@ export default function TransferPickPage() {
                             title:
                                 "Verifique el código que leyó.",
                             message: "El código no corresponde a una ubicación ni a un producto."
+                        });
+
+                    }
+
+                    else if (
+                        !data.success &&
+                        data.code === "NO_PENDING_TRANSFER"
+                    ) {
+
+                        openModal({
+                            title: "Producto sin transferencia pendiente",
+                            message: data.message
+                        });
+
+                    }
+
+                    else if (
+                        !data.success &&
+                        data.code === "NO_ACTIVE_TRANSFER_SESSION"
+                    ) {
+
+                        openModal({
+                            title: "Sesión no disponible",
+                            message: data.message
                         });
 
                     }
@@ -287,9 +315,11 @@ export default function TransferPickPage() {
                 return;
             }
 
+            const code = data.code;
+
             openModal({
-                title: errorTitles[data.code] || "Error",
-                message: data.message
+                title: code ? errorTitles[code] || "Error" : "Error",
+                message: data.message || "Ocurrió un error inesperado"
             });
 
 

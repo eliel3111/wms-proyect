@@ -268,6 +268,377 @@ export async function scanPutawayCode(req, res) {
 
 
 
+
+
+
+
+
+// SCAN TRANSFER DROP
+export async function scanTransferDropCode(req, res) {
+
+    try {
+
+        const { code, current_location_id } = req.body;
+        const userId = req.user.id;
+
+        console.log("================================");
+        console.log("🚚 SCAN TRANSFER DROP");
+        console.log("================================");
+
+        console.log("📥 CODE:", code);
+        console.log("📍 DESTINATION LOCATION:", current_location_id);
+        console.log("👤 USER:", userId);
+
+        if (typeof code !== "string" || !code.trim()) {
+            return res.status(400).json({
+                success: false,
+                code: "INVALID_CODE",
+                message: "Código requerido"
+            });
+        }
+
+        const normalized = code.trim().toUpperCase();
+
+
+        /* ======================================
+           1️⃣ ¿ES UNA UBICACIÓN STORAGE?
+        ====================================== */
+
+        const locationResult =
+            await getActiveStorageLocationByCode(
+                db,
+                normalized
+            );
+
+        console.log(
+            "📍 LOCATION ROWCOUNT:",
+            locationResult.rowCount
+        );
+
+        if (locationResult.rowCount > 0) {
+
+            const location = locationResult.rows[0];
+
+            console.log(
+                "✅ STORAGE LOCATION:",
+                location
+            );
+
+            return res.json({
+                success: true,
+                type: "location",
+                location
+            });
+        }
+
+
+        /* ======================================
+           2️⃣ ¿ES UN PRODUCTO?
+        ====================================== */
+
+        console.log("================================");
+        console.log("🔍 BUSCANDO PRODUCTO");
+        console.log("CODE:", normalized);
+
+        const productResult = await db.query(`
+
+            SELECT DISTINCT
+                p.id,
+                p.sku,
+                p.description,
+                p.uom
+
+            FROM products p
+
+            LEFT JOIN product_barcodes pb
+                ON pb.product_sku = p.sku
+
+            WHERE UPPER(pb.barcode) = $1
+               OR UPPER(p.sku) = $1
+
+            LIMIT 1
+
+        `, [normalized]);
+
+
+        console.log(
+            "📦 PRODUCT ROWCOUNT:",
+            productResult.rowCount
+        );
+
+        console.log(
+            "📦 PRODUCT ROWS:",
+            productResult.rows
+        );
+
+
+        if (productResult.rowCount === 0) {
+
+            return res.json({
+                success: false,
+                code: "INVALID_CODE",
+                message:
+                    "El código no corresponde a una ubicación ni a un producto"
+            });
+
+        }
+
+
+        /* ======================================
+           3️⃣ VALIDAR UBICACIÓN DESTINO
+        ====================================== */
+
+        if (!current_location_id) {
+
+            return res.json({
+                success: false,
+                code: "NO_LOCATION",
+                message:
+                    "Primero escanea una ubicación de destino"
+            });
+
+        }
+
+
+        const product = productResult.rows[0];
+
+
+        /* ======================================
+           4️⃣ OBTENER UBICACIÓN DESTINO
+        ====================================== */
+
+        const destinationResult = await db.query(`
+
+            SELECT
+                id,
+                code,
+                warehouse_id,
+                location_type
+
+            FROM locations
+
+            WHERE id = $1
+              AND location_type = 'STORAGE'
+              AND is_active = true
+
+            LIMIT 1
+
+        `, [current_location_id]);
+
+
+        if (destinationResult.rowCount === 0) {
+
+            return res.json({
+                success: false,
+                code: "INVALID_STORAGE_LOCATION",
+                message:
+                    "La ubicación de destino no es válida"
+            });
+
+        }
+
+
+        const destination = destinationResult.rows[0];
+
+        const warehouseId = Number(
+            destination.warehouse_id
+        );
+
+
+        console.log("================================");
+        console.log("🏬 DESTINATION WAREHOUSE:", warehouseId);
+
+
+        /* ======================================
+           5️⃣ BUSCAR SESIÓN ACTIVA
+        ====================================== */
+
+        const sessionResult = await db.query(`
+
+            SELECT id
+
+            FROM transfer_sessions
+
+            WHERE user_id = $1
+              AND status IN (
+                  'open',
+                  'in_progress'
+              )
+
+            ORDER BY id DESC
+
+            LIMIT 1
+
+        `, [userId]);
+
+
+        if (sessionResult.rowCount === 0) {
+
+            return res.json({
+                success: false,
+                code: "NO_ACTIVE_TRANSFER_SESSION",
+                message:
+                    "No existe una sesión de transferencia activa"
+            });
+
+        }
+
+
+        const sessionId = sessionResult.rows[0].id;
+
+
+        console.log(
+            "📄 TRANSFER SESSION:",
+            sessionId
+        );
+
+
+        /* ======================================
+           6️⃣ BUSCAR PRODUCTO PENDIENTE
+        ====================================== */
+
+        console.log("================================");
+        console.log("🔍 BUSCANDO TRANSFERENCIA PENDIENTE");
+
+        const pendingResult = await db.query(`
+
+            SELECT
+                tl.id,
+                tl.product_id,
+                tl.from_location_id,
+                tl.to_location_id,
+                tl.remaining_qty,
+                tl.status
+
+            FROM transfer_lines tl
+
+            JOIN locations dock
+                ON dock.id = tl.to_location_id
+
+            WHERE tl.transfer_session_id = $1
+
+              AND tl.product_id = $2
+
+              AND tl.status IN (
+                  'open',
+                  'partial'
+              )
+
+              AND tl.remaining_qty > 0
+
+              AND dock.warehouse_id = $3
+
+              AND dock.location_type = 'PICKING'
+
+            ORDER BY tl.id
+
+        `, [
+            sessionId,
+            product.id,
+            warehouseId
+        ]);
+
+
+        console.log(
+            "📦 PENDING ROWCOUNT:",
+            pendingResult.rowCount
+        );
+
+        console.log(
+            "📦 PENDING LINES:",
+            pendingResult.rows
+        );
+
+
+        if (pendingResult.rowCount === 0) {
+
+            return res.json({
+                success: false,
+                code: "NO_PENDING_TRANSFER",
+                message:
+                    "Este producto no tiene cantidades pendientes de transferencia en este almacén"
+            });
+
+        }
+
+
+        /* ======================================
+           7️⃣ CALCULAR CANTIDAD PENDIENTE
+        ====================================== */
+
+        const totalPending = pendingResult.rows.reduce(
+            (total, line) =>
+                total + Number(line.remaining_qty),
+            0
+        );
+
+
+        console.log(
+            "📦 TOTAL PENDING:",
+            totalPending
+        );
+
+
+        /* ======================================
+           8️⃣ TODO OK
+        ====================================== */
+
+        console.log("================================");
+        console.log("✅ TRANSFER DROP SCAN SUCCESS");
+        console.log("================================");
+
+
+        return res.json({
+
+            success: true,
+
+            type: "product",
+
+            product: {
+
+                ...product,
+
+                qty_available: totalPending,
+
+                pending_qty: totalPending,
+
+                to_location_id: destination.id,
+
+                warehouse_id: warehouseId
+
+            }
+
+        });
+
+
+    } catch (error) {
+
+        console.error(
+            "❌ SCAN TRANSFER DROP ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+
+            success: false,
+
+            code: "INTERNAL_ERROR",
+
+            message:
+                "Error procesando el código de transferencia"
+
+        });
+
+    }
+
+}
+
+
+
+
+
+
+
 // CREATE A TRANSFER LINE 
 export async function createTransferLine(req, res) {
     const { productId, fromLocationId, qty } = req.body;

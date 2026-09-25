@@ -9,6 +9,9 @@ import { X } from "lucide-react";
 import { Plus } from "lucide-react";
 import { getPrinter, sendZpl } from "../services/zebra.ts";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
+import { FaCubes } from "react-icons/fa6";
+
+
 
 export interface Product {
     id: string;
@@ -19,26 +22,71 @@ export interface Product {
     erp_name: string | null;
     supplier_barcode: string | null;
     total_qty_on_hand: number;
+    locations: ProductLocation[];
 }
+
+
+interface ProductLocation {
+    location_id: number;
+    location_code: string;
+    qty_on_hand: number;
+    warehouse_id: string;
+    is_active: boolean;
+}
+
+
+
 
 type PrintType = "internal" | "supplier";
 
 
 export default function BarcodePage() {
+   
 
     const [value, setValue] = useState("");
-    const [products, setProducts] = useState<Product[]>([]);
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+const [products, setProducts] = useState<Product[]>([]);
+const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+const [selectedLocation, setSelectedLocation] =
+    useState<ProductLocation | null>(null);
+const [adjustQty, setAdjustQty] = useState("");
+
+// ==========================================
+// PRODUCTO SELECCIONADO
+// ==========================================
+
+const productSelectedFromProducts = products.find(
+    (product) => product.id === selectedProduct?.id
+);
+
+
+// ==========================================
+// UBICACIONES DEL PRODUCTO
+// ==========================================
+
+const stockLocations =
+    productSelectedFromProducts?.locations ?? [];
+
+
+// ==========================================
+// STOCK TOTAL
+// ==========================================
+
+const totalStock =
+    productSelectedFromProducts?.total_qty_on_hand ?? 0;
+const handleOpenLocation = (location: any) => {
+    setSelectedLocation(location);
+    setAdjustQty(String(location.qty_on_hand ?? 0));
+};
+
     const [activeTab, setActiveTab] = useState<"print" | "manual">("manual");
     const isSupplierDisabled = !selectedProduct?.supplier_barcode;
     const [supplierCode, setSupplierCode] = useState("");
 
-
+    const [loading, setLoading] = useState(false);
     const [printType, setPrintType] = useState<PrintType>("internal");
     const [quantity, setQuantity] = useState("");
     const { openModal } = useModal();
 
-    const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const handleClear = () => {
         setValue("");
@@ -47,6 +95,17 @@ export default function BarcodePage() {
             inputRef.current?.focus();
         }, 0);
     };
+
+
+    const [isClosing, setIsClosing] = useState(false);
+    const handleCloseProductModal = () => {
+    setIsClosing(true);
+
+    setTimeout(() => {
+        handleReset();
+        setIsClosing(false);
+    }, 220);
+};
 
 
     async function handleSearch() {
@@ -62,18 +121,16 @@ export default function BarcodePage() {
 
             setProducts(res.data.data);
             inputRef.current?.blur();
-
-            console.log("✅ Result:", res.data);
             if (res.data.data.length === 0) {
                 openModal({
                     title: "Producto no encontrado",
                     message: "No se encontró el producto escaneado.",
                 });
             }
+            console.log("✅ Result:", res.data);
             setLoading(false);
         } catch (error) {
             console.error("❌ Error:", error);
-
         }
     }
 
@@ -106,13 +163,9 @@ export default function BarcodePage() {
                 title: "",
                 message: res.data.message
             });
-
-
-            setSelectedProduct(null);
-            setActiveTab("manual");
-            setPrintType("internal");
-            setQuantity("");
-            setSupplierCode("");
+            // 🔥 opcional: limpiar o feedback
+            // setSupplierCode("");
+            // alert("Guardado correctamente");
 
         } catch (error: any) {
             console.error("❌ Error guardando:", error);
@@ -131,13 +184,39 @@ export default function BarcodePage() {
         }
     }
 
-    function handleReset() {
-        setSelectedProduct(null);
-        setActiveTab("manual");
-        setPrintType("internal");
-        setQuantity("");
-        setSupplierCode("");
+    async function refreshCurrentSearch() {
+    try {
+        if (!value.trim()) return;
+
+        console.log("🔄 Actualizando búsqueda:", value);
+
+        const res = await apiClient.post("/barcode/products/search", {
+            text: value,
+        });
+
+        setProducts(res.data.data);
+
+        console.log("✅ Búsqueda actualizada:", res.data.data);
+
+    } catch (error) {
+        console.error("❌ Error actualizando búsqueda:", error);
     }
+}
+
+    async function handleReset() {
+
+    setSelectedProduct(null);
+    setSelectedLocation(null);
+
+    setActiveTab("manual");
+    setPrintType("internal");
+    setQuantity("");
+    setSupplierCode("");
+    setAdjustQty("");
+
+    // 🔄 volver a buscar lo mismo
+    await refreshCurrentSearch();
+}
 
 
     //Area de impresion
@@ -206,19 +285,33 @@ export default function BarcodePage() {
         description: string,
         sku: string,
         erp_name?: string,
+        erp_sku?: string,
         qty: number = 1
     ) {
         try {
 
 
 
-
             const printer = await getPrinter();
-            console.log("CAMBIO DE PAPI");
+            console.log("CAMBIO en 05/26/2026");
             const d = cleanAndFormat(description);
             const i = cleanAndFormat(erp_name || "");
+            const p = cleanAndFormat(erp_sku || "");
+
             const s = clean(sku);
-            const x = getBarcodeX(s);
+
+// Código largo → barras más estrechas
+const barcodeModuleWidth =
+    s.length >= 15
+        ? 1
+        : 2;
+
+// Para código largo no necesitamos
+// intentar centrarlo agresivamente
+const x =
+    s.length >= 15
+        ? 15
+        : getBarcodeX(s);
 
 
             function limitLabelText(
@@ -247,14 +340,18 @@ export default function BarcodePage() {
 
 ^CF0,26
 
-^FO0,10
+^FO0,17
 ^FB400,2,0,C,0
 ^FD${labelText}^FS
 
-^BY2,2,50
-^FO${x},75
+^BY${barcodeModuleWidth},2,50
+^FO${x},72
 ^BCN,50,Y,N,N
 ^FD${s}^FS
+
+^FO15,167
+^A0N,21,23
+^FDP/N ${p}^FS
 
 ^PQ${qty}
 ^XZ
@@ -284,14 +381,69 @@ export default function BarcodePage() {
         printLabel(
             selectedProduct.description,
             code,
-            selectedProduct.erp_name || "",
-            Number(quantity)
+            selectedProduct.erp_name || "",  // 👈 este faltaba
+            selectedProduct.erp_sku || "",
+            Number(quantity || 1)            // 👈 ahora sí va en posición correcta
         );
     }
+
+
+
+const handleSaveInventoryAdjustment = async () => {
+    try {
+        if (!selectedLocation || !selectedProduct) return;
+
+        const newQty = Number(adjustQty);
+
+        if (Number.isNaN(newQty) || newQty < 0) {
+            openModal({
+                title: "Cantidad inválida",
+                message: "La cantidad debe ser un número mayor o igual a 0.",
+            });
+
+            return;
+        }
+
+        const res = await apiClient.post("/inventory/adjust", {
+            location_id: selectedLocation.location_id,
+            warehouse_id: selectedLocation.warehouse_id,
+            product_sku: selectedProduct.sku,
+            product_id: selectedProduct.id,
+            new_qty: newQty,
+        });
+
+        console.log("RESPUESTA AJUSTE:", res.data);
+
+        openModal({
+    title: res.data.title,
+    message: res.data.message,
+    titleColor: "#198754",
+});
+
+        if (res.data.success) {
+            handleReset();
+        }
+
+    } catch (error: any) {
+        console.error("Error ajustando inventario:", error);
+
+        openModal({
+            title:
+                error.response?.data?.title ||
+                "Error ajustando inventario",
+
+            message:
+                error.response?.data?.message ||
+                "No se pudo actualizar el inventario.",
+        });
+    }
+};
 
     if (loading) {
         return <LoadingScreen />;
     }
+
+
 
     return (
         <div
@@ -350,8 +502,6 @@ export default function BarcodePage() {
 
             <div className="section">
 
-
-
                 {products.length === 0 && (
                     <div className="empty-state">
                         <Printer size={180} strokeWidth={1.5} />
@@ -363,54 +513,54 @@ export default function BarcodePage() {
 
 
                     {products.map((p) => (
-    <div
-        key={p.id}
-        className="barcode-product-card"
-        onClick={() => setSelectedProduct(p)}
-    >
-        <div className="barcode-description">
-            {p.erp_name}<br />
-            {p.description}<br />
-            {p.erp_sku}<br />
-            {p.erp_id}
-        </div>
+                        <div
+                            key={p.id}
+                            className="barcode-product-card"
+                            onClick={() => setSelectedProduct(p)}
+                        >
+                            <div className="barcode-description">
+                                {p.erp_name}<br />
+                                {p.description}<br />
+                                {p.erp_sku}<br />
+                                {p.erp_id}
+                            </div>
 
-        <div className="barcode-card-bottom">
+                            <div className="barcode-card-bottom">
 
-            <div className="barcode-details">
-                <div>
-                    Codigo Interno: {p.sku ?? "-"}
-                </div>
+                                <div className="barcode-details">
+                                    <div>
+                                        Codigo Interno: {p.sku ?? "-"}
+                                    </div>
 
-                {p.supplier_barcode && (
-                    <div>
-                        Codigo de Proveedor: {p.supplier_barcode}
-                    </div>
-                )}
-            </div>
+                                    {p.supplier_barcode && (
+                                        <div>
+                                            Codigo de Proveedor: {p.supplier_barcode}
+                                        </div>
+                                    )}
+                                </div>
 
-{p.total_qty_on_hand > 0 && (
-                    <div className="product-stock">
-                <div className="product-stock-icon">
-                    ✓
-                </div>
+                                {p.total_qty_on_hand > 0 && (
+                                    <div className="product-stock">
+                                        <div className="product-stock-icon">
+                                            ✓
+                                        </div>
 
-                <div className="product-stock-info">
-                    <span className="product-stock-label">
-                        Stock disponible
-                    </span>
+                                        <div className="product-stock-info">
+                                            <span className="product-stock-label">
+                                                Stock disponible
+                                            </span>
 
-                    <span className="product-stock-quantity">
-                        {p.total_qty_on_hand ?? 0} unidades
-                    </span>
-                </div>
-            </div>
-                )}
-            
+                                            <span className="product-stock-quantity">
+                                                {p.total_qty_on_hand ?? 0} unidades
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
 
-        </div>
-    </div>
-))}
+
+                            </div>
+                        </div>
+                    ))}
                 </div>
 
             </div>
@@ -427,17 +577,23 @@ export default function BarcodePage() {
             </div>
 
             {selectedProduct && (
-                <div
-                    className="barcode-modal-overlay"
-                    onClick={() => setSelectedProduct(null)} // 🔥 cerrar al hacer click fuera
-                >
-                    <div
-                        className="barcode-modal-container"
-                        onClick={(e) => e.stopPropagation()} // 🔥 evita cerrar al hacer click dentro
-                    >
-                        <div className="barcode-container-header">
+    <div
+        className={`barcode-modal-overlay ${
+            isClosing ? "closing" : ""
+        }`}
+        onClick={handleCloseProductModal}
+    >
 
-                            <div className="barcode-header-left">
+        <div
+            className={`barcode-modal-container ${
+                isClosing ? "closing" : ""
+            }`}
+            onClick={(e) => e.stopPropagation()}
+        >
+
+            <div className="barcode-container-header">
+
+                <div className="barcode-header-left">
 
                                 <div
                                     className={`barcode-tab  barcode-print-tab ${activeTab === "print" ? "active" : ""}`}
@@ -562,8 +718,86 @@ export default function BarcodePage() {
 
                                         </div>
 
+                                        <div className="product-stock-container">
+
+                                            {/* DIV A - STOCK TOTAL */}
+                                            <div className="stock-summary-card">
+
+                                                <div className="stock-summary-icon">
+                                                    <FaCubes />
+                                                </div>
+
+                                                <div className="stock-summary-content">
+
+                                                    <span className="stock-summary-label">
+                                                        Stock disponible
+                                                    </span>
+
+                                                    <div className="stock-summary-value-container">
+                                                        <span className="stock-summary-value">
+                                                            {totalStock.toLocaleString()}
+                                                        </span>
+
+                                                        <span className="stock-summary-unit">
+                                                            unidades
+                                                        </span>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
 
 
+                                            {/* DIV B - STOCK POR UBICACIÓN */}
+                                            <div className="stock-locations-panel">
+
+                                                <div className="stock-locations-title">
+                                                    Stock por ubicación
+                                                </div>
+
+                                                <div className="stock-locations-grid">
+
+                                                    {stockLocations.map((item) => (
+
+    <div
+        key={item.location_id}
+        className="stock-location-card"
+        onClick={() => handleOpenLocation(item)}
+    >
+
+        <div className="stock-location-column">
+
+            <span className="stock-location-label">
+                Ubicación
+            </span>
+
+            <span className="stock-location-name">
+                {item.location_code}
+            </span>
+
+        </div>
+
+        <div className="stock-location-column stock-location-quantity-column">
+
+            <span className="stock-location-label">
+                Cantidad
+            </span>
+
+            <span className="stock-location-quantity">
+                {item.qty_on_hand}
+            </span>
+
+        </div>
+
+    </div>
+
+))}
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
 
 
                                     </div>
@@ -580,7 +814,7 @@ export default function BarcodePage() {
                                     {/* BOTÓN */}
                                     <button
                                         className="barcode-cancel"
-                                        onClick={handleReset}
+                                        onClick={handleCloseProductModal}
                                     >
                                         Cancelar
                                     </button>
@@ -621,6 +855,92 @@ export default function BarcodePage() {
 
                 </div>
             )}
+
+
+          {selectedLocation && selectedProduct && (
+
+    <div
+        className="location-detail-overlay"
+        onClick={() => setSelectedLocation(null)}
+    >
+
+        <div
+            className="location-detail-modal"
+            onClick={(e) => e.stopPropagation()}
+        >
+
+            {/* HEADER */}
+            <div className="location-detail-header">
+
+                <button
+                    type="button"
+                    className="location-detail-close-icon"
+                    onClick={() => setSelectedLocation(null)}
+                >
+                    ×
+                </button>
+
+                <h3>
+                    Ajustar Inventario en esta ubicación:
+                </h3>
+
+            </div>
+
+
+            {/* UBICACIÓN */}
+            <div className="location-detail-location">
+
+                <div className="location-detail-location-label">
+                    Ubicación
+                </div>
+
+                <div className="location-detail-location-code">
+                    {selectedLocation.location_code}
+                </div>
+
+            </div>
+
+
+            {/* CANTIDAD */}
+            <div className="location-detail-adjustment">
+
+                <input
+                    type="number"
+                    className="location-detail-quantity-input"
+                    value={adjustQty}
+                    onChange={(e) => setAdjustQty(e.target.value)}
+                    min={0}
+                    autoFocus
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            console.log({
+                                locationId: selectedLocation.location_id,
+                                productId: selectedProduct.id,
+                                product_sku: selectedProduct.sku,
+                                quantity: Number(adjustQty),
+                            });
+
+                            // Aquí puedes llamar tu función para guardar
+                            handleSaveInventoryAdjustment();
+                        }
+                    }}
+                />
+
+                <button
+    type="button"
+    className="location-detail-save"
+    onClick={handleSaveInventoryAdjustment}
+>
+    ✓
+</button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+)}
 
         </div>
     )

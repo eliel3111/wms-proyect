@@ -5898,3 +5898,137 @@ export async function getActiveWarehouses(req, res) {
     }
   }
 }
+
+
+
+
+
+
+export async function adjustInventoryByLocation(req, res) {
+    const client = await db.connect();
+
+    try {
+        const {
+            warehouse_id,
+            location_id,
+            product_sku,
+            new_qty,
+        } = req.body;
+
+        // Validaciones básicas
+        if (
+            warehouse_id == null ||
+            location_id == null ||
+            !product_sku ||
+            new_qty == null
+        ) {
+            return res.status(400).json({
+                success: false,
+                title: "Datos incompletos",
+                message:
+                    "warehouse_id, location_id, product_sku y new_qty son requeridos",
+            });
+        }
+
+        const qty = Number(new_qty);
+
+        if (Number.isNaN(qty) || qty < 0) {
+            return res.status(400).json({
+                success: false,
+                title: "Cantidad inválida",
+                message: "La nueva cantidad debe ser un número mayor o igual a 0",
+            });
+        }
+
+        await client.query("BEGIN");
+
+        // Buscar y bloquear la fila
+        const currentResult = await client.query(
+            `
+            SELECT
+                id,
+                warehouse_id,
+                location_id,
+                product_sku,
+                qty_on_hand,
+                qty_reserved
+            FROM inventory_by_location
+            WHERE warehouse_id = $1
+              AND location_id = $2
+              AND product_sku = $3
+            LIMIT 1
+            FOR UPDATE
+            `,
+            [
+                warehouse_id,
+                location_id,
+                product_sku,
+            ]
+        );
+
+        if (currentResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+
+            return res.status(404).json({
+                success: false,
+                title: "Inventario no encontrado",
+                message:
+                    "No existe inventario para ese producto en esa ubicación",
+            });
+        }
+
+        const currentInventory = currentResult.rows[0];
+
+        const updateResult = await client.query(
+            `
+            UPDATE inventory_by_location
+            SET
+                old_qty_on_hand = qty_on_hand,
+                qty_on_hand = $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING
+                id,
+                warehouse_id,
+                location_id,
+                product_sku,
+                qty_on_hand,
+                qty_reserved,
+                qty_available,
+                old_qty_on_hand,
+                updated_at
+            `,
+            [
+                qty,
+                currentInventory.id,
+            ]
+        );
+
+        await client.query("COMMIT");
+
+        return res.status(200).json({
+            success: true,
+            title: "Inventario actualizado",
+            message: "La cantidad fue actualizada correctamente",
+            data: updateResult.rows[0],
+        });
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+
+        console.error(
+            "Error ajustando inventario por ubicación:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            title: "Error interno",
+            message: "No se pudo actualizar el inventario",
+        });
+
+    } finally {
+        client.release();
+    }
+}
+

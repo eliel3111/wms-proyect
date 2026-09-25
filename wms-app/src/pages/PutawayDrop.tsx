@@ -267,7 +267,8 @@ export default function PutawayPickPage() {
 
       openModal({
         title: "Guardado",
-        message: "Putaway registrado correctamente."
+        message: "Putaway registrado correctamente.",
+        titleColor: "#198754",
       });
 
     } catch (error) {

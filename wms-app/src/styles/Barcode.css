@@ -369,22 +369,34 @@ border-top: 1px solid #D1D5DB;
 }
 
 
-/* 📦 Container base */
 .barcode-modal-container {
   display: flex;
   flex-direction: column;
+
   width: 80%;
   max-width: 800px;
+
+  /* CLAVE PARA EL SCROLL EN DESKTOP */
+  height: 85vh;
+  max-height: 85vh;
+
   background: #fff;
-  margin-top: 15vh;
+
+  margin-top: 7vh;
+
   border-radius: 12px;
-  overflow: hidden; /* 👈 para que respete bordes */
+  overflow: hidden;
+
   padding: 20px;
+
+  box-sizing: border-box;
+
   box-shadow: 0 10px 40px rgba(0,0,0,0.3);
 }
 
+
+
 /* 🔹 Secciones */
-.barcode-container-header,
 .barcode-container-center,
 .barcode-container-footer {
   width: 100%;
@@ -401,6 +413,7 @@ border-top: 1px solid #D1D5DB;
   align-items: center;
   width: 100%;
   padding-bottom: 0;
+  padding-right: 15px;
 }
 
 /* Ambos lados ocupan espacio */
@@ -473,32 +486,48 @@ border-top: 1px solid #D1D5DB;
   color: #111827;
 }
 
+
+/* AREA CENTRAL DEL MODAL */
 .barcode-container-center {
-  background: #FFFFFF; /* blanco limpio */
-  flex: 1; /* 👈 ocupa espacio disponible */
+    width: 100%;
+
+    flex: 1;
+
+    /* MUY IMPORTANTE EN FLEX */
+    min-height: 0;
+
+    overflow: hidden;
+
+    background: #ffffff;
 }
 
-/* CONTENEDOR */
+/* ESTA ES LA PARTE QUE HACE SCROLL */
 .barcode-print-view {
-  width: 100%;
-  flex: 1;
-  display: flex;
-  justify-content: center;
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+    justify-content: center;
+
+    /* SCROLL */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* mejor scroll para PDA / mobile */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
+/* CONTENIDO */
 .barcode-print-content {
-  width: 100%;
-  max-width: 500px;
-  padding: 10px;
+    width: 100%;
+    max-width: 500px;
+
+    padding: 10px 10px 30px;
+
+    box-sizing: border-box;
 }
 
-/* MOBILE */
-@media (max-width: 768px) {
-  .barcode-print-content {
-    max-width: none;
-    padding: 0;
-  }
-}
 
 /* TITLES */
 .barcode-title {
@@ -568,17 +597,42 @@ border-top: 1px solid #D1D5DB;
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   border: 2px solid #E5E7EB;
   border-radius: 10px;
+
   padding: 10px;
   margin-top: 10px;
+
+  transition:
+    padding 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.barcode-quantity:focus-within {
+  padding-top: 17px;
+  padding-bottom: 17px;
+
+  border-color: #374151;
+
+  box-shadow:
+    0 0 0 3px rgba(55, 65, 81, 0.08);
 }
 
 .barcode-quantity-input {
   border: none;
   outline: none;
   width: 100%;
+
   font-size: 14px;
+  background: transparent;
+
+  transition: font-size 0.25s ease;
+}
+
+.barcode-quantity:focus-within .barcode-quantity-input {
+  font-size: 16px;
 }
 
 /* ACCIONES */
@@ -650,6 +704,320 @@ border-top: 1px solid #D1D5DB;
   cursor: not-allowed;
 }
 
+
+
+
+.product-stock-container {
+    width: 100%;
+  margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+}
+
+
+/* =========================================================
+   STOCK SUMMARY
+========================================================= */
+
+.stock-summary-card {
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+
+    gap: 18px;
+
+    padding: 18px 20px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #ecfdf5 0%,
+            #f0fdf4 100%
+        );
+
+    border: 1px solid #d1fae5;
+    border-radius: 16px;
+
+    box-sizing: border-box;
+}
+
+
+/* ICON */
+
+.stock-summary-icon {
+    width: 64px;
+    height: 64px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 16px;
+
+    background-color: #d1fae5;
+
+    color: #059669;
+
+    font-size: 30px;
+}
+
+
+/* CONTENT */
+
+.stock-summary-content {
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+}
+
+
+.stock-summary-label {
+    font-size: 14px;
+    font-weight: 500;
+
+    color: #64748b;
+}
+
+
+.stock-summary-value-container {
+    display: flex;
+    align-items: baseline;
+
+    gap: 10px;
+}
+
+
+.stock-summary-value {
+    font-size: 36px;
+    line-height: 1;
+
+    font-weight: 700;
+
+    color: #059669;
+
+    letter-spacing: -1px;
+}
+
+
+.stock-summary-unit {
+    font-size: 14px;
+    font-weight: 600;
+
+    color: #64748b;
+
+    text-transform: uppercase;
+}
+
+
+/* =========================================================
+   LOCATIONS
+========================================================= */
+
+.stock-locations-panel {
+    width: 100%;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 12px;
+}
+
+
+.stock-locations-title {
+    font-size: 17px;
+    font-weight: 700;
+
+    color: #0f172a;
+}
+
+
+/* =========================================================
+   GRID
+
+   Desktop = 2 columnas
+   Mobile = 1 columna
+========================================================= */
+
+.stock-locations-grid {
+    display: grid;
+
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    gap: 12px;
+}
+
+
+/* =========================================================
+   LOCATION CARD
+========================================================= */
+
+.stock-location-card {
+    min-width: 0;
+
+    display: grid;
+
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    align-items: center;
+
+    gap: 20px;
+
+    padding: 15px 18px;
+
+    background-color: #ffffff;
+
+    border: 1px solid #e2e8f0;
+
+    border-radius: 12px;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.stock-location-card:hover {
+    border-color: #cbd5e1;
+
+    box-shadow:
+        0 4px 14px rgba(15, 23, 42, 0.06);
+
+    transform: translateY(-1px);
+}
+
+
+/* COLUMNS */
+
+.stock-location-column {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+}
+
+
+.stock-location-quantity-column {
+    align-items: flex-end;
+}
+
+
+/* HEADER / LABEL */
+
+.stock-location-label {
+    font-size: 11px;
+    font-weight: 600;
+
+    color: #94a3b8;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.5px;
+}
+
+
+/* LOCATION */
+
+.stock-location-name {
+    overflow: hidden;
+
+    color: #0f172a;
+
+    font-size: 15px;
+    font-weight: 650;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* QUANTITY */
+
+.stock-location-quantity {
+    min-width: 64px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 6px 12px;
+
+    border-radius: 8px;
+
+    background-color: #dcfce7;
+
+    color: #15803d;
+
+    font-size: 15px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   MOBILE / PDA
+========================================================= */
+
+@media (max-width: 700px) {
+
+    .product-stock-container {
+        gap: 16px;
+    }
+
+
+    .stock-summary-card {
+        padding: 18px;
+
+        gap: 14px;
+
+        border-radius: 14px;
+    }
+
+
+    .stock-summary-icon {
+        width: 54px;
+        height: 54px;
+
+        border-radius: 14px;
+
+        font-size: 25px;
+    }
+
+
+    .stock-summary-value {
+        font-size: 30px;
+    }
+
+
+    .stock-summary-unit {
+        font-size: 12px;
+    }
+
+
+    /* 1 COLUMNA */
+
+    .stock-locations-grid {
+        grid-template-columns: 1fr;
+
+        gap: 9px;
+    }
+
+
+    .stock-location-card {
+        padding: 13px 15px;
+
+        border-radius: 10px;
+    }
+
+}
+
 @media (max-width: 768px) {
   .barcode-container-header,
   .barcode-container-center,
@@ -663,12 +1031,42 @@ border-top: 1px solid #D1D5DB;
   }
 
   .barcode-modal-container {
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    margin-top: 0;
-    border-radius: 0;
-  }
+        width: 100%;
+        max-width: none;
+
+        height: 100dvh;
+        max-height: 100dvh;
+
+        margin-top: 0;
+
+        border-radius: 0;
+
+        padding: 0;
+    }
+
+    .barcode-container-center {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+     .barcode-print-view {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        -webkit-overflow-scrolling: touch;
+    }
+
+
+    .barcode-print-content {
+        max-width: none;
+
+        padding: 16px;
+
+        box-sizing: border-box;
+    }
+
 }
 
 @media (hover: hover) {
@@ -788,3 +1186,556 @@ input {
 }
 
 }
+
+
+
+
+
+/* ============================================
+   OVERLAY
+============================================ */
+
+.location-detail-overlay {
+    position: fixed;
+    inset: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 16px;
+
+    background: rgba(15, 23, 42, 0.48);
+
+    backdrop-filter: blur(2px);
+
+    z-index: 99999;
+
+    animation: locationOverlayIn 0.18s ease-out;
+}
+
+
+/* ============================================
+   MODAL
+============================================ */
+
+.location-detail-modal {
+    width: 520px;
+    min-height: 320px;
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 5px;
+
+    background: #ffffff;
+
+    border-radius: 16px;
+
+    box-sizing: border-box;
+
+    box-shadow:
+        0 20px 45px rgba(15, 23, 42, 0.22),
+        0 5px 15px rgba(15, 23, 42, 0.12);
+
+    overflow: hidden;
+
+    transform-origin: center;
+
+    animation: locationModalOpen 0.22s ease-out;
+}
+
+
+/* ============================================
+   HEADER
+============================================ */
+
+.location-detail-header {
+    width: 100%;
+
+    min-height: 64px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 14px;
+
+    padding: 10px 14px;
+
+    box-sizing: border-box;
+
+    border-bottom: 1px solid #e5e7eb;
+}
+
+
+.location-detail-header h3 {
+    margin: 0;
+
+    font-size: 18px;
+    font-weight: 600;
+
+    color: #374151;
+
+    line-height: 1.3;
+}
+
+
+/* CLOSE */
+
+.location-detail-close-icon {
+    width: 38px;
+    height: 38px;
+
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: none;
+    border-radius: 50%;
+
+    background: transparent;
+
+    color: #6b7280;
+
+    font-size: 30px;
+    font-weight: 300;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.15s ease;
+}
+
+
+.location-detail-close-icon:hover {
+    background: #fee2e2;
+
+    color: #dc2626;
+
+    transform: scale(1.05);
+}
+
+
+/* ============================================
+   LOCATION
+============================================ */
+
+.location-detail-location {
+    width: 100%;
+
+    flex: 1;
+
+    min-height: 150px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 10px;
+
+    padding: 30px 20px;
+
+    box-sizing: border-box;
+
+    background:
+        linear-gradient(
+            135deg,
+            #f8fbff 0%,
+            #eff6ff 100%
+        );
+}
+
+
+.location-detail-location-label {
+    font-size: 13px;
+    font-weight: 600;
+
+    color: #64748b;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.7px;
+}
+
+
+.location-detail-location-code {
+    max-width: 100%;
+
+    color: #0f172a;
+
+    font-size: 34px;
+    font-weight: 700;
+
+    text-align: center;
+
+    line-height: 1.2;
+
+    word-break: break-word;
+
+    letter-spacing: -0.6px;
+}
+
+
+/* ============================================
+   INPUT + SAVE
+============================================ */
+
+.location-detail-adjustment {
+    width: 100%;
+
+    display: grid;
+
+    grid-template-columns: minmax(0, 1fr) 84px;
+
+    gap: 8px;
+
+    padding: 8px;
+
+    box-sizing: border-box;
+
+    border: 2px solid #2563eb;
+    border-radius: 12px;
+
+    background: #ffffff;
+}
+
+
+.location-detail-quantity-input {
+    width: 100%;
+    min-width: 0;
+
+    height: 64px;
+
+    padding: 0 20px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #dbe2ea;
+    border-radius: 9px;
+
+    outline: none;
+
+    background: #ffffff;
+
+    color: #111827;
+
+    font-size: 28px;
+    font-weight: 600;
+
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+
+.location-detail-quantity-input:focus {
+    border-color: #93c5fd;
+
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+
+/* remove number arrows */
+
+.location-detail-quantity-input::-webkit-outer-spin-button,
+.location-detail-quantity-input::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+/* SAVE */
+.location-detail-quantity-input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+
+/* SAVE */
+
+.location-detail-save {
+    height: 64px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: none;
+    border-radius: 9px;
+
+    background: #2563eb;
+
+    color: #ffffff;
+
+    font-size: 30px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 3px 8px rgba(37, 99, 235, 0.25);
+
+    transition:
+        background-color 0.15s ease,
+        transform 0.1s ease,
+        box-shadow 0.15s ease;
+}
+
+
+.location-detail-save:hover {
+    background: #1d4ed8;
+
+    box-shadow:
+        0 5px 12px rgba(37, 99, 235, 0.3);
+}
+
+
+.location-detail-save:active {
+    transform: scale(0.97);
+}
+
+
+/* ============================================
+   OPEN ANIMATION
+============================================ */
+
+@keyframes locationModalOpen {
+
+    from {
+        opacity: 0;
+        transform: scale(0.78);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+}
+
+
+@keyframes locationOverlayIn {
+
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+
+}
+
+
+/* ============================================
+   MOBILE / PDA
+============================================ */
+
+@media (max-width: 600px) {
+
+    .location-detail-overlay {
+        align-items: flex-start;
+
+        padding: 12px;
+    }
+
+
+    .location-detail-modal {
+        width: 100%;
+
+        min-height: auto;
+
+        margin-top: 12vh;
+
+        border-radius: 14px;
+    }
+
+
+    .location-detail-header {
+        min-height: 56px;
+
+        padding: 8px 10px;
+
+        gap: 8px;
+    }
+
+
+    .location-detail-header h3 {
+        font-size: 16px;
+    }
+
+
+    .location-detail-close-icon {
+        width: 36px;
+        height: 36px;
+
+        font-size: 27px;
+    }
+
+
+    .location-detail-location {
+        min-height: 125px;
+
+        padding: 24px 14px;
+    }
+
+
+    .location-detail-location-code {
+        font-size: 27px;
+    }
+
+
+    .location-detail-adjustment {
+        grid-template-columns: minmax(0, 1fr) 70px;
+    }
+
+
+    .location-detail-quantity-input {
+        height: 60px;
+
+        padding: 0 16px;
+
+        font-size: 25px;
+    }
+
+
+    .location-detail-save {
+        height: 60px;
+
+        font-size: 27px;
+    }
+
+}
+
+/* =========================
+   OVERLAY
+========================= */
+
+.barcode-modal-overlay {
+    animation: barcodeOverlayOpen 0.22s ease-out forwards;
+}
+
+
+/* =========================
+   MODAL OPEN
+========================= */
+
+.barcode-modal-container {
+    transform-origin: center center;
+
+    animation: barcodeModalOpen 0.22s cubic-bezier(
+        0.22,
+        1,
+        0.36,
+        1
+    ) forwards;
+}
+
+
+/* =========================
+   CLOSE
+========================= */
+
+.barcode-modal-overlay.closing {
+    animation: barcodeOverlayClose 0.22s ease-in forwards;
+}
+
+
+.barcode-modal-container.closing {
+    animation: barcodeModalClose 0.22s cubic-bezier(
+        0.4,
+        0,
+        1,
+        1
+    ) forwards;
+}
+
+
+/* =========================
+   OPEN ANIMATION
+========================= */
+
+@keyframes barcodeModalOpen {
+
+    from {
+        opacity: 0;
+
+        transform:
+            scale(0.72)
+            translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+
+        transform:
+            scale(1)
+            translateY(0);
+    }
+
+}
+
+
+/* =========================
+   CLOSE ANIMATION
+========================= */
+
+@keyframes barcodeModalClose {
+
+    from {
+        opacity: 1;
+
+        transform:
+            scale(1)
+            translateY(0);
+    }
+
+    to {
+        opacity: 0;
+
+        transform:
+            scale(0.72)
+            translateY(15px);
+    }
+
+}
+
+
+/* =========================
+   OVERLAY ANIMATION
+========================= */
+
+@keyframes barcodeOverlayOpen {
+
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+
+}
+
+
+@keyframes barcodeOverlayClose {
+
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+
+}
+
+
