@@ -448,6 +448,123 @@ export async function syncAdmCloudPurchaseOrderLinesByIds(
         }
 
 
+        // ====================================================
+// SINCRONIZAR STATUS DE LA PURCHASE ORDER
+// DESDE EL DETAIL DE ADM CLOUD
+// ====================================================
+
+const admStatus =
+  Number(
+    admOrder.Status
+  );
+
+const admStatusDesc =
+  String(
+    admOrder.StatusDesc ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
+
+
+console.log("");
+console.log(
+  "📦 STATUS DETAIL ADM CLOUD:"
+);
+
+console.log({
+  DocID:
+    admOrder.DocID,
+
+  Status:
+    admOrder.Status,
+
+  StatusDesc:
+    admOrder.StatusDesc,
+
+  Void:
+    admOrder.Void
+});
+
+
+// ====================================================
+// DETERMINAR STATUS WMS
+// ====================================================
+
+let newWmsStatus =
+  null;
+
+
+// ANULADA EN ADM
+if (
+  admOrder.Void === true
+) {
+
+  newWmsStatus =
+    "cancelled";
+
+}
+
+
+// RECIBIDA EN ADM
+else if (
+  admStatus === 2 ||
+  admStatusDesc === "recibida"
+) {
+
+  newWmsStatus =
+    "closed";
+
+}
+
+
+// ====================================================
+// ACTUALIZAR SOLO SI ADM NOS DA UN ESTADO DEFINITIVO
+//
+// IMPORTANTE:
+// NO ponemos "open" aquí porque podríamos destruir
+// un estado partial existente en WMS.
+// ====================================================
+
+if (
+  newWmsStatus
+) {
+
+  const statusUpdateResult =
+    await clientDb.query(
+      `
+      UPDATE purchase_orders
+
+      SET
+        status = $1::purchase_order_status,
+        updated_at = NOW()
+
+      WHERE
+        id = $2
+
+      RETURNING
+        id,
+        purchase_order_number,
+        status
+      `,
+      [
+        newWmsStatus,
+        Number(wmsId)
+      ]
+    );
+
+
+  console.log(
+    "✅ STATUS PURCHASE ORDER ACTUALIZADO:"
+  );
+
+  console.log(
+    statusUpdateResult.rows[0]
+  );
+
+}
+
+
         results.push({
 
           purchaseOrderId:

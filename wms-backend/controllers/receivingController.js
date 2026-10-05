@@ -17,6 +17,12 @@ import {
 import {
   liquidateAdmCloudReceptions
 } from "../integrations/admcloud/liquidateAdmCloudReceptions.js";
+import { ConsoleMessage } from "puppeteer-core";
+import {
+  completePurchaseOrderIfFullyReceived
+} from "../services/purchaseOrderCompletionService.js";
+
+
 
 
 /*
@@ -88,19 +94,19 @@ export async function CloseReception(req, res) {
         purchaseOrderIds
       )
         ? [
-            ...new Set(
-              purchaseOrderIds
-                .map(
-                  id =>
-                    Number(id)
-                )
-                .filter(
-                  id =>
-                    Number.isInteger(id) &&
-                    id > 0
-                )
-            )
-          ]
+          ...new Set(
+            purchaseOrderIds
+              .map(
+                id =>
+                  Number(id)
+              )
+              .filter(
+                id =>
+                  Number.isInteger(id) &&
+                  id > 0
+              )
+          )
+        ]
         : [];
 
 
@@ -437,17 +443,17 @@ export async function CloseReception(req, res) {
 
 
     if (
-  [
-    "completed",
-    "abandoned"
-  ].includes(
-    currentReceiptStatus
-  )
-) {
-  throw new Error(
-    `RECEIPT_NOT_AVAILABLE_${receipt.status}`
-  );
-}
+      [
+        "completed",
+        "abandoned"
+      ].includes(
+        currentReceiptStatus
+      )
+    ) {
+      throw new Error(
+        `RECEIPT_NOT_AVAILABLE_${receipt.status}`
+      );
+    }
 
     // =========================================================
     // 14. VALIDAR RECEIPT ↔ PURCHASE ORDERS
@@ -491,7 +497,7 @@ export async function CloseReception(req, res) {
     const samePurchaseOrderSet =
 
       receiptPurchaseOrderIds.length ===
-        normalizedPurchaseOrderIds.length
+      normalizedPurchaseOrderIds.length
 
       &&
 
@@ -1443,8 +1449,8 @@ export async function CloseReception(req, res) {
     // =========================================================
 
     const completedReceiptResult =
-  await client.query(
-    `
+      await client.query(
+        `
     UPDATE receipts
 
     SET
@@ -1467,10 +1473,10 @@ export async function CloseReception(req, res) {
       status,
       finished_at
     `,
-    [
-      normalizedReceiptId
-    ]
-  );
+        [
+          normalizedReceiptId
+        ]
+      );
 
 
     if (
@@ -1561,131 +1567,88 @@ export async function CloseReception(req, res) {
 
 
     // =========================================================
-    // 29. RECALCULAR ESTADO DE CADA PURCHASE ORDER
+    // 29. VALIDAR SI CADA PURCHASE ORDER
+    //     FUE COMPLETAMENTE RECIBIDA
+    //
+    // IMPORTANTE:
+    //
+    // En este punto:
+    //
+    // 1. receipt ya está completed
+    //
+    // 2. purchase_order_lines.received_qty
+    //    ya fue recalculado usando todos
+    //    los receipts completed.
+    //
+    // Por eso ahora sí podemos validar
+    // correctamente cada PO.
     // =========================================================
 
+    const purchaseOrderCompletionResults =
+      [];
+
+
     for (
-      const purchaseOrder
-      of purchaseOrders
+      const purchaseOrderId
+      of normalizedPurchaseOrderIds
     ) {
 
-      const statusResult =
-        await client.query(
-          `
-          SELECT
+      console.log("");
+      console.log(
+        "========================================"
+      );
 
-            COUNT(*)::int
-              AS total_lines,
+      console.log(
+        "📋 VALIDANDO COMPLETITUD DE PO:",
+        purchaseOrderId
+      );
 
-            COUNT(*) FILTER
-            (
-              WHERE
-                COALESCE(
-                  received_qty,
-                  0
-                )
-                >=
-                COALESCE(
-                  ordered_qty,
-                  0
-                )
-            )::int
-              AS completed_lines,
-
-            COUNT(*) FILTER
-            (
-              WHERE
-                COALESCE(
-                  received_qty,
-                  0
-                ) > 0
-            )::int
-              AS received_lines
-
-          FROM purchase_order_lines
-
-          WHERE
-            purchase_order_id =
-              $1
-
-            AND COALESCE(
-              deleted_erp,
-              FALSE
-            ) =
-              FALSE
-          `,
-          [
-            purchaseOrder.id
-          ]
-        );
-
-
-      const totals =
-        statusResult.rows[0];
-
-
-      const totalLines =
-        Number(
-          totals.total_lines ||
-          0
-        );
-
-
-      const completedLines =
-        Number(
-          totals.completed_lines ||
-          0
-        );
-
-
-      const receivedLines =
-        Number(
-          totals.received_lines ||
-          0
-        );
-
-
-      let newStatus =
-  purchaseOrder.status;
-
-
-if (
-  totalLines > 0 &&
-  completedLines === totalLines
-) {
-
-  newStatus =
-    "closed";
-
-} else if (
-  receivedLines > 0
-) {
-
-  newStatus =
-    "partial";
-
-}
-
-
-      await client.query(
-        `
-        UPDATE purchase_orders
-
-        SET
-          status = $1
-
-        WHERE
-          id = $2
-        `,
-        [
-          newStatus,
-          purchaseOrder.id
-        ]
+      console.log(
+        "========================================"
       );
 
 
+      const completionResult =
+        await completePurchaseOrderIfFullyReceived(
+          client,
+          purchaseOrderId
+        );
+
+
       console.log(
-        `📋 ${purchaseOrder.purchase_order_number} → ${newStatus}`
+        "📋 RESULTADO:",
+        completionResult
+      );
+
+
+      // ======================================================
+      // SI EL SERVICIO TUVO UN ERROR REAL
+      // ======================================================
+
+      if (
+        !completionResult?.success
+      ) {
+
+        throw new Error(
+          completionResult?.code ||
+          "PURCHASE_ORDER_COMPLETION_CHECK_FAILED"
+        );
+
+      }
+
+
+      purchaseOrderCompletionResults.push(
+        {
+
+          purchaseOrderId,
+
+          completed:
+            completionResult.completed,
+
+          code:
+            completionResult.code
+
+        }
       );
 
     }
@@ -1754,107 +1717,107 @@ if (
     // =========================================================
 
     const receiptPdfLines =
-  enrichedLines
-    .filter(
-      line =>
-        Number(line.qtyThisReceipt) > 0
-    )
-    .map(
-      (line, index) => {
+      enrichedLines
+        .filter(
+          line =>
+            Number(line.qtyThisReceipt) > 0
+        )
+        .map(
+          (line, index) => {
 
-          const totals =
-            updatedTotalsMap.get(
+            const totals =
+              updatedTotalsMap.get(
+                Number(
+                  line.purchase_order_line_id
+                )
+              ) || {};
+
+
+            const orderedQty =
               Number(
-                line.purchase_order_line_id
-              )
-            ) || {};
+                totals.ordered_qty ??
+                line.ordered_qty ??
+                0
+              );
 
 
-          const orderedQty =
-            Number(
-              totals.ordered_qty ??
-              line.ordered_qty ??
-              0
-            );
-
-
-          const totalReceivedQty =
-            Number(
-              totals.total_received_qty ??
-              0
-            );
-
-
-          return {
-
-            line_no:
-              index + 1,
-
-            id:
-              line.receipt_line_id,
-
-            receipt_line_id:
-              line.receipt_line_id,
-
-            purchase_order_line_id:
-              line.purchase_order_line_id,
-
-            purchase_order_id:
-              line.purchase_order_id,
-
-            sku:
-              line.sku,
-
-            description:
-              line.description,
-
-            erp_name:
-              line.erp_name,
-
-            erp_sku:
-              line.erp_sku,
-
-            erp_id:
-              line.erp_id,
-
-            ordered_qty:
-              orderedQty,
-
-
-            // ================================================
-            // CANTIDAD DE ESTE RECEIPT
-            // ================================================
-
-            received_qty:
+            const totalReceivedQty =
               Number(
-                line.qtyThisReceipt
-              ),
+                totals.total_received_qty ??
+                0
+              );
 
 
-            // ================================================
-            // TOTAL HISTÓRICO
-            // ================================================
+            return {
 
-            total_received_qty:
-              totalReceivedQty,
+              line_no:
+                index + 1,
+
+              id:
+                line.receipt_line_id,
+
+              receipt_line_id:
+                line.receipt_line_id,
+
+              purchase_order_line_id:
+                line.purchase_order_line_id,
+
+              purchase_order_id:
+                line.purchase_order_id,
+
+              sku:
+                line.sku,
+
+              description:
+                line.description,
+
+              erp_name:
+                line.erp_name,
+
+              erp_sku:
+                line.erp_sku,
+
+              erp_id:
+                line.erp_id,
+
+              ordered_qty:
+                orderedQty,
 
 
-            // ================================================
-            // DIFERENCIA TOTAL DE LA PO LINE
-            //
-            // negativo = falta
-            // 0 = completa
-            // positivo = exceso
-            // ================================================
+              // ================================================
+              // CANTIDAD DE ESTE RECEIPT
+              // ================================================
 
-            difference_qty:
-              totalReceivedQty -
-              orderedQty
+              received_qty:
+                Number(
+                  line.qtyThisReceipt
+                ),
 
-          };
 
-        }
-      );
+              // ================================================
+              // TOTAL HISTÓRICO
+              // ================================================
+
+              total_received_qty:
+                totalReceivedQty,
+
+
+              // ================================================
+              // DIFERENCIA TOTAL DE LA PO LINE
+              //
+              // negativo = falta
+              // 0 = completa
+              // positivo = exceso
+              // ================================================
+
+              difference_qty:
+                totalReceivedQty -
+                orderedQty
+
+            };
+
+          }
+        );
 
 
     // =========================================================
@@ -1960,32 +1923,32 @@ if (
 
 
     const liquidationResult =
-  await liquidateAdmCloudReceptions({
+      await liquidateAdmCloudReceptions({
 
-    client,
+        client,
 
-    purchaseOrderIds:
-      normalizedPurchaseOrderIds,
+        purchaseOrderIds:
+          normalizedPurchaseOrderIds,
 
-    receiptId:
-      normalizedReceiptId,
+        receiptId:
+          normalizedReceiptId,
 
-    admLocationId:
-      process.env.ADM_MAIN_LOCATION_ID
+        admLocationId:
+          process.env.ADM_MAIN_LOCATION_ID
 
-  });
+      });
 
 
-console.log(
-  "✅ ADM LIQUIDATION RESULT:"
-);
+    console.log(
+      "✅ ADM LIQUIDATION RESULT:"
+    );
 
-console.dir(
-  liquidationResult,
-  {
-    depth: null
-  }
-);
+    console.dir(
+      liquidationResult,
+      {
+        depth: null
+      }
+    );
 
 
     // =========================================================
@@ -2216,7 +2179,7 @@ console.dir(
 
 
             } catch (
-              emailError
+            emailError
             ) {
 
               console.error(
@@ -2241,7 +2204,7 @@ console.dir(
 
 
         } catch (
-          backgroundError
+        backgroundError
         ) {
 
           console.error(
@@ -2257,70 +2220,985 @@ console.dir(
 
   } catch (error) {
 
-  try {
+    try {
 
-    await client.query(
-      "ROLLBACK"
-    );
+      await client.query(
+        "ROLLBACK"
+      );
 
-  } catch (
+    } catch (
     rollbackError
-  ) {
+    ) {
+
+      console.error(
+        "❌ ERROR DURANTE ROLLBACK:",
+        rollbackError
+      );
+
+    }
+
+
+    console.error("");
+    console.error(
+      "❌ ========================================"
+    );
 
     console.error(
-      "❌ ERROR DURANTE ROLLBACK:",
-      rollbackError
+      "❌ ERROR CERRANDO RECEPCIÓN"
     );
 
-  }
+    console.error(
+      error
+    );
+
+    console.error(
+      "❌ ========================================"
+    );
 
 
-  console.error("");
-  console.error(
-    "❌ ========================================"
-  );
+    return res
+      .status(400)
+      .json({
 
-  console.error(
-    "❌ ERROR CERRANDO RECEPCIÓN"
-  );
+        success:
+          false,
 
-  console.error(
-    error
-  );
+        title:
+          error?.title ||
+          "Error cerrando recepción",
 
-  console.error(
-    "❌ ========================================"
-  );
+        message:
+          error?.message ||
+          "No se pudo completar la recepción.",
 
+        code:
+          error?.code ||
+          "CLOSE_RECEPTION_ERROR"
 
-  return res
-    .status(400)
-    .json({
+      });
 
-      success:
-        false,
-
-      title:
-        error?.title ||
-        "Error cerrando recepción",
-
-      message:
-        error?.message ||
-        "No se pudo completar la recepción.",
-
-      code:
-        error?.code ||
-        "CLOSE_RECEPTION_ERROR"
-
-    });
-
-} finally {
+  } finally {
 
     client.release();
 
   }
 
 }
+
+
+
+
+//Obtain purchase order receptions details
+export async function getPurchaseOrderFullDetails(
+  req,
+  res
+) {
+
+  try {
+
+    // =========================================================
+    // 1. NORMALIZAR PURCHASE ORDER ID
+    // =========================================================
+
+    const purchaseOrderId =
+      Number(
+        req.params.id
+      );
+
+
+    if (
+      !Number.isInteger(
+        purchaseOrderId
+      ) ||
+      purchaseOrderId <= 0
+    ) {
+
+      return res
+        .status(400)
+        .json({
+
+          success: false,
+
+          code:
+            "INVALID_PURCHASE_ORDER_ID",
+
+          message:
+            "El ID de la orden de compra no es válido."
+
+        });
+
+    }
+
+
+    console.log("");
+    console.log("========================================");
+    console.log("📋 PURCHASE ORDER FULL DETAILS");
+    console.log("========================================");
+    console.log(
+      "Purchase Order ID:",
+      purchaseOrderId
+    );
+
+
+    // =========================================================
+    // 2. BUSCAR PURCHASE ORDER
+    // =========================================================
+
+    const purchaseOrderResult =
+      await db.query(
+        `
+        SELECT
+
+          id,
+
+          purchase_order_number,
+
+          erp_order_id
+            AS erp_id,
+
+          supplier_name,
+
+          status
+
+        FROM purchase_orders
+
+        WHERE
+          id = $1
+
+        LIMIT 1
+        `,
+        [
+          purchaseOrderId
+        ]
+      );
+
+
+    // =========================================================
+    // 3. VALIDAR PURCHASE ORDER
+    // =========================================================
+
+    if (
+      purchaseOrderResult.rowCount ===
+      0
+    ) {
+
+      return res
+        .status(404)
+        .json({
+
+          success: false,
+
+          code:
+            "PURCHASE_ORDER_NOT_FOUND",
+
+          message:
+            "La orden de compra no fue encontrada."
+
+        });
+
+    }
+
+
+    const purchaseOrder =
+      purchaseOrderResult.rows[0];
+
+
+    // =========================================================
+    // 4. BUSCAR PURCHASE ORDER LINES
+    //
+    // origen_id = purchase_order_id
+    // origen_type = purchase_order
+    // =========================================================
+
+    const purchaseOrderLinesResult =
+      await db.query(
+        `
+        SELECT
+
+          pol.id,
+
+          pol.purchase_order_id
+            AS origen_id,
+
+          pol.sku,
+
+          pol.description,
+
+          pol.ordered_qty,
+
+          pol.received_qty,
+
+          pol.difference_qty
+
+        FROM purchase_order_lines pol
+
+        WHERE
+          pol.purchase_order_id = $1
+
+          AND COALESCE(
+            pol.deleted_erp,
+            FALSE
+          ) = FALSE
+
+        ORDER BY
+          pol.id
+        `,
+        [
+          purchaseOrderId
+        ]
+      );
+
+
+    // =========================================================
+    // 5. BUSCAR SOLO RECEPCIONES COMPLETADAS
+    //
+    // IMPORTANTE:
+    //
+    // Solo queremos mostrar receipts que realmente
+    // fueron completados.
+    //
+    // De esta forma no aparecen recepciones vacías,
+    // creadas, pausadas o en progreso.
+    // =========================================================
+
+    const receiptsResult =
+      await db.query(
+        `
+    SELECT DISTINCT
+
+      r.id,
+
+      r.receipt_code
+
+    FROM receipts r
+
+    INNER JOIN receipt_purchase_orders rpo
+      ON rpo.receipt_id =
+         r.id
+
+    WHERE
+      rpo.purchase_order_id = $1
+
+      AND r.status =
+        'completed'
+
+    ORDER BY
+      r.id
+    `,
+        [
+          purchaseOrderId
+        ]
+      );
+
+
+    const receipts =
+      receiptsResult.rows;
+
+    // =========================================================
+    // 6. OBTENER RECEIPT IDS
+    // =========================================================
+
+    const receiptIds =
+      receipts.map(
+        receipt =>
+          Number(
+            receipt.id
+          )
+      );
+
+
+    // =========================================================
+    // 7. BUSCAR TODAS LAS RECEIPT LINES
+    //
+    // IMPORTANTE:
+    //
+    // Un receipt puede contener varias Purchase Orders.
+    //
+    // Por eso NO basta con:
+    // rl.receipt_id = ANY(receiptIds)
+    //
+    // También debemos validar:
+    //
+    // receipt_lines.purchase_order_line_id
+    //        ↓
+    // purchase_order_lines.id
+    //        ↓
+    // purchase_order_lines.purchase_order_id
+    //
+    // Y asegurarnos de que purchase_order_id
+    // sea exactamente la PO que estamos consultando.
+    //
+    // origen_id = receipt_id
+    // origen_type = receipt
+    // =========================================================
+
+    let receiptLines =
+      [];
+
+
+    if (
+      receiptIds.length >
+      0
+    ) {
+
+      const receiptLinesResult =
+        await db.query(
+          `
+      SELECT
+
+        rl.id,
+
+        rl.receipt_id
+          AS origen_id,
+
+        rl.sku,
+
+        COALESCE(
+          p.description,
+          pol.description,
+          rl.sku
+        )
+          AS description,
+
+        rl.ordered_qty,
+
+        rl.received_qty,
+
+        rl.difference_qty
+
+      FROM receipt_lines rl
+
+
+      -- =====================================================
+      -- IDENTIFICAR A QUÉ PURCHASE ORDER
+      -- PERTENECE REALMENTE ESTA RECEIPT LINE
+      -- =====================================================
+
+      INNER JOIN purchase_order_lines pol
+        ON pol.id =
+           rl.purchase_order_line_id
+
+
+      -- =====================================================
+      -- PRODUCT DESCRIPTION
+      -- =====================================================
+
+      LEFT JOIN products p
+        ON p.sku =
+           rl.sku
+
+
+      WHERE
+
+        -- Receipt debe ser uno de los receipts
+        -- asociados a la Purchase Order
+
+        rl.receipt_id =
+          ANY(
+            $1::bigint[]
+          )
+
+
+        -- Y la línea debe pertenecer
+        -- específicamente a ESTA Purchase Order
+
+        AND pol.purchase_order_id =
+          $2
+
+
+      ORDER BY
+
+        rl.receipt_id,
+
+        rl.id
+      `,
+          [
+            receiptIds,
+            purchaseOrderId
+          ]
+        );
+
+
+      receiptLines =
+        receiptLinesResult.rows;
+
+    }
+
+    // =========================================================
+    // 8. CONSTRUIR DOCUMENTS
+    //
+    // AQUÍ UNIMOS:
+    //
+    // purchase_order
+    // +
+    // receipts
+    // =========================================================
+
+    const documents = [
+
+      // -------------------------------------------------------
+      // PURCHASE ORDER
+      // -------------------------------------------------------
+
+      {
+        id:
+          Number(
+            purchaseOrder.id
+          ),
+
+        type:
+          "purchase_order",
+
+        code:
+          purchaseOrder.purchase_order_number
+      },
+
+
+      // -------------------------------------------------------
+      // RECEIPTS
+      // -------------------------------------------------------
+
+      ...receipts.map(
+        receipt => ({
+
+          id:
+            Number(
+              receipt.id
+            ),
+
+          type:
+            "receipt",
+
+          code:
+            receipt.receipt_code
+
+        })
+      )
+
+    ];
+
+
+    // =========================================================
+    // 9. NORMALIZAR PURCHASE ORDER LINES
+    // =========================================================
+
+    const purchaseOrderLines =
+      purchaseOrderLinesResult.rows.map(
+        line => ({
+
+          id:
+            Number(
+              line.id
+            ),
+
+          origen_id:
+            Number(
+              line.origen_id
+            ),
+
+          origen_type:
+            "purchase_order",
+
+          sku:
+            line.sku,
+
+          description:
+            line.description,
+
+          ordered_qty:
+            Number(
+              line.ordered_qty ||
+              0
+            ),
+
+          received_qty:
+            Number(
+              line.received_qty ||
+              0
+            ),
+
+          difference_qty:
+            Number(
+              line.difference_qty ||
+              0
+            )
+
+        })
+      );
+
+
+    // =========================================================
+    // 10. NORMALIZAR RECEIPT LINES
+    // =========================================================
+
+    const normalizedReceiptLines =
+      receiptLines.map(
+        line => ({
+
+          id:
+            Number(
+              line.id
+            ),
+
+          origen_id:
+            Number(
+              line.origen_id
+            ),
+
+          origen_type:
+            "receipt",
+
+          sku:
+            line.sku,
+
+          description:
+            line.description,
+
+          ordered_qty:
+            Number(
+              line.ordered_qty ||
+              0
+            ),
+
+          received_qty:
+            Number(
+              line.received_qty ||
+              0
+            ),
+
+          difference_qty:
+            Number(
+              line.difference_qty ||
+              0
+            )
+
+        })
+      );
+
+
+    // =========================================================
+    // 11. UNIR TODAS LAS LÍNEAS
+    // =========================================================
+
+    const lines = [
+
+      ...purchaseOrderLines,
+
+      ...normalizedReceiptLines
+
+    ];
+
+
+    // =========================================================
+    // 12. DEBUG
+    // =========================================================
+
+    console.log("");
+    console.log(
+      "📋 PURCHASE ORDER:"
+    );
+
+    console.log(
+      purchaseOrder
+    );
+
+
+    console.log("");
+    console.log(
+      "📄 DOCUMENTS:"
+    );
+
+    console.table(
+      documents
+    );
+
+
+    console.log("");
+    console.log(
+      "📦 TOTAL LINES:",
+      lines.length
+    );
+
+
+    // =========================================================
+    // 13. RESPONSE
+    // =========================================================
+
+    return res
+      .status(200)
+      .json({
+
+        success: true,
+
+        data: {
+
+          // ===================================================
+          // HEADER PRINCIPAL
+          // ===================================================
+
+          purchase_order: {
+
+            id:
+              Number(
+                purchaseOrder.id
+              ),
+
+            purchase_order_number:
+              purchaseOrder.purchase_order_number,
+
+            erp_id:
+              purchaseOrder.erp_id,
+
+            supplier_name:
+              purchaseOrder.supplier_name,
+
+            status:
+              purchaseOrder.status
+
+          },
+
+
+          // ===================================================
+          // PO + RECEIPTS
+          // ===================================================
+
+          documents,
+
+
+          // ===================================================
+          // PURCHASE ORDER LINES + RECEIPT LINES
+          // ===================================================
+
+          lines
+
+        }
+
+      });
+
+
+  } catch (
+  error
+  ) {
+
+    console.error("");
+    console.error(
+      "❌ ========================================"
+    );
+
+    console.error(
+      "❌ ERROR OBTENIENDO PURCHASE ORDER DETAILS"
+    );
+
+    console.error(
+      error
+    );
+
+    console.error(
+      "❌ ========================================"
+    );
+
+
+    return res
+      .status(500)
+      .json({
+
+        success: false,
+
+        code:
+          "PURCHASE_ORDER_DETAILS_ERROR",
+
+        message:
+          "No se pudieron obtener los detalles de la orden de compra."
+
+      });
+
+  }
+
+}
+
+
+
+
+
+
+//Searching a specific reception
+export async function searchPurchaseOrdersWithReceipts(req, res) {
+
+  const client = await db.connect();
+
+  try {
+
+    const { id } = req.params;
+
+    const searchValue = String(id || "").trim();
+
+
+    if (!searchValue) {
+
+      return res.status(400).json({
+        success: false,
+        title: "Búsqueda requerida",
+        message: "Debe ingresar un ID o número de orden de compra."
+      });
+
+    }
+
+
+    const result = await client.query(
+      `
+      WITH matched_purchase_orders AS (
+
+        SELECT
+
+          po.id,
+          po.purchase_order_number,
+          po.supplier_name,
+          po.expected_date,
+          po.notes,
+          po.erp_warehouse_value,
+          po.status,
+          po.invoice_numbers,
+          po.created_at,
+          po.updated_at,
+          po.erp_order_id,
+          po.erp_write_date
+
+        FROM purchase_orders po
+
+        WHERE
+
+          po.id::text ILIKE $1
+
+          OR po.purchase_order_number::text ILIKE $1
+
+          OR po.erp_order_id::text ILIKE $1
+
+
+        ORDER BY
+
+          po.updated_at DESC NULLS LAST,
+          po.created_at DESC NULLS LAST,
+          po.id DESC
+
+        LIMIT 10
+      )
+
+
+      SELECT
+
+        po.id AS purchase_order_id,
+        po.purchase_order_number,
+        po.supplier_name,
+        po.expected_date,
+        po.notes,
+        po.erp_warehouse_value,
+        po.status,
+        po.invoice_numbers,
+        po.created_at,
+        po.updated_at,
+        po.erp_order_id,
+        po.erp_write_date,
+
+        last_receipt.receipt_id,
+
+        last_receipt.finished_at
+          AS last_receipt_finished_at,
+
+        COALESCE(
+          receipt_count.completed_receipts_count,
+          0
+        ) AS completed_receipts_count
+
+
+      FROM matched_purchase_orders po
+
+
+      LEFT JOIN LATERAL (
+
+        SELECT
+
+          r.id AS receipt_id,
+          r.finished_at
+
+        FROM receipts r
+
+        WHERE r.purchase_order_id = po.id
+          AND r.status = 'completed'
+
+        ORDER BY
+
+          r.finished_at DESC NULLS LAST,
+          r.id DESC
+
+        LIMIT 1
+
+      ) last_receipt ON TRUE
+
+
+      LEFT JOIN LATERAL (
+
+        SELECT
+
+          COUNT(*)::int
+            AS completed_receipts_count
+
+        FROM receipts r
+
+        WHERE r.purchase_order_id = po.id
+          AND r.status = 'completed'
+
+      ) receipt_count ON TRUE
+
+
+      ORDER BY
+
+        po.updated_at DESC NULLS LAST,
+        po.created_at DESC NULLS LAST,
+        po.id DESC;
+      `,
+      [`%${searchValue}%`]
+    );
+
+
+    if (result.rows.length === 0) {
+
+      return res.status(404).json({
+
+        success: false,
+
+        title: "Orden no encontrada",
+
+        message:
+          `No se encontraron órdenes de compra relacionadas con "${searchValue}".`
+
+      });
+
+    }
+
+
+    return res.status(200).json({
+
+      success: true,
+
+      title: "Órdenes encontradas",
+
+      message:
+        "Órdenes de compra encontradas correctamente.",
+
+      data: result.rows
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "❌ Error buscando órdenes de compra:",
+      error
+    );
+
+
+    return res.status(500).json({
+
+      success: false,
+
+      title: "Error del servidor",
+
+      message:
+        "Ocurrió un error al buscar las órdenes de compra."
+
+    });
+
+  } finally {
+
+    client.release();
+
+  }
+
+}
+
+
+
+
+//Las 10 receptions done
+export async function getRecentCompletedReceipts(req, res) {
+  try {
+
+    console.log(
+      "📦 Buscando últimas órdenes con recepción completada"
+    );
+
+    const result = await db.query(`
+      SELECT
+        po.id AS purchase_order_id,
+        po.purchase_order_number,
+        po.erp_order_id,
+        po.status,
+        po.supplier_name,
+
+        COUNT(DISTINCT r.id)::int AS completed_receipts_count,
+
+        MAX(r.finished_at) AS last_receipt_finished_at
+
+      FROM purchase_orders po
+
+      INNER JOIN receipt_purchase_orders rpo
+        ON rpo.purchase_order_id = po.id
+
+      INNER JOIN receipts r
+        ON r.id = rpo.receipt_id
+        AND r.status = 'completed'
+
+      GROUP BY
+        po.id,
+        po.purchase_order_number,
+        po.erp_order_id,
+        po.status,
+        po.supplier_name
+
+      ORDER BY
+        MAX(r.finished_at) DESC NULLS LAST,
+        po.id DESC
+
+      LIMIT 10;
+    `);
+
+    console.log(
+      "Cantidad de ordenes recibidas:",
+      result.rows.length
+    );
+
+    console.log(
+      "Ordenes:",
+      result.rows
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: result.rows.length,
+      data: result.rows
+    });
+
+  } catch (error) {
+
+    console.error(
+      "❌ Error buscando órdenes con recepciones:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      title: "Error obteniendo recepciones",
+      message:
+        "No se pudieron obtener las órdenes con recepciones recientes."
+    });
+  }
+}
+
+
+
+
+
 
 
 // Search all the reception information for reception
@@ -2814,13 +3692,13 @@ export async function savingReception(req, res) {
       purchase_order_ids
     )
       ? [
-          ...new Set(
-            purchase_order_ids.map(
-              (id) =>
-                Number(id)
-            )
+        ...new Set(
+          purchase_order_ids.map(
+            (id) =>
+              Number(id)
           )
-        ]
+        )
+      ]
       : [];
 
 
@@ -3025,7 +3903,7 @@ export async function savingReception(req, res) {
       line.id <= 0 ||
 
       typeof line.received_qty !==
-        "number" ||
+      "number" ||
 
       !Number.isFinite(
         line.received_qty
@@ -3402,7 +4280,7 @@ export async function savingReception(req, res) {
     const samePurchaseOrders =
 
       receiptPurchaseOrderIds.length ===
-        purchaseOrderIds.length
+      purchaseOrderIds.length
 
       &&
 
@@ -3779,8 +4657,8 @@ export async function savingReception(req, res) {
 
 
     const receiptLinesResult =
-  await client.query(
-    `
+      await client.query(
+        `
     INSERT INTO receipt_lines
     (
       receipt_id,
@@ -3822,8 +4700,8 @@ export async function savingReception(req, res) {
       difference_qty,
       created_at
     `,
-    receiptLineParams
-  );
+        receiptLineParams
+      );
 
 
     console.log("");
@@ -3836,30 +4714,30 @@ export async function savingReception(req, res) {
       receiptLinesResult.rows
     );
 
-// ============================================================
-// 22. RECALCULAR PURCHASE_ORDER_LINES.RECEIVED_QTY
-//
-// receipt_lines.received_qty
-// = cantidad recibida en CADA receipt
-//
-// purchase_order_lines.received_qty
-// = TOTAL acumulado entre todos los receipts válidos
-// ============================================================
+    // ============================================================
+    // 22. RECALCULAR PURCHASE_ORDER_LINES.RECEIVED_QTY
+    //
+    // receipt_lines.received_qty
+    // = cantidad recibida en CADA receipt
+    //
+    // purchase_order_lines.received_qty
+    // = TOTAL acumulado entre todos los receipts válidos
+    // ============================================================
 
-const purchaseOrderLineIds =
-  enrichedLines.map(
-    (line) =>
-      Number(line.id)
-  );
+    const purchaseOrderLineIds =
+      enrichedLines.map(
+        (line) =>
+          Number(line.id)
+      );
 
 
-// ------------------------------------------------------------
-// 22.1 CALCULAR TOTAL RECIBIDO POR CADA PO LINE
-// ------------------------------------------------------------
+    // ------------------------------------------------------------
+    // 22.1 CALCULAR TOTAL RECIBIDO POR CADA PO LINE
+    // ------------------------------------------------------------
 
-const accumulatedResult =
-  await client.query(
-    `
+    const accumulatedResult =
+      await client.query(
+        `
     SELECT
       pol.id,
       pol.sku,
@@ -3896,59 +4774,59 @@ const accumulatedResult =
     ORDER BY
       pol.id
     `,
-    [
-      purchaseOrderLineIds
-    ]
-  );
+        [
+          purchaseOrderLineIds
+        ]
+      );
 
 
-console.log("");
-console.log(
-  "📊 TOTAL RECIBIDO ACUMULADO:"
-);
+    console.log("");
+    console.log(
+      "📊 TOTAL RECIBIDO ACUMULADO:"
+    );
 
-console.table(
-  accumulatedResult.rows
-);
-
-
-// ------------------------------------------------------------
-// 22.2 VALIDAR QUE NO SE RECIBA MÁS DE LO ORDENADO
-// ------------------------------------------------------------
-
-const overReceivedLine =
-  accumulatedResult.rows.find(
-    (line) =>
-      Number(
-        line.total_received_qty
-      ) >
-      Number(
-        line.ordered_qty
-      )
-  );
+    console.table(
+      accumulatedResult.rows
+    );
 
 
-if (
-  overReceivedLine
-) {
+    // ------------------------------------------------------------
+    // 22.2 VALIDAR QUE NO SE RECIBA MÁS DE LO ORDENADO
+    // ------------------------------------------------------------
 
-  throw new Error(
-    `La línea ${overReceivedLine.id} ` +
-    `(${overReceivedLine.sku}) tiene ` +
-    `${overReceivedLine.total_received_qty} recibidos ` +
-    `pero solamente ${overReceivedLine.ordered_qty} ordenados.`
-  );
+    const overReceivedLine =
+      accumulatedResult.rows.find(
+        (line) =>
+          Number(
+            line.total_received_qty
+          ) >
+          Number(
+            line.ordered_qty
+          )
+      );
 
-}
+
+    if (
+      overReceivedLine
+    ) {
+
+      throw new Error(
+        `La línea ${overReceivedLine.id} ` +
+        `(${overReceivedLine.sku}) tiene ` +
+        `${overReceivedLine.total_received_qty} recibidos ` +
+        `pero solamente ${overReceivedLine.ordered_qty} ordenados.`
+      );
+
+    }
 
 
-// ------------------------------------------------------------
-// 22.3 ACTUALIZAR EL ACUMULADO EN PURCHASE_ORDER_LINES
-// ------------------------------------------------------------
+    // ------------------------------------------------------------
+    // 22.3 ACTUALIZAR EL ACUMULADO EN PURCHASE_ORDER_LINES
+    // ------------------------------------------------------------
 
-const updatePurchaseOrderLinesResult =
-  await client.query(
-    `
+    const updatePurchaseOrderLinesResult =
+      await client.query(
+        `
     UPDATE purchase_order_lines pol
 
     SET
@@ -3995,24 +4873,24 @@ const updatePurchaseOrderLinesResult =
       pol.ordered_qty,
       pol.received_qty
     `,
-    [
-      purchaseOrderLineIds
-    ]
-  );
+        [
+          purchaseOrderLineIds
+        ]
+      );
 
 
-console.log("");
-console.log(
-  "✅ PURCHASE ORDER LINES ACTUALIZADAS:"
-);
+    console.log("");
+    console.log(
+      "✅ PURCHASE ORDER LINES ACTUALIZADAS:"
+    );
 
-console.table(
-  updatePurchaseOrderLinesResult.rows
-);
+    console.table(
+      updatePurchaseOrderLinesResult.rows
+    );
 
     // ============================================================
-// 23. ACTUALIZAR STATUS DEL RECEIPT
-// ============================================================
+    // 23. ACTUALIZAR STATUS DEL RECEIPT
+    // ============================================================
 
     const updateReceiptResult =
       await client.query(
@@ -4180,7 +5058,7 @@ console.table(
         );
 
       } catch (
-        rollbackError
+      rollbackError
       ) {
 
         console.error(
@@ -4334,12 +5212,12 @@ export async function getReceivingByPoId(req, res) {
   );
 
   try {
-   // ============================================================
-// 1️⃣ BUSCAR TODAS LAS ÓRDENES DE COMPRA
-// ============================================================
+    // ============================================================
+    // 1️⃣ BUSCAR TODAS LAS ÓRDENES DE COMPRA
+    // ============================================================
 
-const poResult = await db.query(
-  `
+    const poResult = await db.query(
+      `
   SELECT
     id,
     purchase_order_number,
@@ -4348,134 +5226,134 @@ const poResult = await db.query(
   WHERE id = ANY($1::bigint[])
   ORDER BY id
   `,
-  [purchaseOrderIds]
-);
+      [purchaseOrderIds]
+    );
 
 
-console.log(
-  "📦 ÓRDENES ENCONTRADAS:",
-  poResult.rows
-);
+    console.log(
+      "📦 ÓRDENES ENCONTRADAS:",
+      poResult.rows
+    );
 
 
-// ============================================================
-// 2️⃣ VALIDAR QUE SE ENCONTRÓ AL MENOS UNA
-// ============================================================
+    // ============================================================
+    // 2️⃣ VALIDAR QUE SE ENCONTRÓ AL MENOS UNA
+    // ============================================================
 
-if (poResult.rowCount === 0) {
+    if (poResult.rowCount === 0) {
 
-  return res.status(404).json({
-    success: false,
-    message: "PURCHASE_ORDER_NOT_FOUND",
-  });
+      return res.status(404).json({
+        success: false,
+        message: "PURCHASE_ORDER_NOT_FOUND",
+      });
 
-}
-
-
-// ============================================================
-// 3️⃣ VALIDAR QUE TODAS LAS IDS EXISTAN
-// ============================================================
-
-if (poResult.rowCount !== purchaseOrderIds.length) {
-
-  const foundIds = poResult.rows.map(
-    (order) => Number(order.id)
-  );
+    }
 
 
-  const missingIds = purchaseOrderIds.filter(
-    (id) => !foundIds.includes(Number(id))
-  );
+    // ============================================================
+    // 3️⃣ VALIDAR QUE TODAS LAS IDS EXISTAN
+    // ============================================================
+
+    if (poResult.rowCount !== purchaseOrderIds.length) {
+
+      const foundIds = poResult.rows.map(
+        (order) => Number(order.id)
+      );
 
 
-  console.log(
-    "❌ IDS NO ENCONTRADOS:",
-    missingIds
-  );
+      const missingIds = purchaseOrderIds.filter(
+        (id) => !foundIds.includes(Number(id))
+      );
 
 
-  return res.status(404).json({
-
-    success: false,
-
-    title:
-      "Orden de Compra no disponible",
-
-    message:
-      "Una o más órdenes de compra no existen.",
-
-    missingIds,
-
-  });
-
-}
+      console.log(
+        "❌ IDS NO ENCONTRADOS:",
+        missingIds
+      );
 
 
-// ============================================================
-// 4️⃣ VALIDAR SI ALGUNA ESTÁ CANCELADA
-// ============================================================
+      return res.status(404).json({
 
-const cancelledOrder = poResult.rows.find(
-  (order) =>
-    String(order.status)
-      .trim()
-      .toLowerCase() === "cancelled"
-);
+        success: false,
 
+        title:
+          "Orden de Compra no disponible",
 
-if (cancelledOrder) {
+        message:
+          "Una o más órdenes de compra no existen.",
 
-  console.log(
-    "❌ ORDEN CANCELADA:",
-    cancelledOrder
-  );
+        missingIds,
+
+      });
+
+    }
 
 
-  return res.status(409).json({
+    // ============================================================
+    // 4️⃣ VALIDAR SI ALGUNA ESTÁ CANCELADA
+    // ============================================================
 
-    success: false,
-
-    title:
-      "Orden de Compra no disponible",
-
-    message:
-      `La orden ${cancelledOrder.purchase_order_number} está cancelada.`,
-
-    data: {
-      id:
-        cancelledOrder.id,
-
-      purchase_order_number:
-        cancelledOrder.purchase_order_number,
-
-      status:
-        cancelledOrder.status,
-    },
-
-  });
-
-}
+    const cancelledOrder = poResult.rows.find(
+      (order) =>
+        String(order.status)
+          .trim()
+          .toLowerCase() === "cancelled"
+    );
 
 
-// ============================================================
-// 5️⃣ TODAS LAS ÓRDENES SON VÁLIDAS
-// ============================================================
+    if (cancelledOrder) {
 
-const purchaseOrders =
-  poResult.rows;
+      console.log(
+        "❌ ORDEN CANCELADA:",
+        cancelledOrder
+      );
 
 
-console.log(
-  "✅ TODAS LAS ÓRDENES SON VÁLIDAS:",
-  purchaseOrders
-);
+      return res.status(409).json({
 
-  // ============================================================
-// 2️⃣ BUSCAR RECEPCIÓN ACTIVA PARA ESTE CONJUNTO EXACTO DE POs
-// ============================================================
+        success: false,
 
-const receiptResult = await db.query(
-  `
+        title:
+          "Orden de Compra no disponible",
+
+        message:
+          `La orden ${cancelledOrder.purchase_order_number} está cancelada.`,
+
+        data: {
+          id:
+            cancelledOrder.id,
+
+          purchase_order_number:
+            cancelledOrder.purchase_order_number,
+
+          status:
+            cancelledOrder.status,
+        },
+
+      });
+
+    }
+
+
+    // ============================================================
+    // 5️⃣ TODAS LAS ÓRDENES SON VÁLIDAS
+    // ============================================================
+
+    const purchaseOrders =
+      poResult.rows;
+
+
+    console.log(
+      "✅ TODAS LAS ÓRDENES SON VÁLIDAS:",
+      purchaseOrders
+    );
+
+    // ============================================================
+    // 2️⃣ BUSCAR RECEPCIÓN ACTIVA PARA ESTE CONJUNTO EXACTO DE POs
+    // ============================================================
+
+    const receiptResult = await db.query(
+      `
   SELECT
     r.id,
     r.receipt_code,
@@ -4507,65 +5385,65 @@ const receiptResult = await db.query(
 
   LIMIT 1
   `,
-  [
-    purchaseOrderIds,
-    purchaseOrderIds.length
-  ]
-);
+      [
+        purchaseOrderIds,
+        purchaseOrderIds.length
+      ]
+    );
 
 
-let receiptId;
+    let receiptId;
 
 
-// ============================================================
-// 3️⃣ SI NO EXISTE → CREAR UNA SOLA RECEPCIÓN
-// ============================================================
+    // ============================================================
+    // 3️⃣ SI NO EXISTE → CREAR UNA SOLA RECEPCIÓN
+    // ============================================================
 
-if (receiptResult.rowCount === 0) {
+    if (receiptResult.rowCount === 0) {
 
-  console.log(
-    "➕ No existe recepción activa para:",
-    purchaseOrderIds
-  );
+      console.log(
+        "➕ No existe recepción activa para:",
+        purchaseOrderIds
+      );
 
 
-  // ==========================================================
-  // GENERAR CÓDIGO
-  // ==========================================================
+      // ==========================================================
+      // GENERAR CÓDIGO
+      // ==========================================================
 
-  const seqResult = await db.query(
-    `
+      const seqResult = await db.query(
+        `
     SELECT
       nextval('receipt_code_seq') AS seq
     `
-  );
+      );
 
 
-  const nextNumber =
-    seqResult.rows[0].seq;
+      const nextNumber =
+        seqResult.rows[0].seq;
 
 
-  const yearReceipt =
-    new Date().getFullYear();
+      const yearReceipt =
+        new Date().getFullYear();
 
 
-  const receiptCodeGenerated =
-    `${yearReceipt}-${nextNumber}`;
+      const receiptCodeGenerated =
+        `${yearReceipt}-${nextNumber}`;
 
 
-  console.log(
-    "📄 Nuevo receipt code:",
-    receiptCodeGenerated
-  );
+      console.log(
+        "📄 Nuevo receipt code:",
+        receiptCodeGenerated
+      );
 
 
-  // ==========================================================
-  // CREAR UNA SOLA RECEPCIÓN
-  // ==========================================================
+      // ==========================================================
+      // CREAR UNA SOLA RECEPCIÓN
+      // ==========================================================
 
-  const createReceipt =
-    await db.query(
-      `
+      const createReceipt =
+        await db.query(
+          `
       INSERT INTO receipts (
         receipt_code,
         operator_id,
@@ -4584,29 +5462,29 @@ if (receiptResult.rowCount === 0) {
         id,
         receipt_code
       `,
-      [
-        receiptCodeGenerated,
-        operatorId
-      ]
-    );
+          [
+            receiptCodeGenerated,
+            operatorId
+          ]
+        );
 
 
-  receiptId =
-    createReceipt.rows[0].id;
+      receiptId =
+        createReceipt.rows[0].id;
 
 
-  console.log(
-    "✅ RECEIPT CREADO:",
-    receiptId
-  );
+      console.log(
+        "✅ RECEIPT CREADO:",
+        receiptId
+      );
 
 
-  // ==========================================================
-  // RELACIONAR TODAS LAS POs CON EL MISMO RECEIPT
-  // ==========================================================
+      // ==========================================================
+      // RELACIONAR TODAS LAS POs CON EL MISMO RECEIPT
+      // ==========================================================
 
-  await db.query(
-    `
+      await db.query(
+        `
     INSERT INTO receipt_purchase_orders (
       receipt_id,
       purchase_order_id
@@ -4616,45 +5494,45 @@ if (receiptResult.rowCount === 0) {
       $1,
       unnest($2::bigint[])
     `,
-    [
-      receiptId,
-      purchaseOrderIds
-    ]
-  );
+        [
+          receiptId,
+          purchaseOrderIds
+        ]
+      );
 
 
-  console.log(
-    "✅ POs vinculadas al receipt:",
-    purchaseOrderIds
-  );
+      console.log(
+        "✅ POs vinculadas al receipt:",
+        purchaseOrderIds
+      );
 
-}
-
-
-// ============================================================
-// SI YA EXISTE → UTILIZAR LA MISMA RECEPCIÓN
-// ============================================================
-
-else {
-
-  receiptId =
-    receiptResult.rows[0].id;
+    }
 
 
-  console.log(
-    "♻️ RECEPCIÓN ACTIVA ENCONTRADA:",
-    receiptId
-  );
+    // ============================================================
+    // SI YA EXISTE → UTILIZAR LA MISMA RECEPCIÓN
+    // ============================================================
 
-}
+    else {
+
+      receiptId =
+        receiptResult.rows[0].id;
 
 
-   // ============================================================
-// BUSCAR RECEPCIONES COMPLETADAS DE TODAS LAS POs
-// ============================================================
+      console.log(
+        "♻️ RECEPCIÓN ACTIVA ENCONTRADA:",
+        receiptId
+      );
 
-const completedReceiptsResult = await db.query(
-  `
+    }
+
+
+    // ============================================================
+    // BUSCAR RECEPCIONES COMPLETADAS DE TODAS LAS POs
+    // ============================================================
+
+    const completedReceiptsResult = await db.query(
+      `
   SELECT DISTINCT
     r.id
   FROM receipts r
@@ -4665,48 +5543,48 @@ const completedReceiptsResult = await db.query(
   WHERE rpo.purchase_order_id = ANY($1::bigint[])
     AND r.status = 'completed'
   `,
-  [purchaseOrderIds]
-);
+      [purchaseOrderIds]
+    );
 
 
-const completedReceiptIds =
-  completedReceiptsResult.rows.map(
-    (row) => Number(row.id)
-  );
+    const completedReceiptIds =
+      completedReceiptsResult.rows.map(
+        (row) => Number(row.id)
+      );
 
 
-console.log(
-  "✅ RECEPCIONES COMPLETADAS:",
-  completedReceiptIds
-);
+    console.log(
+      "✅ RECEPCIONES COMPLETADAS:",
+      completedReceiptIds
+    );
 
 
-// ============================================================
-// TOTAL RECIBIDO EN RECEPCIONES COMPLETADAS ANTERIORES
-//
-// IMPORTANTE:
-//
-// NO usamos MAX.
-//
-// Una PO puede tener múltiples receipts:
-//
-// Receipt 23 = 400
-// Receipt 24 = 50
-//
-// Total anterior = 450
-// ============================================================
+    // ============================================================
+    // TOTAL RECIBIDO EN RECEPCIONES COMPLETADAS ANTERIORES
+    //
+    // IMPORTANTE:
+    //
+    // NO usamos MAX.
+    //
+    // Una PO puede tener múltiples receipts:
+    //
+    // Receipt 23 = 400
+    // Receipt 24 = 50
+    //
+    // Total anterior = 450
+    // ============================================================
 
-const previousReceivedMap =
-  new Map();
+    const previousReceivedMap =
+      new Map();
 
 
-if (
-  completedReceiptIds.length > 0
-) {
+    if (
+      completedReceiptIds.length > 0
+    ) {
 
-  const receiptLinesResult =
-    await db.query(
-      `
+      const receiptLinesResult =
+        await db.query(
+          `
       SELECT
         purchase_order_line_id,
 
@@ -4726,43 +5604,43 @@ if (
       GROUP BY
         purchase_order_line_id
       `,
-      [
-        completedReceiptIds
-      ]
-    );
+          [
+            completedReceiptIds
+          ]
+        );
 
 
-  receiptLinesResult.rows.forEach(
-    (row) => {
+      receiptLinesResult.rows.forEach(
+        (row) => {
 
-      previousReceivedMap.set(
-        Number(
-          row.purchase_order_line_id
-        ),
+          previousReceivedMap.set(
+            Number(
+              row.purchase_order_line_id
+            ),
 
-        Number(
-          row.total_received_qty
-        )
+            Number(
+              row.total_received_qty
+            )
+          );
+
+        }
       );
 
     }
-  );
-
-}
 
 
-console.log(
-  "📊 TOTAL RECIBIDO ANTERIORMENTE:",
-  previousReceivedMap
-);
+    console.log(
+      "📊 TOTAL RECIBIDO ANTERIORMENTE:",
+      previousReceivedMap
+    );
 
 
-// ============================================================
-// BUSCAR TODAS LAS LÍNEAS DE TODAS LAS POs
-// ============================================================
+    // ============================================================
+    // BUSCAR TODAS LAS LÍNEAS DE TODAS LAS POs
+    // ============================================================
 
-const linesResult = await db.query(
-  `
+    const linesResult = await db.query(
+      `
   SELECT
     pol.id,
 
@@ -4788,56 +5666,56 @@ const linesResult = await db.query(
     pol.purchase_order_id,
     pol.id
   `,
-  [purchaseOrderIds]
-);
+      [purchaseOrderIds]
+    );
 
 
-console.log(
-  "📦 PURCHASE ORDER LINES:",
-  linesResult.rows
-);
+    console.log(
+      "📦 PURCHASE ORDER LINES:",
+      linesResult.rows
+    );
 
 
-// ============================================================
-// OBTENER TODOS LOS SKUs SIN DUPLICADOS
-// ============================================================
+    // ============================================================
+    // OBTENER TODOS LOS SKUs SIN DUPLICADOS
+    // ============================================================
 
-const skus = [
-  ...new Set(
-    linesResult.rows
-      .map((line) => line.sku)
-      .filter(Boolean)
-  ),
-];
-
-
-console.log(
-  "📦 SKUS:",
-  skus
-);
+    const skus = [
+      ...new Set(
+        linesResult.rows
+          .map((line) => line.sku)
+          .filter(Boolean)
+      ),
+    ];
 
 
-// ============================================================
-// MAPAS DE PRODUCTOS
-// ============================================================
-
-const barcodeMap = new Map();
-
-const erpNameMap = new Map();
-
-const erpSkuMap = new Map();
-
-const erpIdMap = new Map();
+    console.log(
+      "📦 SKUS:",
+      skus
+    );
 
 
-// ============================================================
-// BUSCAR DATOS ERP DE LOS PRODUCTOS
-// ============================================================
+    // ============================================================
+    // MAPAS DE PRODUCTOS
+    // ============================================================
 
-if (skus.length > 0) {
+    const barcodeMap = new Map();
 
-  const productResult = await db.query(
-    `
+    const erpNameMap = new Map();
+
+    const erpSkuMap = new Map();
+
+    const erpIdMap = new Map();
+
+
+    // ============================================================
+    // BUSCAR DATOS ERP DE LOS PRODUCTOS
+    // ============================================================
+
+    if (skus.length > 0) {
+
+      const productResult = await db.query(
+        `
     SELECT
       sku,
       erp_name,
@@ -4849,41 +5727,41 @@ if (skus.length > 0) {
     WHERE sku =
       ANY($1::text[])
     `,
-    [skus]
-  );
-
-
-  productResult.rows.forEach(
-    (row) => {
-
-      erpNameMap.set(
-        row.sku,
-        row.erp_name
+        [skus]
       );
 
-      erpSkuMap.set(
-        row.sku,
-        row.erp_sku
-      );
 
-      erpIdMap.set(
-        row.sku,
-        row.erp_id
-      );
+      productResult.rows.forEach(
+        (row) => {
 
+          erpNameMap.set(
+            row.sku,
+            row.erp_name
+          );
+
+          erpSkuMap.set(
+            row.sku,
+            row.erp_sku
+          );
+
+          erpIdMap.set(
+            row.sku,
+            row.erp_id
+          );
+
+        }
+      );
     }
-  );
-}
 
 
-// ============================================================
-// BUSCAR BARCODES
-// ============================================================
+    // ============================================================
+    // BUSCAR BARCODES
+    // ============================================================
 
-if (skus.length > 0) {
+    if (skus.length > 0) {
 
-  const barcodeResult = await db.query(
-    `
+      const barcodeResult = await db.query(
+        `
     SELECT
       product_sku,
       barcode
@@ -4893,211 +5771,211 @@ if (skus.length > 0) {
     WHERE product_sku =
       ANY($1::text[])
     `,
-    [skus]
-  );
+        [skus]
+      );
 
 
-  console.log(
-    "📊 BARCODES:",
-    barcodeResult.rows
-  );
+      console.log(
+        "📊 BARCODES:",
+        barcodeResult.rows
+      );
 
 
-  barcodeResult.rows.forEach(
-    (row) => {
+      barcodeResult.rows.forEach(
+        (row) => {
 
-      if (
-        !barcodeMap.has(
-          row.product_sku
-        )
-      ) {
+          if (
+            !barcodeMap.has(
+              row.product_sku
+            )
+          ) {
 
-        barcodeMap.set(
-          row.product_sku,
-          []
-        );
-      }
+            barcodeMap.set(
+              row.product_sku,
+              []
+            );
+          }
 
 
-      barcodeMap
-        .get(row.product_sku)
-        .push(row.barcode);
+          barcodeMap
+            .get(row.product_sku)
+            .push(row.barcode);
 
+        }
+      );
     }
-  );
-}
 
 
-// ============================================================
-// ENRIQUECER TODAS LAS LÍNEAS
-// ============================================================
+    // ============================================================
+    // ENRIQUECER TODAS LAS LÍNEAS
+    // ============================================================
 
-const enrichedLines =
-  linesResult.rows.map(
-    (line) => {
+    const enrichedLines =
+      linesResult.rows.map(
+        (line) => {
 
-      const dbQty =
-        Number(
-          line.received_qty ?? 0
-        );
-
-
-      const previousReceiptQty =
-  Number(
-    previousReceivedMap.get(
-      Number(line.id)
-    ) ?? 0
-  );
+          const dbQty =
+            Number(
+              line.received_qty ?? 0
+            );
 
 
-      const barcodes =
-        barcodeMap.get(
-          line.sku
-        ) || [];
+          const previousReceiptQty =
+            Number(
+              previousReceivedMap.get(
+                Number(line.id)
+              ) ?? 0
+            );
 
 
-      return {
-
-        // ======================================================
-        // ID DE PURCHASE_ORDER_LINE
-        // ======================================================
-
-        id:
-          Number(line.id),
+          const barcodes =
+            barcodeMap.get(
+              line.sku
+            ) || [];
 
 
-        // ======================================================
-        // PO A LA QUE PERTENECE ESTA LÍNEA
-        // ======================================================
+          return {
 
-        purchase_order_id:
-          Number(
-            line.purchase_order_id
-          ),
+            // ======================================================
+            // ID DE PURCHASE_ORDER_LINE
+            // ======================================================
 
-        purchase_order_number:
-          line.purchase_order_number,
+            id:
+              Number(line.id),
 
 
-        // ======================================================
-        // PRODUCTO
-        // ======================================================
+            // ======================================================
+            // PO A LA QUE PERTENECE ESTA LÍNEA
+            // ======================================================
 
-        sku:
-          line.sku,
+            purchase_order_id:
+              Number(
+                line.purchase_order_id
+              ),
 
-        description:
-          line.description,
-
-        ordered_qty:
-          Number(
-            line.ordered_qty ?? 0
-          ),
+            purchase_order_number:
+              line.purchase_order_number,
 
 
-        // ======================================================
-        // RECEPCIÓN
-        // ======================================================
+            // ======================================================
+            // PRODUCTO
+            // ======================================================
 
-        received_qty:
-          dbQty,
+            sku:
+              line.sku,
 
-        min_received_qty:
-          previousReceiptQty,
+            description:
+              line.description,
 
-
-        // ======================================================
-        // BARCODES / ERP
-        // ======================================================
-
-        barcodes,
-
-        product_exists:
-          barcodes.length > 0,
-
-        erp_name:
-          erpNameMap.get(
-            line.sku
-          ) || null,
-
-        erp_sku:
-          erpSkuMap.get(
-            line.sku
-          ) || null,
-
-        erp_id:
-          erpIdMap.get(
-            line.sku
-          ) || null,
-
-      };
-
-    }
-  );
+            ordered_qty:
+              Number(
+                line.ordered_qty ?? 0
+              ),
 
 
-console.log("");
-console.log(
-  "✅ ========================================"
-);
-console.log(
-  "✅ ENRICHED LINES"
-);
-console.log(
-  "✅ ========================================"
-);
+            // ======================================================
+            // RECEPCIÓN
+            // ======================================================
 
-console.log(
-  enrichedLines
-);
+            received_qty:
+              dbQty,
+
+            min_received_qty:
+              previousReceiptQty,
 
 
-// ============================================================
-// OBTENER LOS NÚMEROS DE LAS POs
-// ============================================================
+            // ======================================================
+            // BARCODES / ERP
+            // ======================================================
 
-const purchaseOrderNumbers =
-  purchaseOrders.map(
-    (order) =>
-      order.purchase_order_number
-  );
+            barcodes,
+
+            product_exists:
+              barcodes.length > 0,
+
+            erp_name:
+              erpNameMap.get(
+                line.sku
+              ) || null,
+
+            erp_sku:
+              erpSkuMap.get(
+                line.sku
+              ) || null,
+
+            erp_id:
+              erpIdMap.get(
+                line.sku
+              ) || null,
+
+          };
+
+        }
+      );
 
 
-console.log(
-  "📦 PURCHASE ORDER NUMBERS:",
-  purchaseOrderNumbers
-);
+    console.log("");
+    console.log(
+      "✅ ========================================"
+    );
+    console.log(
+      "✅ ENRICHED LINES"
+    );
+    console.log(
+      "✅ ========================================"
+    );
+
+    console.log(
+      enrichedLines
+    );
 
 
-// ============================================================
-// RESPONDER
-// ============================================================
+    // ============================================================
+    // OBTENER LOS NÚMEROS DE LAS POs
+    // ============================================================
 
-return res.status(200).json({
+    const purchaseOrderNumbers =
+      purchaseOrders.map(
+        (order) =>
+          order.purchase_order_number
+      );
 
-  success: true,
 
-  data: {
+    console.log(
+      "📦 PURCHASE ORDER NUMBERS:",
+      purchaseOrderNumbers
+    );
 
-    // IDs de todas las POs
-    purchase_order_ids:
-      purchaseOrderIds,
 
-    // Labels / números de todas las POs
-    purchase_order_numbers:
-      purchaseOrderNumbers,
+    // ============================================================
+    // RESPONDER
+    // ============================================================
 
-    // Una sola recepción
-    receipt_id:
-      receiptId,
+    return res.status(200).json({
 
-    // Todas las líneas combinadas
-    lines:
-      enrichedLines,
+      success: true,
 
-  },
+      data: {
 
-});
+        // IDs de todas las POs
+        purchase_order_ids:
+          purchaseOrderIds,
+
+        // Labels / números de todas las POs
+        purchase_order_numbers:
+          purchaseOrderNumbers,
+
+        // Una sola recepción
+        receipt_id:
+          receiptId,
+
+        // Todas las líneas combinadas
+        lines:
+          enrichedLines,
+
+      },
+
+    });
 
   } catch (error) {
     console.error("Error fetching receiving by PO ID:", error);
@@ -5962,7 +6840,7 @@ export async function confirmingIdOrder(req, res) {
         );
 
       } catch (
-        rollbackError
+      rollbackError
       ) {
 
         console.error(

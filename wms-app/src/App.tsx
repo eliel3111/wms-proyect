@@ -1,5 +1,4 @@
-import { Routes, Route } from "react-router-dom";
-import Home from "./pages/home.tsx";
+import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/login.tsx";
 import MainLayout from "./components/MainLayout";
 import PrivateRoute from "./components/PrivateRoute.tsx";
@@ -28,7 +27,7 @@ import PickingFinal from "./pages/picking_user_final.tsx"
 import BarcodePage from "./pages/Barcode-main.tsx";
 import MonitorInventory from "./pages/Inventory_monitor.tsx"
 import Inventory_count from "./pages/Inventory_count.tsx"
-
+import ReceivingDetailsPage from "./pages/ReceivingDetailsPage.tsx"
 
 
 function App() {
@@ -37,7 +36,7 @@ function App() {
 
       {/* RUTAS */}
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
 
         {/* Ruta protegida */}
@@ -67,6 +66,10 @@ function App() {
             path="receiving/final"
             element={<ReceivingFinal />}
           />
+          <Route
+  path="/receiving/details/:id"
+  element={<ReceivingDetailsPage />}
+/>
 
 
           {/* PUTAWAY */}

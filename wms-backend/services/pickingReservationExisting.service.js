@@ -1,5 +1,8 @@
 import { getPickingConfig } from "../services/pickingBestRoute.js";
 
+
+
+//Esta función compara la cantidad solicitada de un movimiento con la cantidad que ya está distribuida en sus líneas de picking. Según la diferencia, intenta agregar cantidad, conservarla o reducirla.
 export async function reserveMissingQtyForExistingMoveLines(
   client,
   move,
@@ -8,12 +11,30 @@ export async function reserveMissingQtyForExistingMoveLines(
   if (!stockMove) {
     throw new Error("Debe enviar stockMove");
   }
+console.log("*************************************************************");
+  //client - Conexión a PostgreSQL
+  //move - Producto con SKU, picking_id y ubicaciones
+  //stockMove - Movimiento específico que se está revisando
 
-  const moveId = stockMove.move_id;
-  const pickingId = move.picking_id;
-  const productId = move.product_id;
-  const sku = move.sku;
-  const requiredQty = Number(stockMove.product_qty || 0);
+
+
+
+  //Obtiene los datos del movimiento y del producto
+  const moveId = stockMove.move_id;  // "6"
+  const pickingId = move.picking_id; // ID del pedido
+  const productId = move.product_id; // ID del producto
+  const sku = move.sku;              // SKU del producto
+  const requestedMove = move.moves.find(
+  (item) => String(item.move_id) === String(moveId)
+);
+
+if (!requestedMove) {
+  throw new Error(
+    `No se encontró el movimiento ${moveId} en move.moves.`
+  );
+}
+
+const requiredQty = Number(requestedMove.product_qty);
 
   console.log("🟣 ---- reserveMissingQtyForExistingMoveLines ----");
   console.log("🆔 moveId:", moveId);
@@ -21,152 +42,173 @@ export async function reserveMissingQtyForExistingMoveLines(
   console.log("🏷️ sku:", sku);
   console.log("📌 requiredQty:", requiredQty);
 
+
+
   const config = await getPickingConfig(client);
 
+
+  //Esta función busca las líneas de picking stock_move_line de un movimiento o stock_move y devuelve las que no están canceladas.
   const moveLines = await getStockMoveLinesByMoveId(client, moveId);
 
+  //Se separan las lineas que tiene qty_done > 0, es decir que el operador ya recogio unidades
   const processedLines = moveLines.filter(
     line => Number(line.qty_done || 0) > 0
   );
 
-console.log("🟨🟨🟨 LINEAS CON CANTIDAD PICKICHEADA:", processedLines);
+  console.log("🟨🟨🟨 LINEAS CON CANTIDAD PICKICHEADA:", processedLines);
 
+  // Aqui estan las lineas que no tienen nada recibido.
   const openReservedLines = moveLines.filter(
     line => Number(line.qty_done || 0) === 0
   );
 
-  //const processedQty = sumQty(processedLines, "qty_done");
-  const processedQty = sumQty(processedLines, "product_uom_qty");
-console.log("🟨🟨🟨 CANTIDAD DE LAS LINEAS PICHEADAS YA HECHA:", processedQty);
-//console.log("🟨🟨🟨 CANTIDAD DE LAS LINEAS PICHEADAS TOTAL:", processedQty2);
-  const openReservedQty = sumQty(openReservedLines, "product_uom_qty");
-console.log("🟨🟨🟨 CANTIDAD DE LINEAS NO TOCADAS:", openReservedQty);
-  const coveredQty = processedQty + openReservedQty;
+  const processedAdjustment = config.allow_picking_without_locations
+  ? await adjustProcessedMoveLinesByAvailability(client, {
+      move,
+      stockMove,
+      processedLines,
+    })
+  : {
+      processedQty: sumQty(processedLines, "product_uom_qty"),
+      changed: false,
+    };
 
-  const diffQty = requiredQty - coveredQty;
+const processedQty = processedAdjustment.processedQty;
 
-  console.log("🧮 RESUMEN DE RESERVA:", {
-    requiredQty,
-    processedQty,
-    openReservedQty,
-    coveredQty,
-    diffQty,
-    allow_picking_without_locations: config.allow_picking_without_locations
-  });
+const openReservedQty = sumQty(
+  openReservedLines,
+  "product_uom_qty"
+);
+
+const coveredQty = processedQty + openReservedQty;
+const diffQty = requiredQty - coveredQty;
+
+console.log("🧮 RESUMEN DE RESERVA:", {
+  requiredQty,
+  processedQty,
+  openReservedQty,
+  coveredQty,
+  diffQty,
+  processedLinesChanged: processedAdjustment.changed,
+  allow_picking_without_locations:
+    config.allow_picking_without_locations,
+});
 
   // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
-// CASO 1: LA ORDEN AUMENTÓ
-// =====================================================
-if (diffQty > 0) {
-  console.log("🟢 CASO 1: La orden aumentó");
-  console.log("🟢 Cantidad adicional a agregar en stock_move_line:", diffQty);
-
-  if (config.allow_picking_without_locations) {
-    const result = await increaseExistingMoveLineWithoutLocations(client, {
-      move,
-      stockMove,
-      moveLines,
-      openReservedLines,
-      diffQty,
-    });
-
-    await updateStockMoveReservedQtyAndState(client, moveId, requiredQty);
-
-    return {
-      ...result,
-      case: "ORDER_INCREASED",
-    };
-  }
-
+  // CASO 1: LA ORDEN AUMENTÓ
   // =====================================================
-  // NUEVA LÓGICA:
-  // Buscar disponibilidad real por moveId
-  // =====================================================
-  const availableResult = await availableLocationsForMoveId(
-    client,
-    moveId,
-    moveLines
-  );
+  if (diffQty > 0) {
+    console.log("🟢 CASO 1: La orden aumentó");
+    console.log("🟢 Cantidad adicional a agregar en stock_move_line:", diffQty);
 
-  console.log("📍 REAL AVAILABLE LINES:", availableResult.lines);
-  console.log("📍 Total real disponible:", availableResult.totalPotentialQty);
+    if (config.allow_picking_without_locations) {
+      const result = await increaseExistingMoveLineWithoutLocations(client, {
+        move,
+        stockMove,
+        moveLines,
+        openReservedLines,
+        diffQty,
+      });
 
-  if (availableResult.lines.length === 0) {
-    await updateStockMoveReservedQtyAndState(client, moveId, coveredQty);
+      await updateStockMoveReservedQtyAndState(client, moveId, requiredQty);
 
-    return {
-      reserved: 0,
-      createdQty: 0,
-      skipped: true,
-      case: "ORDER_INCREASED_NO_STOCK",
-      missingQty: diffQty,
-      message:
-        "La orden aumentó, pero no hay inventario disponible para reservar la diferencia.",
-    };
-  }
-
-  // =====================================================
-  // Elegir una ubicación si puede cubrir todo.
-  // Si no, acumular varias.
-  // =====================================================
-  const potentialResult = buildLinesToAddFromRealAvailableLines(
-    availableResult.lines,
-    diffQty
-  );
-
-  console.log("📍 POTENCIALES PARA AGREGAR:", potentialResult.lines);
-  console.log("📍 Cantidad seleccionada:", potentialResult.totalSelectedQty);
-  console.log("📍 Faltante:", potentialResult.remainingQty);
-
-  if (potentialResult.lines.length === 0) {
-    await updateStockMoveReservedQtyAndState(client, moveId, coveredQty);
-
-    return {
-      reserved: 0,
-      createdQty: 0,
-      skipped: true,
-      case: "ORDER_INCREASED_NO_STOCK",
-      missingQty: diffQty,
-      message:
-        "La orden aumentó, pero no hay inventario disponible para reservar la diferencia.",
-    };
-  }
-
-  // =====================================================
-  // Crear o aumentar stock_move_line
-  // SIN tocar inventory_by_location.qty_reserved
-  // =====================================================
-
-  const addedQty = await createOrIncreaseMoveLinesWithoutInventoryReservation(
-    client,
-    {
-      move,
-      stockMove,
-      potentialLines: potentialResult.lines,
-      openReservedLines,
+      return {
+        ...result,
+        case: "ORDER_INCREASED",
+      };
     }
-  );
 
-  const finalCoveredQty = coveredQty + addedQty;
+    // =====================================================
+    // NUEVA LÓGICA:
+    // Buscar disponibilidad real por moveId
+    // =====================================================
+    const availableResult = await availableLocationsForMoveId(
+      client,
+      moveId,
+      moveLines
+    );
 
-  await updateStockMoveReservedQtyAndState(client, moveId, finalCoveredQty);
+    console.log("📍 REAL AVAILABLE LINES:", availableResult.lines);
+    console.log("📍 Total real disponible:", availableResult.totalPotentialQty);
 
-  return {
-    reserved: 0,
-    createdQty: addedQty,
-    skipped: false,
-    case:
-      potentialResult.remainingQty > 0
-        ? "ORDER_INCREASED_PARTIAL"
-        : "ORDER_INCREASED",
-    missingQty: potentialResult.remainingQty,
-    message:
-      potentialResult.remainingQty > 0
-        ? "La orden aumentó. Se agregaron líneas parciales sin tocar qty_reserved."
-        : "La orden aumentó. Se agregaron líneas adicionales sin tocar qty_reserved.",
-  };
-}
-// 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
+    if (availableResult.lines.length === 0) {
+      await updateStockMoveReservedQtyAndState(client, moveId, coveredQty);
+
+      return {
+        reserved: 0,
+        createdQty: 0,
+        skipped: true,
+        case: "ORDER_INCREASED_NO_STOCK",
+        missingQty: diffQty,
+        message:
+          "La orden aumentó, pero no hay inventario disponible para reservar la diferencia.",
+      };
+    }
+
+    // =====================================================
+    // Elegir una ubicación si puede cubrir todo.
+    // Si no, acumular varias.
+    // =====================================================
+    const potentialResult = buildLinesToAddFromRealAvailableLines(
+      availableResult.lines,
+      diffQty
+    );
+
+    console.log("📍 POTENCIALES PARA AGREGAR:", potentialResult.lines);
+    console.log("📍 Cantidad seleccionada:", potentialResult.totalSelectedQty);
+    console.log("📍 Faltante:", potentialResult.remainingQty);
+
+    if (potentialResult.lines.length === 0) {
+      await updateStockMoveReservedQtyAndState(client, moveId, coveredQty);
+
+      return {
+        reserved: 0,
+        createdQty: 0,
+        skipped: true,
+        case: "ORDER_INCREASED_NO_STOCK",
+        missingQty: diffQty,
+        message:
+          "La orden aumentó, pero no hay inventario disponible para reservar la diferencia.",
+      };
+    }
+
+    // =====================================================
+    // Crear o aumentar stock_move_line
+    // SIN tocar inventory_by_location.qty_reserved
+    // =====================================================
+
+    const addedQty = await createOrIncreaseMoveLinesWithoutInventoryReservation(
+      client,
+      {
+        move,
+        stockMove,
+        potentialLines: potentialResult.lines,
+        openReservedLines,
+      }
+    );
+
+    const finalCoveredQty = coveredQty + addedQty;
+
+    await updateStockMoveReservedQtyAndState(client, moveId, finalCoveredQty);
+
+    return {
+      reserved: 0,
+      createdQty: addedQty,
+      skipped: false,
+      case:
+        potentialResult.remainingQty > 0
+          ? "ORDER_INCREASED_PARTIAL"
+          : "ORDER_INCREASED",
+      missingQty: potentialResult.remainingQty,
+      message:
+        potentialResult.remainingQty > 0
+          ? "La orden aumentó. Se agregaron líneas parciales sin tocar qty_reserved."
+          : "La orden aumentó. Se agregaron líneas adicionales sin tocar qty_reserved.",
+    };
+  }
+
+  console.log("*************************************************************");
+  // 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩
 
   // =====================================================
   // CASO 2: LA ORDEN QUEDÓ IGUAL
@@ -193,117 +235,117 @@ if (diffQty > 0) {
     console.log("🟠 CASO 3: La orden bajó");
     console.log("🟠 Cantidad a liberar:", qtyToRelease);
 
-    
 
 
 
 
-console.log("OPEN RESERVED LINES:", openReservedLines);
-console.log("requiredQty:", requiredQty);
-console.log("qtyToRelease:", qtyToRelease);
 
-const required = Math.max(
-  Number(requiredQty) - Number(processedQty),
-  0
-);
+    console.log("OPEN RESERVED LINES:", openReservedLines);
+    console.log("requiredQty:", requiredQty);
+    console.log("qtyToRelease:", qtyToRelease);
 
-// Ordenar de mayor a menor para intentar encontrar una sola línea primero
-const sortedLines = [...openReservedLines].sort(
-  (a, b) => Number(b.product_uom_qty) - Number(a.product_uom_qty)
-);
-
-let selectedLines = [];
-
-// ----------------------------------------------------
-// 1. Buscar una línea que cubra toda la cantidad
-// ----------------------------------------------------
-const singleLine = sortedLines.find(
-  line => Number(line.product_uom_qty) >= required
-);
-
-if (singleLine) {
-  selectedLines.push({
-    id: singleLine.id,
-    qty: required
-  });
-} else {
-
-  // ----------------------------------------------------
-  // 2. Acumular líneas hasta completar requiredQty
-  // ----------------------------------------------------
-  let accumulated = 0;
-
-  for (const line of sortedLines) {
-
-    if (accumulated >= required) break;
-
-    const available = Number(line.product_uom_qty);
-
-    const qtyForThisLine = Math.min(
-      available,
-      required - accumulated
+    const required = Math.max(
+      Number(requiredQty) - Number(processedQty),
+      0
     );
 
-    selectedLines.push({
-      id: line.id,
-      qty: qtyForThisLine
-    });
+    // Ordenar de mayor a menor para intentar encontrar una sola línea primero
+    const sortedLines = [...openReservedLines].sort(
+      (a, b) => Number(b.product_uom_qty) - Number(a.product_uom_qty)
+    );
 
-    accumulated += qtyForThisLine;
-  }
-}
+    let selectedLines = [];
 
-console.log("SELECTED LINES:", selectedLines);
+    // ----------------------------------------------------
+    // 1. Buscar una línea que cubra toda la cantidad
+    // ----------------------------------------------------
+    const singleLine = sortedLines.find(
+      line => Number(line.product_uom_qty) >= required
+    );
 
-// ----------------------------------------------------
-// 3. Actualizar líneas elegidas
-// ----------------------------------------------------
-for (const selected of selectedLines) {
-console.log("🟩🟩 SELECTED ID AND QTY", selected.id, selected.qty);
-  const result = await client.query(`
+    if (singleLine) {
+      selectedLines.push({
+        id: singleLine.id,
+        qty: required
+      });
+    } else {
+
+      // ----------------------------------------------------
+      // 2. Acumular líneas hasta completar requiredQty
+      // ----------------------------------------------------
+      let accumulated = 0;
+
+      for (const line of sortedLines) {
+
+        if (accumulated >= required) break;
+
+        const available = Number(line.product_uom_qty);
+
+        const qtyForThisLine = Math.min(
+          available,
+          required - accumulated
+        );
+
+        selectedLines.push({
+          id: line.id,
+          qty: qtyForThisLine
+        });
+
+        accumulated += qtyForThisLine;
+      }
+    }
+
+    console.log("SELECTED LINES:", selectedLines);
+
+    // ----------------------------------------------------
+    // 3. Actualizar líneas elegidas
+    // ----------------------------------------------------
+    for (const selected of selectedLines) {
+      console.log("🟩🟩 SELECTED ID AND QTY", selected.id, selected.qty);
+      const result = await client.query(`
     UPDATE stock_move_line
     SET product_uom_qty = $1
     WHERE id = $2
     RETURNING id, product_uom_qty
 `, [
-    selected.qty,
-    selected.id
-]);
+        selected.qty,
+        selected.id
+      ]);
 
-console.log("UPDATE RESULT:", result.rows);
-}
+      console.log("UPDATE RESULT:", result.rows);
+    }
 
-const verify = await client.query(`
+    const verify = await client.query(`
 SELECT id, product_uom_qty
 FROM stock_move_line
 WHERE move_id = $1
 ORDER BY id
 `, [moveId]);
 
-console.log("AFTER UPDATE:", verify.rows);
+    console.log("AFTER UPDATE:", verify.rows);
 
 
-// ----------------------------------------------------
-// 4. Cancelar líneas no elegidas
-// ----------------------------------------------------
-const selectedIds = selectedLines.map(l => l.id);
+    // ----------------------------------------------------
+    // 4. Cancelar líneas no elegidas
+    // ----------------------------------------------------
+    const selectedIds = selectedLines.map(l => l.id);
 
-const linesToCancel = openReservedLines.filter(
-    line => !selectedIds.includes(line.id)
-);
+    const linesToCancel = openReservedLines.filter(
+      line => !selectedIds.includes(line.id)
+    );
 
-console.log("LINES TO CANCEL:", linesToCancel);
+    console.log("LINES TO CANCEL:", linesToCancel);
 
-for (const line of linesToCancel) {
+    for (const line of linesToCancel) {
 
-    console.log("❌❌❌❌ LINEAS QUE SE VAN A CANCELAR: ", line);
-await client.query(`
+      console.log("❌❌❌❌ LINEAS QUE SE VAN A CANCELAR: ", line);
+      await client.query(`
     UPDATE stock_move_line
     SET
         state = 'cancel'
     WHERE id = $1
 `, [line.id]);
-}
+    }
 
 
 
@@ -323,6 +365,210 @@ await client.query(`
     };
   }
 }
+
+
+// Ejecutar dentro de la transacción del controller.
+// No modifica inventory_by_location.qty_reserved.
+export async function adjustProcessedMoveLinesByAvailability(
+  client,
+  { move, stockMove, processedLines }
+) {
+  const moveId = stockMove?.move_id;
+
+  if (!moveId) {
+    throw new Error("Debe enviar stockMove.move_id.");
+  }
+
+  if (!move.sku) {
+    throw new Error("Debe enviar move.sku.");
+  }
+
+  // Obtener la cantidad solicitada desde move.moves.
+  const requestedMove = move.moves?.find(
+    (item) => String(item.move_id) === String(moveId)
+  );
+
+  if (!requestedMove) {
+    throw new Error(
+      `No se encontró el movimiento ${moveId} en move.moves.`
+    );
+  }
+
+  const requiredQty = Number(requestedMove.product_qty);
+
+  if (!Number.isFinite(requiredQty) || requiredQty < 0) {
+    throw new Error("La cantidad solicitada es inválida.");
+  }
+
+  // Solo líneas del movimiento actual que ya tienen recogida.
+  const lines = processedLines
+    .filter(
+      (line) =>
+        String(line.move_id) === String(moveId) &&
+        line.state !== "cancel" &&
+        Number(line.qty_done || 0) > 0
+    )
+    .sort((a, b) =>
+      BigInt(a.id) < BigInt(b.id)
+        ? -1
+        : BigInt(a.id) > BigInt(b.id)
+          ? 1
+          : 0
+    );
+
+  const qtyDoneTotal = lines.reduce(
+    (sum, line) => sum + Number(line.qty_done),
+    0
+  );
+
+  if (qtyDoneTotal > requiredQty) {
+    throw new Error(
+      `El movimiento ${moveId} ya tiene ${qtyDoneTotal} recogidas, ` +
+      `pero solicita ${requiredQty}.`
+    );
+  }
+
+  // Apartar primero lo recogido de TODAS las líneas.
+  let remainingPending = requiredQty - qtyDoneTotal;
+
+  let processedQty = 0;
+  let changed = false;
+
+  // Evita contar dos veces la disponibilidad de una misma ubicación.
+  const stockByLocation = new Map();
+
+  for (const line of lines) {
+    if (
+      String(line.picking_id) !== String(move.picking_id) ||
+      String(line.product_id) !== String(move.product_id)
+    ) {
+      throw new Error(
+        `La línea ${line.id} no corresponde al picking/producto.`
+      );
+    }
+
+    const locationId = line.location_id;
+    const warehouseId = line.warehouse_id;
+    const locationKey = `${warehouseId}:${locationId}`;
+
+    if (!stockByLocation.has(locationKey)) {
+      const { rows } = await client.query(
+        `
+          SELECT qty_available
+          FROM inventory_by_location
+          WHERE product_sku = $1
+            AND location_id = $2
+            AND warehouse_id = $3
+          FOR UPDATE
+        `,
+        [move.sku, locationId, warehouseId]
+      );
+
+      if (rows.length > 1) {
+        throw new Error(
+          "Inventario duplicado para SKU, ubicación y almacén."
+        );
+      }
+
+      const available = rows.length
+        ? Number(rows[0].qty_available)
+        : 0;
+
+      if (!Number.isFinite(available)) {
+        throw new Error(
+          `Cantidad disponible inválida en la ubicación ${locationId}.`
+        );
+      }
+
+      stockByLocation.set(
+        locationKey,
+        Math.max(available, 0)
+      );
+    }
+
+    const qtyDone = Number(line.qty_done);
+    const available = stockByLocation.get(locationKey);
+
+    // No agregar cantidad a una línea finalizada.
+    const pendingQty = line.state === "done"
+      ? 0
+      : Math.min(available, remainingPending);
+
+    const finalQty = qtyDone + pendingQty;
+
+    if (Number(line.product_uom_qty) !== finalQty) {
+      if (line.state === "done") {
+        throw new Error(
+          `La línea ${line.id} está finalizada y requiere revisión.`
+        );
+      }
+
+      const updated = await client.query(
+        `
+          UPDATE stock_move_line
+          SET product_uom_qty = $1,
+              write_date = NOW()
+          WHERE id = $2
+            AND move_id = $3
+            AND COALESCE(state, '') NOT IN ('cancel', 'done')
+            AND qty_done = $4
+            AND product_uom_qty = $5
+          RETURNING id
+        `,
+        [
+          finalQty,
+          line.id,
+          moveId,
+          qtyDone,
+          line.product_uom_qty,
+        ]
+      );
+
+      if (updated.rows.length !== 1) {
+        throw new Error(
+          `La línea ${line.id} cambió mientras se ajustaba.`
+        );
+      }
+
+      // Mantener actualizados también los datos en memoria.
+      line.product_uom_qty = finalQty;
+      changed = true;
+    }
+
+    stockByLocation.set(
+      locationKey,
+      available - pendingQty
+    );
+
+    remainingPending -= pendingQty;
+    processedQty += finalQty;
+
+    console.log("📍 Línea tocada ajustada:", {
+      moveId,
+      lineId: line.id,
+      locationId,
+      warehouseId,
+      qtyDone,
+      available,
+      pendingQty,
+      finalQty,
+    });
+  }
+
+  console.log(
+    "📦 CANTIDAD FINAL ASIGNADA EN LÍNEAS TOCADAS:",
+    processedQty
+  );
+
+  return {
+    processedQty,
+    qtyDoneTotal,
+    missingQty: requiredQty - processedQty,
+    changed,
+  };
+}
+
+
 
 //🟩🟩 CASO 1: Servicio para buscar ubicaciones reales disponibles
 export async function availableLocationsForMoveId(
@@ -479,7 +725,7 @@ export async function availableLocationsForMoveId(
 }
 
 //🟩🟩 CASO 1: 2. Servicio para elegir líneas hasta cubrir diffQty
- export function buildLinesToAddFromRealAvailableLines(
+export function buildLinesToAddFromRealAvailableLines(
   realAvailableLines,
   diffQty
 ) {
@@ -734,7 +980,7 @@ async function releaseReservationFromInventory(client, stockMoveLine, qtyToRelea
   });
 
 
-  
+
 
   const product = await getProductSkuByProductId(
     client,
@@ -746,8 +992,8 @@ async function releaseReservationFromInventory(client, stockMoveLine, qtyToRelea
       `No se encontró SKU para product_id ${stockMoveLine.product_id}`
     );
   }
- console.log("🟨🟨🟨🟨🟨 location id: ", product.sku );
- console.log("🟨🟨🟨🟨🟨 product sku: ", stockMoveLine.location_id );
+  console.log("🟨🟨🟨🟨🟨 location id: ", product.sku);
+  console.log("🟨🟨🟨🟨🟨 product sku: ", stockMoveLine.location_id);
   const inventoryResult = await client.query(
     `
     SELECT id, qty_reserved
@@ -848,6 +1094,8 @@ async function createPotentialMoveLinesWithoutInventoryReservation(client, {
   return totalCreated;
 }
 
+
+//Esta función busca las líneas de picking de un movimiento y devuelve las que no están canceladas.
 async function getStockMoveLinesByMoveId(client, moveId) {
   const query = `
     SELECT *
@@ -883,6 +1131,15 @@ async function increaseExistingMoveLineWithoutLocations(client, {
    * 2. Si no existe, usar la location_id de cualquier línea existente.
    * 3. Si tampoco existe, usar la primera location sugerida.
    */
+
+  console.log("PRUEBA PRUEBA PRUEBA PRUEBA --------------------------------------------");
+  console.log("MOVE: ", move);
+  console.log("STOCKMOVE: ", stockMove);
+  console.log("Move lines: ", moveLines);
+  console.log("openReservedLines: ", openReservedLines);
+  console.log("diffqty: ", diffQty);
+
+  //Se elige la primera linea que no se ha tocado de stockmoveline
   const targetOpenLine = openReservedLines[0];
 
   const locationId =

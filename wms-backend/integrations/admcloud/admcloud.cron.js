@@ -161,13 +161,13 @@ let isSyncRunning = false;
 export function startAdmCloudCron() {
 
   console.log(
-    "⏰ Adm Cloud cron iniciado - cada 15 segundos"
+    "⏰ Adm Cloud cron iniciado - cada 2 min"
   );
 
 
   cron.schedule(
-    "*/30 * * * * *",
-    async () => {
+  "*/2 * * * *",
+  async () => {
 
       // ======================================================
       // EVITAR DOS SYNC AL MISMO TIEMPO

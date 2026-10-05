@@ -221,7 +221,7 @@ export async function processBatch(
     }
 
 
-    console.log(
+    /*console.log(
       `🟢 Nuevos: ${toInsert.length}`
     );
 
@@ -235,7 +235,7 @@ export async function processBatch(
         toInsert.length -
         toUpdate.length
       }`
-    );
+    );*/
 
 
     // ==================================================

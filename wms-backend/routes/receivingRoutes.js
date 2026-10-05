@@ -1,5 +1,6 @@
 import express from "express";
-import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId, savingReception, getReceivingDifferences, gettingReceptionLocation, CloseReception } from "../controllers/receivingController.js"
+import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId, savingReception, getReceivingDifferences, gettingReceptionLocation, CloseReception, getRecentCompletedReceipts,
+  searchPurchaseOrdersWithReceipts, getPurchaseOrderFullDetails } from "../controllers/receivingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
@@ -29,6 +30,28 @@ router.get(
 // Search all the reception information for reception
 router.get(
   "/locations", authMiddleware, gettingReceptionLocation
+);
+
+
+//Last 10 receptions done
+router.get(
+  "/recent-completed-receipts", authMiddleware,
+  getRecentCompletedReceipts
+);
+
+
+//Search a specific reception completed
+router.get(
+  "/search-purchase-orders/:id", authMiddleware,
+  searchPurchaseOrdersWithReceipts
+);
+
+
+//Obtaining reception details from PO
+router.get(
+  "/purchase-order-details/:id",
+  authMiddleware,
+  getPurchaseOrderFullDetails
 );
 
 // Search all the data related to an purschase order.

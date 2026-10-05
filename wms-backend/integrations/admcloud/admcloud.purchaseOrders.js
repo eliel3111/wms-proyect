@@ -338,39 +338,97 @@ function resolveAdmCloudPurchaseOrderStatus({
   existingWmsStatus
 }) {
 
-  // ----------------------------------------------------------
-  // VOID EN ADM CLOUD
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 1. ANULADA EN ADM CLOUD
+  // ==========================================================
 
-  if (order.Void === true) {
+  if (
+    order.Void === true
+  ) {
+
     return "cancelled";
+
   }
 
 
-  // ----------------------------------------------------------
-  // SI YA HUBO RECEPCIÓN PARCIAL EN WMS
-  // NO PERDER ESE ESTADO
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 2. ESTADO DE PROCESAMIENTO ADM CLOUD
+  //
+  // Ejemplo:
+  //
+  // Status: 2
+  // StatusDesc: "Recibida"
+  //
+  // Si ADM dice RECIBIDA,
+  // la Purchase Order queda CLOSED en WMS.
+  // ==========================================================
+
+  const admStatus =
+    String(
+      order.StatusDesc ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+ /* console.log(
+    "📦 ADM Status:",
+    order.Status
+  );
+
+  console.log(
+    "📦 ADM StatusDesc:",
+    order.StatusDesc
+  );*/
+
+
+  if (
+    admStatus ===
+    "recibida"
+  ) {
+
+    return "closed";
+
+  }
+
+
+  // ==========================================================
+  // 3. SI WMS YA ESTÁ CLOSED
+  // NO VOLVERLA OPEN
+  // ==========================================================
+
+  if (
+    existingWmsStatus ===
+    "closed"
+  ) {
+
+    return "closed";
+
+  }
+
+
+  // ==========================================================
+  // 4. SI YA TIENE RECEPCIÓN PARCIAL
+  // ==========================================================
 
   if (
     existingWmsStatus ===
     "partial"
   ) {
+
     return "partial";
+
   }
 
 
-  // ----------------------------------------------------------
-  // Por ahora el listado de Adm Cloud no nos está dando
-  // un estado claro de "received/closed".
-  //
-  // AuthorizationStatusDesc = "Pendiente"
-  // es estado de AUTORIZACIÓN, no de recepción.
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 5. DEFAULT
+  // ==========================================================
 
   return "open";
-}
 
+}
 
 
 // ============================================================
@@ -450,14 +508,14 @@ export async function syncAdmCloudPurchaseOrder(
     return null;
   }
 
-
+/*
   console.log("");
   console.log("🟦 ========================================");
   console.log("🟦 SINCRONIZANDO PURCHASE ORDER");
   console.log("🆔 Adm Cloud ID:", erpId);
   console.log("📄 DocID:", order.DocID);
   console.log("🟦 ========================================");
-
+*/
 
   // ==========================================================
   // BUSCAR / BLOQUEAR EXISTENTE
@@ -570,7 +628,7 @@ export async function syncAdmCloudPurchaseOrder(
     total;
 
 
-  console.log(
+ /* console.log(
     "📄 Número:",
     purchaseOrderNumber
   );
@@ -610,7 +668,7 @@ export async function syncAdmCloudPurchaseOrder(
     "💰 Total:",
     total
   );
-
+*/
 
   // ==========================================================
   // UPDATE
@@ -677,10 +735,10 @@ export async function syncAdmCloudPurchaseOrder(
       );
 
 
-    console.log(
+    /*console.log(
       "🔄 Orden actualizada:",
       updateResult.rows[0]
-    );
+    );*/
 
 
     return {

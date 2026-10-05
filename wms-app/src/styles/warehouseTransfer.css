@@ -367,7 +367,7 @@ AREA DE ALMACEN COMPRIMIDO*/
 /* GRID */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
@@ -380,6 +380,7 @@ AREA DE ALMACEN COMPRIMIDO*/
   cursor: pointer;
   transition: 0.25s;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  
 }
 
 .card:hover {

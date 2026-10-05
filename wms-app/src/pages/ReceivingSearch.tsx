@@ -6,6 +6,7 @@ import { openReceptionDB } from "../services/indexeddb.ts";
 import TextInput from "../components/TextInput.tsx";
 import MultiSelectInput from "../components/MultiSelectInput.tsx";
 import apiClient from "../services/apiClient.ts";
+import ReceivingOrdersTable from "../components/ReceivingOrdersTable.tsx";
 
 export default function ReceivingSearch() {
 
@@ -237,6 +238,19 @@ export default function ReceivingSearch() {
 
         </div>
       </div>
+
+
+ {/* =========================================
+        ÚLTIMAS ÓRDENES CON RECEPCIÓN
+        SOLO DESKTOP
+    ========================================= */}
+
+      <div className="receiving-orders-desktop-section">
+
+        <ReceivingOrdersTable />
+
+      </div>
+
     </div>
   );
 }

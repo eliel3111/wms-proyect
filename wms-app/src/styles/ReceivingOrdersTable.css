@@ -1,0 +1,761 @@
+/* =========================================================
+   RECEIVING ORDERS TABLE
+========================================================= */
+
+
+/* =========================================================
+   MAIN CONTAINER
+========================================================= */
+
+.receiving-orders-container {
+  width: 100%;
+  height: auto;
+
+  display: flex;
+  flex-direction: column;
+
+  box-sizing: border-box;
+
+  background-color: #ffffff;
+
+  border-radius: 12px;
+
+  overflow: hidden;
+
+  border: 1px solid rgba(215, 222, 231, 0.7);
+
+  box-shadow:
+    0 4px 16px rgba(31, 45, 61, 0.05);
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.receiving-orders-header {
+  width: 100%;
+  height: auto;
+
+  min-height: 78px;
+
+  display: flex;
+  align-items: center;
+
+  box-sizing: border-box;
+
+  padding: 14px 18px;
+
+  background-color: #ffffff;
+}
+
+
+/* =========================================================
+   TITLE SIDE - 70%
+========================================================= */
+
+.receiving-orders-container-title {
+  width: 70%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   TITLE ICON
+========================================================= */
+
+.receiving-orders-title-icon {
+  width: 46px;
+  height: 46px;
+
+  flex: 0 0 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(
+      135deg,
+      #edf6ff 0%,
+      #e1efff 100%
+    );
+
+  color: #1e88e5;
+}
+
+
+.receiving-orders-title-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+
+/* =========================================================
+   TITLE CONTENT
+========================================================= */
+
+.receiving-orders-title-content {
+  min-width: 0;
+
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  justify-content: center;
+
+  gap: 3px;
+}
+
+
+/* =========================================================
+   MAIN TITLE
+========================================================= */
+
+.receiving-orders-title {
+  width: 100%;
+
+  color: #1f2d3d;
+
+  font-size: 17px;
+  font-weight: 700;
+
+  line-height: 1.25;
+
+  letter-spacing: -0.15px;
+}
+
+
+/* =========================================================
+   SUBTITLE
+========================================================= */
+
+.receiving-orders-subtitle {
+  width: 100%;
+
+  color: #6b7a90;
+
+  font-size: 13px;
+  font-weight: 400;
+
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   SEARCH SIDE - 30%
+========================================================= */
+
+.receiving-orders-search-box {
+  width: 30%;
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   SEARCH INPUT WRAPPER
+========================================================= */
+
+.receiving-orders-search-input-container {
+  width: 100%;
+  max-width: 310px;
+  height: 40px;
+
+  position: relative;
+
+  display: flex;
+  align-items: center;
+}
+
+
+/* =========================================================
+   SEARCH ICON
+========================================================= */
+
+.receiving-orders-search-icon {
+  position: absolute;
+
+  left: 13px;
+
+  color: #7e8da3;
+
+  pointer-events: none;
+
+  z-index: 2;
+}
+
+
+/* =========================================================
+   SEARCH INPUT
+========================================================= */
+
+.receiving-orders-search-input {
+  width: 100%;
+  height: 100%;
+
+  padding:
+    0
+    14px
+    0
+    42px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #cad4e1;
+  border-radius: 6px;
+
+  outline: none;
+
+  background-color: #ffffff;
+
+  color: #1f2d3d;
+
+  font-size: 13px;
+  font-weight: 400;
+
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+
+.receiving-orders-search-input::placeholder {
+  color: #7e8da3;
+
+  opacity: 1;
+}
+
+
+.receiving-orders-search-input:hover {
+  border-color: #aebdce;
+}
+
+
+.receiving-orders-search-input:focus {
+  border-color: #1e88e5;
+
+  box-shadow:
+    0 0 0 2px rgba(30, 136, 229, 0.09);
+}
+
+
+/* =========================================================
+   TABLE CONTAINER
+========================================================= */
+
+.receiving-orders-table-container {
+  width: calc(100% - 32px);
+  height: auto;
+
+  margin:
+    0
+    16px
+    16px;
+
+  box-sizing: border-box;
+
+  overflow-x: auto;
+
+  border: 1px solid #d9e1ea;
+  border-radius: 6px;
+
+  background-color: #ffffff;
+}
+
+
+/* =========================================================
+   TABLE
+========================================================= */
+
+.receiving-orders-table {
+  width: 100%;
+
+  min-width: 950px;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  table-layout: fixed;
+
+  background-color: #ffffff;
+
+  color: #2c3e50;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   COLUMN WIDTHS
+========================================================= */
+
+.receiving-orders-table th:nth-child(1),
+.receiving-orders-table td:nth-child(1) {
+  width: 11%;
+}
+
+
+.receiving-orders-table th:nth-child(2),
+.receiving-orders-table td:nth-child(2) {
+  width: 13%;
+}
+
+
+.receiving-orders-table th:nth-child(3),
+.receiving-orders-table td:nth-child(3) {
+  width: 27%;
+}
+
+
+.receiving-orders-table th:nth-child(4),
+.receiving-orders-table td:nth-child(4) {
+  width: 21%;
+}
+
+
+.receiving-orders-table th:nth-child(5),
+.receiving-orders-table td:nth-child(5) {
+  width: 17%;
+}
+
+
+.receiving-orders-table th:nth-child(6),
+.receiving-orders-table td:nth-child(6) {
+  width: 11%;
+}
+
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
+
+.receiving-orders-table thead {
+  background:
+    linear-gradient(
+      180deg,
+      #f7f9fc 0%,
+      #edf2f7 100%
+    );
+}
+
+
+.receiving-orders-table th {
+  height: 36px;
+
+  padding: 0 12px;
+
+  box-sizing: border-box;
+
+  border-bottom: 1px solid #d7e0e9;
+
+  color: #29384d;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-align: left;
+
+  vertical-align: middle;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   TABLE BODY
+========================================================= */
+
+.receiving-orders-table td {
+  height: 34px;
+
+  padding: 0 12px;
+
+  box-sizing: border-box;
+
+  border-bottom: 1px solid #e2e8ef;
+  border-right: 1px solid #edf1f5;
+
+  color: #314158;
+
+  font-size: 12px;
+  font-weight: 400;
+
+  vertical-align: middle;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.receiving-orders-table td:last-child {
+  border-right: none;
+}
+
+
+.receiving-orders-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+
+/* =========================================================
+   ROW
+========================================================= */
+
+.receiving-orders-table tbody tr {
+  background-color: #ffffff;
+
+  transition:
+    background-color 0.15s ease;
+}
+
+
+.receiving-orders-table tbody tr:hover {
+  background-color: #f7faff;
+}
+
+
+/* =========================================================
+   ERP ID
+========================================================= */
+
+.receiving-orders-table td:nth-child(1) {
+  color: #314158;
+
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   PURCHASE ORDER NUMBER
+========================================================= */
+
+.receiving-orders-table td:nth-child(2) {
+  color: #1976d2;
+
+  font-weight: 500;
+
+  cursor: pointer;
+}
+
+
+.receiving-orders-table td:nth-child(2):hover {
+  color: #1565c0;
+
+  text-decoration: underline;
+}
+
+
+/* =========================================================
+   SUPPLIER
+========================================================= */
+
+.receiving-orders-table td:nth-child(3) {
+  color: #2c3e50;
+}
+
+
+/* =========================================================
+   RECEIPT COUNT
+========================================================= */
+
+.receiving-orders-table td:nth-child(4) {
+  color: #314158;
+
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   LAST RECEIPT DATE
+========================================================= */
+
+.receiving-orders-table td:nth-child(5) {
+  color: #314158;
+
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   STATUS BASE
+========================================================= */
+
+.receiving-orders-status {
+  min-width: 76px;
+
+  width: fit-content;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4px 10px;
+
+  box-sizing: border-box;
+
+  border-radius: 6px;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  line-height: 1.2;
+
+  text-transform: capitalize;
+}
+
+
+/* =========================================================
+   STATUS - OPEN
+========================================================= */
+
+.receiving-orders-status-open {
+  background-color: #d9f7e4;
+
+  color: #118348;
+}
+
+
+/* =========================================================
+   STATUS - ACTIVE
+========================================================= */
+
+.receiving-orders-status-active {
+  background-color: #d9f7e4;
+
+  color: #118348;
+}
+
+
+/* =========================================================
+   STATUS - PARTIAL
+========================================================= */
+
+.receiving-orders-status-partial {
+  background-color: #fff1d6;
+
+  color: #b36b00;
+}
+
+
+/* =========================================================
+   STATUS - COMPLETED
+========================================================= */
+
+.receiving-orders-status-completed {
+  background-color: #dff5e8;
+
+  color: #0f8047;
+}
+
+
+/* =========================================================
+   STATUS - DONE
+========================================================= */
+
+.receiving-orders-status-done {
+  background-color: #dff5e8;
+
+  color: #0f8047;
+}
+
+
+/* =========================================================
+   STATUS - DRAFT
+========================================================= */
+
+.receiving-orders-status-draft {
+  background-color: #edf1f5;
+
+  color: #64748b;
+}
+
+
+/* =========================================================
+   STATUS - CANCELLED
+========================================================= */
+
+.receiving-orders-status-cancelled,
+.receiving-orders-status-canceled {
+  background-color: #fde5e5;
+
+  color: #c0392b;
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+.receiving-orders-loading {
+  width: 100%;
+  min-height: 180px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  color: #6b7a90;
+
+  font-size: 14px;
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.receiving-orders-empty {
+  width: 100%;
+  min-height: 180px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  color: #8390a6;
+
+  font-size: 14px;
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+.receiving-orders-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+
+.receiving-orders-table-container::-webkit-scrollbar-track {
+  background-color: #f2f5f8;
+}
+
+
+.receiving-orders-table-container::-webkit-scrollbar-thumb {
+  background-color: #c1ccd8;
+
+  border-radius: 999px;
+}
+
+
+.receiving-orders-table-container::-webkit-scrollbar-thumb:hover {
+  background-color: #aab8c7;
+}
+
+
+/* =========================================================
+   SMALL DESKTOP / TABLET
+========================================================= */
+
+@media (max-width: 1100px) {
+
+  .receiving-orders-header {
+    padding: 14px;
+  }
+
+
+  .receiving-orders-container-title {
+    width: 65%;
+  }
+
+
+  .receiving-orders-search-box {
+    width: 35%;
+  }
+
+
+  .receiving-orders-title {
+    font-size: 16px;
+  }
+
+
+  .receiving-orders-subtitle {
+    font-size: 12px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   EL PARENT YA LO OCULTA, PERO LO DEJAMOS PROTEGIDO
+========================================================= */
+
+@media (max-width: 768px) {
+
+  .receiving-orders-container {
+    display: none;
+  }
+
+}
+
+
+.receiving-orders-po-link {
+  appearance: none;
+
+  border: none;
+
+  padding: 0;
+
+  background: transparent;
+
+  color: #1976d2;
+
+  font: inherit;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  text-align: left;
+
+  transition:
+    color 0.18s ease,
+    text-decoration-color 0.18s ease;
+}
+
+
+.receiving-orders-po-link:hover {
+  color: #0d5fb8;
+
+  text-decoration: underline;
+}
+
+
+.receiving-orders-po-link:active {
+  color: #0a4d96;
+}
+
+
+.receiving-orders-po-link:focus-visible {
+  outline: 2px solid rgba(30, 136, 229, 0.35);
+
+  outline-offset: 3px;
+
+  border-radius: 3px;
+}

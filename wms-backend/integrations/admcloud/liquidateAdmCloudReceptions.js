@@ -329,7 +329,7 @@ async function restoreAdmCloudReception({
 // LIQUIDAR RECEPCIONES ADM CLOUD
 // ============================================================
 
-export async function liquidateAdmCloudReceptions({
+export async function liquidateAdmCloudReceptions2({
 
     client,
 
@@ -1128,7 +1128,7 @@ pol.erp_price,
 
                             Cost:
                                 Number(
-                                    line.erp_cost ??
+                                    line.erp_price ??
                                     0
                                 ),
 
@@ -1941,4 +1941,1759 @@ if (
         );
 
     }
+}
+
+
+// ============================================================
+// LIQUIDAR RECEPCIÓN EN ADM CLOUD
+//
+// NUEVA ARQUITECTURA:
+//
+// 1 RECEIPT WMS
+//      =
+// 1 RECEPTION ADM CLOUD
+//
+// El receipt puede contener varias Purchase Orders.
+//
+// Cada Item indica:
+//
+// SourceTransactionID
+//      = GUID de la Purchase Order en ADM
+//
+// SourceRowID
+//      = GUID de la Purchase Order Line en ADM
+//
+// Quantity
+//      = cantidad recibida solamente en ESTE receipt.
+//
+// NO acumulamos cantidades históricas.
+//
+// NO hacemos UPDATE.
+//
+// Cada receipt crea siempre una nueva Reception ADM.
+// ============================================================
+
+export async function liquidateAdmCloudReceptions({
+
+    client,
+
+    purchaseOrderIds,
+
+    receiptId
+
+}) {
+
+
+    // ==========================================================
+    // RECEPCIONES ADM CREADAS EN ESTA EJECUCIÓN
+    //
+    // Normalmente habrá máximo UNA.
+    //
+    // Si algo falla después del CREATE,
+    // se elimina de ADM Cloud.
+    // ==========================================================
+
+    const ReceptionCreatedJustNow =
+        [];
+
+
+    // ==========================================================
+    // MAPPINGS QUE GUARDAREMOS EN adm_receptions
+    //
+    // Ejemplo:
+    //
+    // PO 4 → Receipt 30 → ADM XYZ
+    // PO 7 → Receipt 30 → ADM XYZ
+    // PO 9 → Receipt 30 → ADM XYZ
+    //
+    // El adm_reception_id será EL MISMO.
+    // ==========================================================
+
+    const receptionsToSave =
+        [];
+
+
+    try {
+
+        console.log("");
+        console.log(
+            "============================================="
+        );
+
+        console.log(
+            "🚚 INICIANDO LIQUIDACIÓN ADM CLOUD"
+        );
+
+        console.log(
+            "============================================="
+        );
+
+
+        // ========================================================
+        // 1. VALIDAR CLIENT
+        // ========================================================
+
+        if (
+            !client
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Error de liquidación",
+
+                "DATABASE_CLIENT_REQUIRED",
+
+                "El cliente de base de datos es requerido."
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 2. NORMALIZAR Y VALIDAR PURCHASE ORDER IDS
+        // ========================================================
+
+        const normalizedPurchaseOrderIds =
+            Array.isArray(
+                purchaseOrderIds
+            )
+                ? [
+                    ...new Set(
+
+                        purchaseOrderIds
+
+                            .map(
+                                id =>
+                                    Number(
+                                        id
+                                    )
+                            )
+
+                            .filter(
+                                id =>
+                                    Number.isInteger(
+                                        id
+                                    ) &&
+                                    id > 0
+                            )
+
+                    )
+                ]
+                : [];
+
+
+        if (
+            normalizedPurchaseOrderIds.length ===
+            0
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Orden de compra requerida",
+
+                "PURCHASE_ORDER_REQUIRED",
+
+                "No hay órdenes de compra para procesar."
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 3. NORMALIZAR Y VALIDAR RECEIPT ID
+        // ========================================================
+
+        const normalizedReceiptId =
+            Number(
+                receiptId
+            );
+
+
+        if (
+            !Number.isInteger(
+                normalizedReceiptId
+            ) ||
+            normalizedReceiptId <= 0
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Recepción requerida",
+
+                "RECEIPT_REQUIRED",
+
+                "receiptId es requerido."
+
+            );
+
+        }
+
+
+        console.log(
+            "🧾 Receipt ID:",
+            normalizedReceiptId
+        );
+
+
+        console.log(
+            "📋 Purchase Order IDs:",
+            normalizedPurchaseOrderIds
+        );
+
+
+        // ========================================================
+        // 4. BUSCAR RECEIPT
+        // ========================================================
+
+        const receiptResult =
+            await client.query(
+                `
+                SELECT
+                    id,
+                    receipt_code,
+                    status,
+                    finished_at
+
+                FROM receipts
+
+                WHERE
+                    id = $1
+
+                LIMIT 1
+                `,
+                [
+                    normalizedReceiptId
+                ]
+            );
+
+
+        // ========================================================
+        // 5. VALIDAR QUE EL RECEIPT EXISTA
+        // ========================================================
+
+        if (
+            receiptResult.rowCount ===
+            0
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Recepción no encontrada",
+
+                "RECEIPT_NOT_FOUND",
+
+                `No existe el receipt ${normalizedReceiptId}.`
+
+            );
+
+        }
+
+
+        const receipt =
+            receiptResult.rows[0];
+
+
+        console.log("");
+        console.log(
+            "🧾 RECEIPT:"
+        );
+
+        console.log(
+            receipt
+        );
+
+
+        // ========================================================
+        // 6. VALIDAR RECEIPT COMPLETED
+        //
+        // IMPORTANTE:
+        //
+        // Sigue dentro de la transacción de CloseReception.
+        //
+        // Si posteriormente falla ADM:
+        //
+        // CloseReception hará ROLLBACK.
+        // ========================================================
+
+        const receiptStatus =
+            String(
+                receipt.status ||
+                ""
+            )
+                .trim()
+                .toLowerCase();
+
+
+        if (
+            receiptStatus !==
+            "completed"
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Recepción no completada",
+
+                "RECEIPT_NOT_COMPLETED",
+
+                `El receipt ${normalizedReceiptId} todavía no está completed.`
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 7. VALIDAR RECEIPT CODE
+        // ========================================================
+
+        if (
+            !receipt.receipt_code
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Código faltante",
+
+                "RECEIPT_CODE_REQUIRED",
+
+                "El receipt no tiene receipt_code."
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 8. FECHA DEL DOCUMENTO ADM
+        // ========================================================
+
+        const docDate =
+            receipt.finished_at
+
+                ? new Date(
+                    receipt.finished_at
+                )
+                    .toISOString()
+                    .slice(
+                        0,
+                        10
+                    )
+
+                : new Date()
+                    .toISOString()
+                    .slice(
+                        0,
+                        10
+                    );
+
+
+        console.log(
+            "📅 ADM DocDate:",
+            docDate
+        );
+
+
+        // ========================================================
+        // 9. ITEMS GLOBALES
+        //
+        // TODAS LAS POs VAN A ALIMENTAR ESTE MISMO ARRAY.
+        //
+        // AL FINAL:
+        //
+        // UNA SOLA RECEPTION ADM
+        // CONTENDRÁ TODOS LOS ITEMS.
+        // ========================================================
+
+        const items =
+            [];
+
+
+        // ========================================================
+        // POs QUE REALMENTE FUERON PROCESADAS
+        // ========================================================
+
+        const processedPurchaseOrders =
+            [];
+
+
+        // ========================================================
+        // 10. PO QUE SE USARÁ PARA EL HEADER ADM
+        //
+        // Regla del WMS:
+        //
+        // Tomamos RelationshipID y LocationID
+        // de la PO que tenga MÁS ITEMS recibidos
+        // dentro de este receipt.
+        //
+        // Ejemplo:
+        //
+        // PO 4 → 3 items
+        // PO 7 → 8 items
+        // PO 9 → 2 items
+        //
+        // Header:
+        //
+        // RelationshipID → PO 7
+        // LocationID     → PO 7
+        // ========================================================
+
+        let headerSourcePurchaseOrder =
+            null;
+
+
+        let largestPurchaseOrderItemCount =
+            -1;
+
+
+        // ========================================================
+        // 11. PROCESAR TODAS LAS PURCHASE ORDERS
+        //
+        // IMPORTANTE:
+        //
+        // AQUÍ NO CREAMOS RECEPCIONES ADM.
+        //
+        // Solamente:
+        //
+        // - buscamos PO
+        // - buscamos líneas de ESTE receipt
+        // - construimos Items
+        //
+        // El CREATE ADM ocurre DESPUÉS del for.
+        // ========================================================
+
+        for (
+            const purchaseOrderId
+            of normalizedPurchaseOrderIds
+        ) {
+
+            console.log("");
+            console.log(
+                "============================================="
+            );
+
+            console.log(
+                `📦 PROCESANDO PO ID: ${purchaseOrderId}`
+            );
+
+            console.log(
+                "============================================="
+            );
+
+
+            // ====================================================
+            // 12. BUSCAR PURCHASE ORDER
+            //
+            // erp_order_id
+            //      =
+            // SourceTransactionID
+            //
+            // erp_provider_id
+            //      =
+            // candidato para RelationshipID
+            //
+            // erp_warehouse_id
+            //      =
+            // candidato para LocationID
+            // ====================================================
+
+            const poResult =
+                await client.query(
+                    `
+                    SELECT
+                        id,
+                        purchase_order_number,
+                        supplier_name,
+
+                        erp_order_id,
+                        erp_provider_id,
+                        erp_warehouse_id
+
+                    FROM purchase_orders
+
+                    WHERE
+                        id = $1
+
+                    LIMIT 1
+                    `,
+                    [
+                        purchaseOrderId
+                    ]
+                );
+
+
+            // ====================================================
+            // 13. VALIDAR PO
+            // ====================================================
+
+            if (
+                poResult.rowCount ===
+                0
+            ) {
+
+                throw new AdmLiquidationError(
+
+                    "Orden de compra no encontrada",
+
+                    "PURCHASE_ORDER_NOT_FOUND",
+
+                    `No existe la orden ${purchaseOrderId}.`
+
+                );
+
+            }
+
+
+            const purchaseOrder =
+                poResult.rows[0];
+
+
+            // ====================================================
+            // 14. VALIDAR ID DE PO EN ADM
+            //
+            // Este será SourceTransactionID.
+            // ====================================================
+
+            if (
+                !purchaseOrder.erp_order_id
+            ) {
+
+                throw new AdmLiquidationError(
+
+                    "Orden ADM no configurada",
+
+                    "ERP_ORDER_ID_REQUIRED",
+
+                    `La orden ${
+                        purchaseOrder.purchase_order_number ||
+                        purchaseOrderId
+                    } no tiene erp_order_id.`
+
+                );
+
+            }
+
+
+            // ====================================================
+            // 15. VALIDAR PROVEEDOR ADM
+            // ====================================================
+
+            if (
+                !purchaseOrder.erp_provider_id
+            ) {
+
+                throw new AdmLiquidationError(
+
+                    "Proveedor ADM no configurado",
+
+                    "ERP_PROVIDER_ID_REQUIRED",
+
+                    `La orden ${
+                        purchaseOrder.purchase_order_number ||
+                        purchaseOrderId
+                    } no tiene erp_provider_id configurado.`
+
+                );
+
+            }
+
+
+            // ====================================================
+            // 16. VALIDAR ALMACÉN ADM
+            // ====================================================
+
+            if (
+                !purchaseOrder.erp_warehouse_id
+            ) {
+
+                throw new AdmLiquidationError(
+
+                    "Almacén ADM no configurado",
+
+                    "ERP_WAREHOUSE_ID_REQUIRED",
+
+                    `La orden ${
+                        purchaseOrder.purchase_order_number ||
+                        purchaseOrderId
+                    } no tiene erp_warehouse_id configurado.`
+
+                );
+
+            }
+
+
+            // ====================================================
+            // 17. BUSCAR SOLAMENTE LAS LÍNEAS DE:
+            //
+            // - ESTA PO
+            // - ESTE RECEIPT
+            //
+            // YA NO:
+            //
+            // SUMAMOS HISTÓRICO.
+            //
+            // YA NO:
+            //
+            // BUSCAMOS TODOS LOS RECEIPTS COMPLETED.
+            //
+            // received_qty aquí es exactamente
+            // lo recibido en ESTE receipt.
+            // ====================================================
+
+            const linesResult =
+                await client.query(
+                    `
+                    SELECT
+
+                        rl.id
+                            AS receipt_line_id,
+
+                        rl.received_qty,
+
+
+                        pol.id
+                            AS purchase_order_line_id,
+
+                        pol.purchase_order_id,
+
+                        pol.sku,
+
+                        pol.description,
+
+
+                        -- ========================================
+                        -- IDS ADM
+                        -- ========================================
+
+                        pol.erp_line_id,
+
+                        pol.erp_product_id,
+
+
+                        -- ========================================
+                        -- CAMPOS DEL ITEM ADM
+                        -- ========================================
+
+                        pol.erp_cost,
+
+                        pol.erp_price,
+
+                        pol.erp_uom_id,
+
+                        pol.erp_row_type,
+
+                        pol.erp_estimated_delivery_date,
+
+                        pol.erp_exchange_rate,
+
+                        pol.erp_warranty_days,
+
+                        pol.erp_warranty_units
+
+
+                    FROM receipt_lines rl
+
+
+                    INNER JOIN purchase_order_lines pol
+
+                        ON pol.id =
+                           rl.purchase_order_line_id
+
+
+                    WHERE
+
+                        rl.receipt_id =
+                            $1
+
+                        AND
+
+                        pol.purchase_order_id =
+                            $2
+
+                        AND
+
+                        COALESCE(
+                            pol.deleted_erp,
+                            FALSE
+                        ) =
+                            FALSE
+
+
+                    ORDER BY
+                        pol.id
+                    `,
+                    [
+                        normalizedReceiptId,
+                        purchaseOrderId
+                    ]
+                );
+
+
+            // ====================================================
+            // 18. VALIDAR QUE LA PO TENGA LÍNEAS EN ESTE RECEIPT
+            // ====================================================
+
+            if (
+                linesResult.rowCount ===
+                0
+            ) {
+
+                throw new AdmLiquidationError(
+
+                    "Orden sin productos recibidos",
+
+                    "PURCHASE_ORDER_RECEIPT_LINES_NOT_FOUND",
+
+                    `La orden ${
+                        purchaseOrder.purchase_order_number ||
+                        purchaseOrderId
+                    } no tiene líneas en el receipt ${normalizedReceiptId}.`
+
+                );
+
+            }
+
+
+            // ====================================================
+            // 19. SOLO CANTIDADES POSITIVAS
+            // ====================================================
+
+            const receivedLines =
+                linesResult.rows.filter(
+                    line => {
+
+                        const quantity =
+                            Number(
+                                line.received_qty
+                            );
+
+
+                        return (
+                            Number.isFinite(
+                                quantity
+                            ) &&
+                            quantity > 0
+                        );
+
+                    }
+                );
+
+
+            if (
+                receivedLines.length ===
+                0
+            ) {
+
+                throw new AdmLiquidationError(
+
+                    "No hay productos recibidos",
+
+                    "NO_RECEIVED_PRODUCTS_FOR_PURCHASE_ORDER",
+
+                    `La orden ${
+                        purchaseOrder.purchase_order_number ||
+                        purchaseOrderId
+                    } no tiene cantidades positivas en el receipt ${normalizedReceiptId}.`
+
+                );
+
+            }
+
+
+            console.log("");
+            console.log(
+                "📊 PRODUCTOS DE ESTA PO EN ESTE RECEIPT:"
+            );
+
+
+            console.table(
+                receivedLines.map(
+                    line => ({
+
+                        purchase_order_line_id:
+                            line.purchase_order_line_id,
+
+                        sku:
+                            line.sku,
+
+                        received_qty:
+                            Number(
+                                line.received_qty
+                            ),
+
+                        erp_order_id:
+                            purchaseOrder.erp_order_id,
+
+                        erp_line_id:
+                            line.erp_line_id
+
+                    })
+                )
+            );
+
+
+            // ====================================================
+            // 20. DETERMINAR SI ESTA PO SERÁ LA PO PRINCIPAL
+            // PARA EL HEADER
+            //
+            // "MÁS GRANDE"
+            // =
+            // mayor cantidad de líneas/items recibidos.
+            //
+            // Si hay empate:
+            // gana la primera encontrada.
+            // ====================================================
+
+            const purchaseOrderItemCount =
+                receivedLines.length;
+
+
+            if (
+                purchaseOrderItemCount >
+                largestPurchaseOrderItemCount
+            ) {
+
+                largestPurchaseOrderItemCount =
+                    purchaseOrderItemCount;
+
+
+                headerSourcePurchaseOrder =
+                {
+
+                    purchaseOrderId:
+                        Number(
+                            purchaseOrder.id
+                        ),
+
+                    purchaseOrderNumber:
+                        purchaseOrder.purchase_order_number,
+
+                    supplierName:
+                        purchaseOrder.supplier_name,
+
+                    RelationshipID:
+                        purchaseOrder.erp_provider_id,
+
+                    LocationID:
+                        purchaseOrder.erp_warehouse_id,
+
+                    itemCount:
+                        purchaseOrderItemCount
+
+                };
+
+            }
+
+
+            // ====================================================
+            // 21. CONSTRUIR ITEMS DE ESTA PO
+            //
+            // IMPORTANTE:
+            //
+            // RowOrder
+            // =
+            // posición de la línea dentro de la NUEVA
+            // Reception ADM.
+            //
+            // NO ES el ID de purchase_order_line.
+            //
+            //
+            // SourceTransactionID
+            // =
+            // GUID de la Purchase Order ADM.
+            //
+            //
+            // SourceRowID
+            // =
+            // GUID de la línea original de la PO ADM.
+            //
+            //
+            // Quantity
+            // =
+            // cantidad recibida SOLO EN ESTE receipt.
+            // ====================================================
+
+            for (
+                const line
+                of receivedLines
+            ) {
+
+                // ==================================================
+                // VALIDAR PRODUCTO ADM
+                // ==================================================
+
+                if (
+                    !line.erp_product_id
+                ) {
+
+                    throw new AdmLiquidationError(
+
+                        "Producto ADM no configurado",
+
+                        "ERP_PRODUCT_ID_REQUIRED",
+
+                        `La línea ${
+                            line.purchase_order_line_id
+                        } de la orden ${
+                            purchaseOrder.purchase_order_number ||
+                            purchaseOrderId
+                        } no tiene erp_product_id.`
+
+                    );
+
+                }
+
+
+                // ==================================================
+                // VALIDAR SOURCE ROW ID
+                //
+                // Este campo identifica la línea original
+                // de la Purchase Order en ADM Cloud.
+                // ==================================================
+
+                if (
+                    !line.erp_line_id
+                ) {
+
+                    throw new AdmLiquidationError(
+
+                        "Línea ADM no configurada",
+
+                        "ERP_LINE_ID_REQUIRED",
+
+                        `La línea ${
+                            line.purchase_order_line_id
+                        } de la orden ${
+                            purchaseOrder.purchase_order_number ||
+                            purchaseOrderId
+                        } no tiene erp_line_id.`
+
+                    );
+
+                }
+
+
+                const quantity =
+                    Number(
+                        line.received_qty
+                    );
+
+
+                if (
+                    !Number.isFinite(
+                        quantity
+                    ) ||
+                    quantity <= 0
+                ) {
+
+                    throw new AdmLiquidationError(
+
+                        "Cantidad inválida",
+
+                        "INVALID_RECEIVED_QUANTITY",
+
+                        `La línea ${
+                            line.purchase_order_line_id
+                        } tiene una cantidad recibida inválida.`
+
+                    );
+
+                }
+
+
+                // ==================================================
+                // ROW ORDER GLOBAL
+                //
+                // Si:
+                //
+                // PO 4 agrega 2 items
+                // PO 7 agrega 3 items
+                //
+                // quedarán:
+                //
+                // 1
+                // 2
+                // 3
+                // 4
+                // 5
+                // ==================================================
+
+                const rowOrder =
+                    items.length +
+                    1;
+
+
+                const item =
+                {
+
+                    // ==============================================
+                    // POSICIÓN DEL ITEM EN LA RECEPTION ADM
+                    // ==============================================
+
+                    RowOrder:
+                        rowOrder,
+
+
+                    // ==============================================
+                    // PRODUCTO ADM
+                    // ==============================================
+
+                    ItemID:
+                        line.erp_product_id,
+
+
+                    // ==============================================
+                    // COSTO
+                    // ==============================================
+
+                    Cost:
+                        Number(
+                            line.erp_price ??
+                            0
+                        ),
+
+
+                    // ==============================================
+                    // PRECIO
+                    // ==============================================
+
+                    Price:
+                        Number(
+                            line.erp_price ??
+                            0
+                        ),
+
+
+                    // ==============================================
+                    // CANTIDAD DE ESTE RECEIPT
+                    // ==============================================
+
+                    Quantity:
+                        quantity,
+
+
+                    // ==============================================
+                    // UNIDAD DE MEDIDA ADM
+                    // ==============================================
+
+                    UOMID:
+                        line.erp_uom_id ||
+                        null,
+
+
+                    // ==============================================
+                    // TIPO DE FILA
+                    // ==============================================
+
+                    RowType:
+                        Number(
+                            line.erp_row_type ??
+                            0
+                        ),
+
+
+                    // ==============================================
+                    // FECHA ESTIMADA
+                    //
+                    // IMPORTANTE:
+                    // no hacemos new Date() aquí.
+                    // ==============================================
+
+                    EstimatedDeliveryDate:
+                        line.erp_estimated_delivery_date
+
+                            ? String(
+                                line.erp_estimated_delivery_date
+                            )
+
+                            : "0001-01-01T00:00:00",
+
+
+                    // ==============================================
+                    // EXCHANGE RATE
+                    // ==============================================
+
+                    ExchangeRate:
+                        Number(
+                            line.erp_exchange_rate ??
+                            0
+                        ),
+
+
+                    // ==============================================
+                    // WARRANTY
+                    // ==============================================
+
+                    WarrantyDays:
+                        Number(
+                            line.erp_warranty_days ??
+                            0
+                        ),
+
+
+                    WarrantyUnits:
+                        Number(
+                            line.erp_warranty_units ??
+                            0
+                        ),
+
+
+                    // ==============================================
+                    // PURCHASE ORDER ADM
+                    //
+                    // TRANSACTION ORIGEN DE ESTA LÍNEA
+                    // ==============================================
+
+                    SourceTransactionID:
+                        purchaseOrder.erp_order_id,
+
+
+                    // ==============================================
+                    // PURCHASE ORDER LINE ADM
+                    //
+                    // FILA ORIGEN DE ESTA LÍNEA
+                    // ==============================================
+
+                    SourceRowID:
+                        line.erp_line_id
+
+                };
+
+
+                items.push(
+                    item
+                );
+
+            }
+
+
+            // ====================================================
+            // 22. REGISTRAR PO PROCESADA
+            // ====================================================
+
+            processedPurchaseOrders.push({
+
+                id:
+                    Number(
+                        purchaseOrder.id
+                    ),
+
+                purchase_order_number:
+                    purchaseOrder.purchase_order_number,
+
+                erp_order_id:
+                    purchaseOrder.erp_order_id,
+
+                erp_provider_id:
+                    purchaseOrder.erp_provider_id,
+
+                erp_warehouse_id:
+                    purchaseOrder.erp_warehouse_id,
+
+                items_count:
+                    receivedLines.length
+
+            });
+
+
+            console.log(
+                `✅ PO ${
+                    purchaseOrder.purchase_order_number ||
+                    purchaseOrderId
+                } agregó ${receivedLines.length} item(s).`
+            );
+
+        }
+
+
+        // ========================================================
+        // FIN DEL FOR DE PURCHASE ORDERS
+        // ========================================================
+
+
+        // ========================================================
+        // 23. VALIDAR QUE EXISTAN ITEMS
+        // ========================================================
+
+        if (
+            items.length ===
+            0
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "Recepción sin productos",
+
+                "NO_ITEMS_TO_CREATE_RECEPTION",
+
+                `El receipt ${normalizedReceiptId} no tiene productos para enviar a ADM Cloud.`
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 24. VALIDAR QUE TENGAMOS PO PARA EL HEADER
+        // ========================================================
+
+        if (
+            !headerSourcePurchaseOrder
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "No se pudo determinar la orden principal",
+
+                "HEADER_PURCHASE_ORDER_NOT_FOUND",
+
+                "No fue posible determinar la orden de compra que se utilizará para construir el encabezado ADM."
+
+            );
+
+        }
+
+
+        // ========================================================
+        // DEBUG DE TODAS LAS POs
+        // ========================================================
+
+        console.log("");
+        console.log(
+            "📋 PURCHASE ORDERS PROCESADAS:"
+        );
+
+        console.table(
+            processedPurchaseOrders
+        );
+
+
+        console.log("");
+        console.log(
+            "🏆 PO SELECCIONADA PARA HEADER:"
+        );
+
+        console.log(
+            headerSourcePurchaseOrder
+        );
+
+
+        console.log("");
+        console.log(
+            "📦 TOTAL ITEMS ADM:",
+            items.length
+        );
+
+
+        // ========================================================
+        // 25. CONSTRUIR UN SOLO PAYLOAD ADM
+        //
+        // UNA RECEPTION ADM POR RECEIPT.
+        // ========================================================
+
+        const payload =
+        {
+
+            // ==============================================
+            // FECHA
+            // ==============================================
+
+            DocDate:
+                docDate,
+
+
+            // ==============================================
+            // CÓDIGO DEL RECEIPT WMS
+            // ==============================================
+
+            Reference:
+                receipt.receipt_code,
+
+
+            // ==============================================
+            // PROVEEDOR
+            //
+            // PO con mayor número de items.
+            // ==============================================
+
+            RelationshipID:
+                headerSourcePurchaseOrder
+                    .RelationshipID,
+
+
+            // ==============================================
+            // LOCATION / WAREHOUSE ADM
+            //
+            // PO con mayor número de items.
+            // ==============================================
+
+            LocationID:
+                headerSourcePurchaseOrder
+                    .LocationID,
+
+
+            // ==============================================
+            // NOTAS
+            // ==============================================
+
+            Notes:
+                `Recepción ${receipt.receipt_code}`,
+
+
+            // ==============================================
+            // TODOS LOS ITEMS DE TODAS LAS POs
+            // ==============================================
+
+            Items:
+                items,
+
+
+            // ==============================================
+            // POR AHORA NO UTILIZADOS
+            // ==============================================
+
+            Documents:
+                [],
+
+            Files:
+                [],
+
+            CustomFields:
+                []
+
+        };
+
+
+        console.log("");
+        console.log(
+            "============================================="
+        );
+
+        console.log(
+            "📤 PAYLOAD ADM CLOUD"
+        );
+
+        console.log(
+            "============================================="
+        );
+
+
+        console.dir(
+            payload,
+            {
+                depth:
+                    null
+            }
+        );
+
+
+        // ========================================================
+        // 26. CREAR UNA SOLA RECEPCIÓN ADM
+        //
+        // YA NO EXISTE:
+        //
+        // - UPDATE
+        // - confirmAdmCloudReceptionById
+        // - existingAdmReception
+        // - restoreAdmCloudReception
+        //
+        // Cada receipt crea un documento ADM nuevo.
+        // ========================================================
+
+        let creationResult;
+
+
+        try {
+
+            creationResult =
+                await createAdmCloudReception(
+                    payload
+                );
+
+        } catch (
+            error
+        ) {
+
+            console.error("");
+            console.error(
+                "❌ createAdmCloudReception falló:"
+            );
+
+            console.error(
+                error
+            );
+
+
+            throw new AdmLiquidationError(
+
+                "Error creando recepción en ADM Cloud",
+
+                "ADM_RECEPTION_CREATE_FAILED",
+
+                error?.message ||
+                `No se pudo crear la recepción ADM para el receipt ${normalizedReceiptId}.`
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 27. OBTENER ID DE LA RECEPCIÓN ADM
+        // ========================================================
+
+        const admReceptionId =
+            creationResult
+                ?.receptionId;
+
+
+        if (
+            !creationResult?.success ||
+            !admReceptionId
+        ) {
+
+            throw new AdmLiquidationError(
+
+                "ADM Cloud no devolvió recepción",
+
+                "ADM_RECEPTION_ID_REQUIRED",
+
+                `ADM Cloud no devolvió un receptionId para el receipt ${normalizedReceiptId}.`
+
+            );
+
+        }
+
+
+        // ========================================================
+        // 28. GUARDAR INMEDIATAMENTE PARA COMPENSACIÓN
+        //
+        // MUY IMPORTANTE:
+        //
+        // Desde este momento ADM tiene un documento creado.
+        //
+        // Si cualquier cosa falla después:
+        //
+        // DELETE /Receptions/{id}
+        // ========================================================
+
+        ReceptionCreatedJustNow.push(
+            admReceptionId
+        );
+
+
+        console.log("");
+        console.log(
+            "✅ ========================================"
+        );
+
+        console.log(
+            "✅ RECEPTION CREADA EN ADM CLOUD"
+        );
+
+        console.log(
+            "🧾 WMS Receipt:",
+            normalizedReceiptId
+        );
+
+        console.log(
+            "☁️ ADM Reception ID:",
+            admReceptionId
+        );
+
+        console.log(
+            "📦 Total Items:",
+            items.length
+        );
+
+        console.log(
+            "📋 Total POs:",
+            processedPurchaseOrders.length
+        );
+
+        console.log(
+            "✅ ========================================"
+        );
+
+
+        // ========================================================
+        // 29. PREPARAR MAPPINGS
+        //
+        // MISMO:
+        //
+        // receiptId
+        // admReceptionId
+        //
+        // DIFERENTE:
+        //
+        // purchaseOrderId
+        //
+        // Ejemplo:
+        //
+        // PO 4 → Receipt 30 → XYZ
+        // PO 7 → Receipt 30 → XYZ
+        // PO 9 → Receipt 30 → XYZ
+        // ========================================================
+
+        for (
+            const purchaseOrder
+            of processedPurchaseOrders
+        ) {
+
+            receptionsToSave.push({
+
+                purchaseOrderId:
+                    purchaseOrder.id,
+
+                receiptId:
+                    normalizedReceiptId,
+
+                admReceptionId
+
+            });
+
+        }
+
+
+        console.log("");
+        console.log(
+            "🔗 MAPPINGS A GUARDAR:"
+        );
+
+        console.table(
+            receptionsToSave
+        );
+
+
+        // ========================================================
+        // 30. GUARDAR TODOS LOS MAPPINGS EN WMS
+        //
+        // TODAVÍA ESTAMOS DENTRO DEL BEGIN
+        // DE CloseReception.
+        //
+        // Si cualquier INSERT falla:
+        //
+        // 1. entra al catch
+        // 2. elimina Reception ADM
+        // 3. error sube a CloseReception
+        // 4. CloseReception hace ROLLBACK
+        // ========================================================
+
+        for (
+            const reception
+            of receptionsToSave
+        ) {
+
+            await client.query(
+                `
+                INSERT INTO adm_receptions
+                (
+                    purchase_order_id,
+                    created_from_receipt_id,
+                    adm_reception_id
+                )
+
+                VALUES
+                (
+                    $1,
+                    $2,
+                    $3
+                )
+                `,
+                [
+                    reception.purchaseOrderId,
+                    reception.receiptId,
+                    reception.admReceptionId
+                ]
+            );
+
+        }
+
+
+        console.log("");
+        console.log(
+            "✅ MAPPINGS ADM GUARDADOS EN WMS"
+        );
+
+
+        // ========================================================
+        // 31. TERMINÓ CORRECTAMENTE
+        //
+        // NO HACEMOS COMMIT AQUÍ.
+        //
+        // CloseReception es quien hace:
+        //
+        // await client.query("COMMIT");
+        // ========================================================
+
+        console.log("");
+        console.log(
+            "============================================="
+        );
+
+        console.log(
+            "✅ LIQUIDACIÓN ADM TERMINADA CORRECTAMENTE"
+        );
+
+        console.log(
+            "============================================="
+        );
+
+
+        return {
+
+            success:
+                true,
+
+            ReceptionCreatedJustNow,
+
+            receptions:
+                receptionsToSave
+
+        };
+
+
+    } catch (
+        error
+    ) {
+
+        console.error("");
+        console.error(
+            "============================================="
+        );
+
+        console.error(
+            "❌ ERROR DURANTE LIQUIDACIÓN ADM CLOUD"
+        );
+
+        console.error(
+            "============================================="
+        );
+
+        console.error(
+            error
+        );
+
+
+        // ========================================================
+        // 32. COMPENSACIÓN ADM
+        //
+        // YA NO EXISTEN UPDATES.
+        //
+        // Por lo tanto:
+        //
+        // NO restauramos nada.
+        //
+        // Solamente eliminamos cualquier Reception ADM
+        // creada durante esta ejecución.
+        // ========================================================
+
+        if (
+            ReceptionCreatedJustNow.length >
+            0
+        ) {
+
+            console.log("");
+            console.log(
+                `⚠️ Se intentarán eliminar ${ReceptionCreatedJustNow.length} recepción(es) ADM creadas durante esta ejecución.`
+            );
+
+
+            for (
+                const admReceptionId
+                of [
+                    ...ReceptionCreatedJustNow
+                ].reverse()
+            ) {
+
+                try {
+
+                    const deleteResult =
+                        await deleteAdmCloudReception(
+                            admReceptionId
+                        );
+
+
+                    console.log(
+                        `✅ Recepción ADM eliminada: ${admReceptionId}`
+                    );
+
+
+                    if (
+                        deleteResult
+                            ?.alreadyDeleted
+                    ) {
+
+                        console.log(
+                            `⚠️ La recepción ${admReceptionId} ya estaba eliminada.`
+                        );
+
+                    }
+
+
+                } catch (
+                    deleteError
+                ) {
+
+                    // ==============================================
+                    // ESCENARIO CRÍTICO
+                    //
+                    // PostgreSQL hará ROLLBACK,
+                    // pero ADM podría conservar la recepción.
+                    // ==============================================
+
+                    console.error("");
+                    console.error(
+                        "🚨 ERROR CRÍTICO ELIMINANDO RECEPCIÓN ADM"
+                    );
+
+                    console.error(
+                        "ADM Reception ID:",
+                        admReceptionId
+                    );
+
+                    console.error(
+                        deleteError
+                    );
+
+                }
+
+            }
+
+        }
+
+
+        // ========================================================
+        // 33. SI YA ES AdmLiquidationError,
+        // CONSERVAMOS EL ERROR ORIGINAL
+        // ========================================================
+
+        if (
+            error instanceof
+            AdmLiquidationError
+        ) {
+
+            throw error;
+
+        }
+
+
+        // ========================================================
+        // 34. CUALQUIER OTRO ERROR
+        // ========================================================
+
+        throw new AdmLiquidationError(
+
+            "Error durante la liquidación",
+
+            "ADM_LIQUIDATION_ERROR",
+
+            error?.message ||
+            "Ocurrió un error mientras se procesaba la recepción en ADM Cloud."
+
+        );
+
+    }
+
 }

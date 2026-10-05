@@ -70,6 +70,17 @@ import {
 import {
   confirmAdmCloudReceptionById
 } from "./integrations/admcloud/admcloud.reception.js";
+//Search sales orders
+import {
+  syncAdmCloudSalesOrdersController,
+} from "./integrations/admcloud/admcloud.salesOrders.js";
+//Search an unique sale order
+import {
+  getAdmCloudSalesOrderByIdController,
+} from "./integrations/admcloud/admcloud.salesOrders.js";
+
+
+
 
 const app = express();
 
@@ -104,6 +115,22 @@ app.use(express.json());
 
 startAdmCloudCron();
 
+
+
+// ============================================================
+// TEST - Search an unique sale order
+app.get(
+  "/test-admcloud-sales-orders/:id",
+  getAdmCloudSalesOrderByIdController
+);
+
+// ============================================================
+// TEST - SINCRONIZAR TODAS LAS SALES ORDERS ADM CLOUD
+app.get(
+  "/test-admcloud-sales-orders",
+  syncAdmCloudSalesOrdersController
+);
+// ============================================================
 
 //confirm recepcion with ID
 app.get(

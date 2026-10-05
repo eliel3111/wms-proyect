@@ -73,6 +73,10 @@ function normalizeReceptionItem(
   }
 
 
+  // ==========================================================
+  // DATOS BÁSICOS
+  // ==========================================================
+
   const rowOrder =
     toNumber(
       item.RowOrder,
@@ -120,11 +124,84 @@ function normalizeReceptionItem(
     );
 
 
-  const estimatedDeliveryDate =
-    toText(
-      item.EstimatedDeliveryDate
-    );
+  // ==========================================================
+  // FECHA ESTIMADA
+  // ==========================================================
 
+  let estimatedDeliveryDate =
+    item.EstimatedDeliveryDate;
+
+
+  // Si viene vacío
+  if (
+    !estimatedDeliveryDate
+  ) {
+
+    estimatedDeliveryDate =
+      "0001-01-01T00:00:00";
+
+  }
+
+  // Si PostgreSQL / pg lo convirtió en Date
+  else if (
+    estimatedDeliveryDate
+      instanceof Date
+  ) {
+
+    const year =
+      estimatedDeliveryDate
+        .getUTCFullYear();
+
+
+    // ADM usa esta fecha como valor default
+    if (
+      year <= 1
+    ) {
+
+      estimatedDeliveryDate =
+        "0001-01-01T00:00:00";
+
+    } else {
+
+      estimatedDeliveryDate =
+        estimatedDeliveryDate
+          .toISOString()
+          .slice(
+            0,
+            19
+          );
+
+    }
+
+  }
+
+  // Si ya viene como string
+  else {
+
+    estimatedDeliveryDate =
+      toText(
+        estimatedDeliveryDate
+      );
+
+
+    if (
+      estimatedDeliveryDate &&
+      estimatedDeliveryDate.startsWith(
+        "0001-01-01"
+      )
+    ) {
+
+      estimatedDeliveryDate =
+        "0001-01-01T00:00:00";
+
+    }
+
+  }
+
+
+  // ==========================================================
+  // OTROS CAMPOS REQUERIDOS ADM
+  // ==========================================================
 
   const exchangeRate =
     toNumber(
@@ -148,72 +225,212 @@ function normalizeReceptionItem(
 
 
   // ==========================================================
+  // NUEVA LÓGICA
+  //
+  // SourceTransactionID
+  // =
+  // GUID de la Purchase Order en ADM Cloud
+  //
+  // SourceRowID
+  // =
+  // GUID de la línea de la Purchase Order en ADM Cloud
+  // ==========================================================
+
+  const sourceTransactionId =
+    toText(
+      item.SourceTransactionID
+    );
+
+
+  const sourceRowId =
+    toText(
+      item.SourceRowID
+    );
+
+
+  // ==========================================================
   // VALIDACIONES
   // ==========================================================
 
   if (
-    !Number.isInteger(rowOrder) ||
+    !Number.isInteger(
+      rowOrder
+    ) ||
     rowOrder <= 0
   ) {
+
     throw new Error(
       `INVALID_ROW_ORDER_ITEM_${index + 1}`
     );
+
   }
 
 
-  if (!itemId) {
+  // ==========================================================
+  // ITEM ID
+  // ==========================================================
+
+  if (
+    !itemId
+  ) {
+
     throw new Error(
       `ITEM_ID_REQUIRED_ITEM_${index + 1}`
     );
+
   }
 
 
-  if (!isGuid(itemId)) {
+  if (
+    !isGuid(
+      itemId
+    )
+  ) {
+
     throw new Error(
       `INVALID_ITEM_ID_ITEM_${index + 1}`
     );
+
   }
 
 
+  // ==========================================================
+  // QUANTITY
+  // ==========================================================
+
   if (
-    !Number.isFinite(quantity) ||
+    !Number.isFinite(
+      quantity
+    ) ||
     quantity <= 0
   ) {
+
     throw new Error(
       `INVALID_QUANTITY_ITEM_${index + 1}`
     );
+
   }
 
 
+  // ==========================================================
+  // COST
+  // ==========================================================
+
   if (
-    !Number.isFinite(cost) ||
+    !Number.isFinite(
+      cost
+    ) ||
     cost < 0
   ) {
+
     throw new Error(
       `INVALID_COST_ITEM_${index + 1}`
     );
+
   }
 
 
+  // ==========================================================
+  // PRICE
+  // ==========================================================
+
   if (
-    !Number.isFinite(price) ||
+    !Number.isFinite(
+      price
+    ) ||
     price < 0
   ) {
+
     throw new Error(
       `INVALID_PRICE_ITEM_${index + 1}`
     );
+
+  }
+
+
+  // ==========================================================
+  // UOM
+  // ==========================================================
+
+  if (
+    uomId &&
+    !isGuid(
+      uomId
+    )
+  ) {
+
+    throw new Error(
+      `INVALID_UOM_ID_ITEM_${index + 1}`
+    );
+
+  }
+
+
+  // ==========================================================
+  // SOURCE TRANSACTION ID
+  //
+  // En tu WMS lo hacemos obligatorio,
+  // aunque ADM lo documente como opcional,
+  // porque necesitamos enlazar cada línea con su PO.
+  // ==========================================================
+
+  if (
+    !sourceTransactionId
+  ) {
+
+    throw new Error(
+      `SOURCE_TRANSACTION_ID_REQUIRED_ITEM_${index + 1}`
+    );
+
   }
 
 
   if (
-    uomId &&
-    !isGuid(uomId)
+    !isGuid(
+      sourceTransactionId
+    )
   ) {
+
     throw new Error(
-      `INVALID_UOM_ID_ITEM_${index + 1}`
+      `INVALID_SOURCE_TRANSACTION_ID_ITEM_${index + 1}`
     );
+
   }
 
+
+  // ==========================================================
+  // SOURCE ROW ID
+  //
+  // Identifica la línea exacta de la PO en ADM.
+  // ==========================================================
+
+  if (
+    !sourceRowId
+  ) {
+
+    throw new Error(
+      `SOURCE_ROW_ID_REQUIRED_ITEM_${index + 1}`
+    );
+
+  }
+
+
+  if (
+    !isGuid(
+      sourceRowId
+    )
+  ) {
+
+    throw new Error(
+      `INVALID_SOURCE_ROW_ID_ITEM_${index + 1}`
+    );
+
+  }
+
+
+  // ==========================================================
+  // RETURN FINAL
+  // ==========================================================
 
   return {
 
@@ -248,10 +465,22 @@ function normalizeReceptionItem(
       warrantyDays,
 
     WarrantyUnits:
-      warrantyUnits
-  };
-}
+      warrantyUnits,
 
+
+    // ========================================================
+    // NUEVOS CAMPOS
+    // ========================================================
+
+    SourceTransactionID:
+      sourceTransactionId,
+
+    SourceRowID:
+      sourceRowId
+
+  };
+
+}
 
 // ============================================================
 // CREAR RECEPTION ADM CLOUD
