@@ -1,5 +1,5 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession, finalizeInventorySession, adjustInventoryByLocation } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession, finalizeInventorySession, adjustInventoryByLocation, addLocationStock } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -89,7 +89,11 @@ router.post(
   finalizeInventorySession
 );
 
-
+router.post(
+    "/add-location-stock",
+    authMiddleware,
+    addLocationStock
+);
 
 
 router.post("/adjust", authMiddleware, adjustInventoryByLocation);

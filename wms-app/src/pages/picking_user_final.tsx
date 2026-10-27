@@ -22,7 +22,7 @@ export default function PickingFinal() {
     const inputRef = useRef<HTMLInputElement>(null);
     const [loading, setLoading] = useState(true);
     const [location, setLocation] = useState<ReceivingLocation | null>(null);
-    
+
     const [confirmation, setConfirmation] = useState<{
         show: boolean;
         receiptCode: string;
@@ -65,7 +65,7 @@ export default function PickingFinal() {
 
             } catch (err: any) {
                 // Error de red o 500
-                
+
                 console.error(err);
             } finally {
                 setLoading(false);
@@ -77,74 +77,145 @@ export default function PickingFinal() {
     }, []);
 
     //FUNCTION: To verify the location code scanned exists.
-    async function handleScanKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    async function handleScanKeyDown(
+        e: React.KeyboardEvent<HTMLInputElement>
+    ) {
         if (e.key !== "Enter") return;
 
-        const scannedCode = e.currentTarget.value.trim();
+        const scannedCode =
+            e.currentTarget.value.trim();
+
+        // Limpiar inmediatamente el input.
+        e.currentTarget.value = "";
 
         if (!scannedCode) return;
 
         console.log("📟 Código leído:", scannedCode);
 
-        
-
-        if (location?.code == scannedCode) {
-            setLoading(true);
-            console.log(location.code);
-            console.log(location);
-            const result = await closeReceiving({
-                pickingId: Number(id),
-                locationId: Number(location.location_id),
+        if (!location) {
+            openModal({
+                title: "Ubicación no disponible",
+                message:
+                    "No se encontró una ubicación de despacho.",
+                onCloseCallback: focusScannerInput,
             });
-            console.log("RESULTADO: ", result);
-           if (result.success) {
-                console.log("🟩 FUNCIONO")
-                setConfirmation({
-                    show: true,
-                    receiptCode: result.receiptCode
-                });
-                setLoading(false);
-            } else {
-                console.log("❌ NO FUNCIONO");
-                openModal({
-                title: result.title,
-                message: result.message,
-            });
-            setLoading(false);
-            }
-        } else {
 
+            return;
+        }
+
+        if (location.code !== scannedCode) {
             openModal({
                 title: "Ubicación inválida",
-                message: `El código escaneado NO es la ubicacion valida: ${location?.code}`,
-                onCloseCallback: focusScannerInput, // 👈 AQUÍ
+                message:
+                    `El código escaneado no corresponde a ` +
+                    `la ubicación válida: ${location.code}`,
+                onCloseCallback: focusScannerInput,
             });
 
-        } 
+            return;
+        }
 
-        // 🧹 limpiar input para el próximo scan
-        e.currentTarget.value = "";
+        setLoading(true);
 
+        try {
+            const result = await closeReceiving({
+                pickingId: Number(id),
+                locationId: Number(
+                    location.location_id
+                ),
+            });
+
+            console.log("📦 Resultado:", result);
+
+            if (!result?.success) {
+                openModal({
+                    title:
+                        result?.title ||
+                        "No se pudo cerrar el picking",
+                    message:
+                        result?.message ||
+                        "Ocurrió un error procesando el picking.",
+                    onCloseCallback: focusScannerInput,
+                });
+
+                return;
+            }
+
+            console.log("🟩 PICKING PROCESADO");
+
+            setConfirmation({
+                show: true,
+                receiptCode:
+                    result?.data?.pickingName ||
+                    String(id),
+            });
+        } catch (error: any) {
+            console.error(
+                "❌ Error cerrando picking:",
+                error
+            );
+
+            openModal({
+                title:
+                    error?.title ||
+                    "Error cerrando picking",
+                message:
+                    error?.message ||
+                    "No se pudo comunicar con el servidor.",
+                onCloseCallback: focusScannerInput,
+            });
+        } finally {
+            // Siempre se ejecuta, haya éxito o error.
+            setLoading(false);
+        }
     }
 
-async function closeReceiving(payload: CloseReceivingPayload) {
-    try {
-        console.log(payload);
-        const response = await apiClient.post("/picking/close", payload);
+    async function closeReceiving(
+        payload: CloseReceivingPayload
+    ) {
+        try {
+            console.log(
+                "📤 Cerrando picking:",
+                payload
+            );
 
-        console.log("✅ RESPONSE:", response);
+            const response = await apiClient.post(
+                "/picking/close",
+                payload
+            );
 
-        return response.data;
+            console.log(
+                "✅ Respuesta:",
+                response.data
+            );
 
-    } catch (error: any) {
+            return response.data;
+        } catch (error: any) {
+            const backendError =
+                error.response?.data;
 
-        const backendError = error.response?.data;
+            console.error(
+                "❌ Error del backend:",
+                backendError || error
+            );
 
-        console.log("❌ ERROR BACKEND:", backendError);
+            /*
+             * Si el backend respondió con un JSON,
+             * lanzar ese JSON para que handleScanKeyDown
+             * pueda mostrar title y message.
+             */
+            if (backendError) {
+                throw backendError;
+            }
 
-        throw backendError; // 🔥 importante para UI
+            throw {
+                success: false,
+                title: "Error de conexión",
+                message:
+                    "No se pudo comunicar con el servidor.",
+            };
+        }
     }
-}
 
     function focusScannerInput() {
         setTimeout(() => {
@@ -158,18 +229,18 @@ async function closeReceiving(payload: CloseReceivingPayload) {
         return <LoadingScreen />;
     }
 
-    
+
     if (confirmation.show) {
-           return <ConfirmationScreen
-                title="¡PEDIDO CERRADO!"
-                message={`Pedido entregado en ${location?.code}.`}
-                autoCloseMs={3000}
-                onFinish={() => {
-                    navigate("/picking-user-init");
-                }}
-            />
-        
-            }
+        return <ConfirmationScreen
+            title="¡PEDIDO CERRADO!"
+            message={`Pedido entregado en ${location?.code}.`}
+            autoCloseMs={3000}
+            onFinish={() => {
+                navigate("/picking-user-init");
+            }}
+        />
+
+    }
 
     return (
         <div className="page-receiving-final">
@@ -182,12 +253,12 @@ async function closeReceiving(payload: CloseReceivingPayload) {
                     </div>
 
                     <div className="barcode-info">
-  <span className="barcode-label">
-    Ubicar toda la mercancía en la ubicación de despacho:
-    <br />
-    <span className="barcode-value">{location?.code}</span>
-  </span>
-</div>
+                        <span className="barcode-label">
+                            Ubicar toda la mercancía en la ubicación de despacho:
+                            <br />
+                            <span className="barcode-value">{location?.code}</span>
+                        </span>
+                    </div>
                 </div>
 
                 {/* INPUT DE SCAN */}

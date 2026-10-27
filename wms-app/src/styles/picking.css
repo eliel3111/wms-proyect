@@ -8,6 +8,9 @@
   box-sizing: border-box;
 }
 
+
+
+
 html,
 body {
   height: 100%;
@@ -73,6 +76,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   background: white;
+  width: 100%;
   min-height: 0;
   /* 🔥 ESTA ES LA CLAVE */
 }
@@ -81,13 +85,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 20px;
-
+  padding: 30px 60px;
+  min-height: 2500px;
   min-height: 100%;
   height: auto;
 
   background-color: rgb(253, 253, 253);
-  max-width: 1200px;
+
+ 
   margin: 0 auto;
 
   position: relative;
@@ -126,7 +131,7 @@ body {
   border: none;
   background: transparent;
 
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 500;
   color: #1f2937;
   /* 🔥 mejor color */
@@ -140,6 +145,8 @@ body {
 .sidebar-button:hover {
   background-color: #909195;
   transform: translateX(3px);
+  font-weight: 500;
+  font-size: 19px;
 }
 
 .sidebar-button svg {
@@ -548,7 +555,7 @@ input:checked+.slider:before {
   /* relativo a mainInner */
   top: 0;
   right: 0;
-  width: 40%;
+  width: 30%;
   /* puedes cambiar a 30% */
   height: 100%;
   background: #cfcfcf;
@@ -900,8 +907,26 @@ input:checked+.slider:before {
 
 /* AZUL */
 .modal-pick-btn-blue {
-  background-color: #2563eb;
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
   color: white;
+}
+
+.modal-pick-btn-unassign {
+  background-color: #dc2626;
+  background: linear-gradient(135deg, #cc3a3a, #8a1414);
+  color: white;
+
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.modal-pick-btn-unassign:hover {
+  background-color: #b91c1c;
+}
+
+.modal-pick-btn-unassign:active {
+  transform: scale(0.98);
 }
 
 .modal-pick-btn-blue:hover {
@@ -1073,7 +1098,7 @@ input:checked+.slider:before {
   padding: 14px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  
   color: white;
   font-size: 16px;
   font-weight: 600;
@@ -1327,4 +1352,2486 @@ input:checked+.slider:before {
     padding: 8px 10px;
     cursor: pointer;
   }
+}
+
+
+
+/* =========================================================
+   GARLAS WMS
+   PICKING PROCESS — DESKTOP ERP REDESIGN
+   PEGAR AL FINAL DE picking.css
+
+   No requiere cambios en PickingProcess.tsx
+========================================================= */
+
+@media (min-width: 769px) {
+
+  /* =====================================================
+     PAGE / LAYOUT
+  ===================================================== */
+
+  .main {
+    background:
+      linear-gradient(
+        180deg,
+        #f5f7fa 0%,
+        #f8fafc 100%
+      );
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    color:
+      var(
+        --text-primary,
+        #17233c
+      );
+  }
+
+
+  .mainInner {
+    width: 100%;
+
+    min-height: 100%;
+
+    padding:
+      26px
+      34px
+      42px;
+
+    gap: 20px;
+
+    margin: 0;
+
+    background:
+      transparent;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+  }
+
+
+  /* =====================================================
+     DESKTOP SIDEBAR
+  ===================================================== */
+
+  .sidebarDesktop {
+    flex:
+      0 0 260px;
+
+    min-width:
+      260px;
+
+    background:
+      #ffffff;
+
+    border-right:
+      1px solid
+      #e2e8f0;
+
+    box-shadow:
+      4px
+      0
+      18px
+      rgba(
+        15,
+        23,
+        42,
+        0.025
+      );
+  }
+
+
+  .sidebarInner {
+    padding:
+      22px
+      14px;
+
+    background:
+      #ffffff;
+
+    color:
+      var(
+        --text-primary,
+        #17233c
+      );
+  }
+
+
+  .sidebarInner > h1,
+  .sidebarInner > h2,
+  .sidebarInner > h3,
+  .sidebarInner > strong {
+    color:
+      #17233c;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-heading,
+        -0.022em
+      );
+  }
+
+
+  .nav {
+    gap:
+      5px;
+
+    margin-top:
+      18px;
+  }
+
+
+  .nav a {
+    min-height:
+      44px;
+
+    padding:
+      0
+      13px;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    border-radius:
+      9px;
+
+    color:
+      #46566d;
+
+    font-size:
+      var(
+        --text-md,
+        14px
+      );
+
+    line-height:
+      var(
+        --leading-ui,
+        1.4
+      );
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+
+    transition:
+      background-color
+      140ms
+      ease,
+      color
+      140ms
+      ease;
+  }
+
+
+  .nav a:hover {
+    background:
+      #f1f5f9;
+
+    color:
+      #1769d2;
+  }
+
+
+  .sidebar-button {
+    min-height:
+      48px;
+
+    padding:
+      0
+      14px;
+
+    gap:
+      11px;
+
+    border-radius:
+      9px;
+
+    color:
+      #3b4b61;
+
+    font-size:
+      var(
+        --text-md,
+        14px
+      );
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+
+    transition:
+      background-color
+      140ms
+      ease,
+      color
+      140ms
+      ease;
+  }
+
+
+  .sidebar-button:hover {
+    background:
+      #edf5ff;
+
+    color:
+      #1769d2;
+
+    transform:
+      none;
+
+    font-size:
+      var(
+        --text-md,
+        14px
+      );
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+  }
+
+
+  .sidebar-button svg {
+    width:
+      21px;
+
+    height:
+      21px;
+
+    stroke:
+      #2486df;
+  }
+
+
+  /* =====================================================
+     MONITOR HEADER
+  ===================================================== */
+
+  .monitor-header {
+    min-height:
+      138px;
+
+    padding:
+      24px
+      28px;
+
+    border:
+      1px solid
+      #dce5ef;
+
+    border-radius:
+      16px;
+
+    color:
+      #17233c;
+
+    background:
+      radial-gradient(
+        circle at 78% 50%,
+        rgba(
+          59,
+          130,
+          246,
+          0.13
+        ) 0%,
+        rgba(
+          59,
+          130,
+          246,
+          0
+        ) 36%
+      ),
+      linear-gradient(
+        135deg,
+        #ffffff 0%,
+        #f4f8fc 58%,
+        #eaf3fb 100%
+      );
+
+    box-shadow:
+      0
+      4px
+      15px
+      rgba(
+        15,
+        23,
+        42,
+        0.045
+      );
+
+    overflow:
+      hidden;
+  }
+
+
+  .monitor-header-parta {
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    justify-content:
+      center;
+
+    gap:
+      5px;
+  }
+
+
+  .monitor-title-small {
+    color:
+      #6e7f96;
+
+    font-size:
+      var(
+        --text-xs,
+        12px
+      );
+
+    line-height:
+      17px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      0.13em;
+
+    text-transform:
+      uppercase;
+
+    opacity:
+      1;
+  }
+
+
+  .monitor-title-big {
+    color:
+      var(
+        --text-primary,
+        #17233c
+      );
+
+    font-size:
+      32px;
+
+    line-height:
+      var(
+        --leading-tight,
+        1.15
+      );
+
+    font-weight:
+      var(
+        --weight-bold,
+        690
+      );
+
+    letter-spacing:
+      var(
+        --tracking-display,
+        -0.035em
+      );
+  }
+
+
+  /* =====================================================
+     PAGINATION
+  ===================================================== */
+
+  .page-control {
+    min-height:
+      52px;
+
+    padding:
+      5px
+      7px
+      5px
+      18px;
+
+    gap:
+      14px;
+
+    border:
+      1px solid
+      #d8e1eb;
+
+    border-radius:
+      11px;
+
+    background:
+      rgba(
+        255,
+        255,
+        255,
+        0.94
+      );
+
+    color:
+      #273950;
+
+    box-shadow:
+      0
+      3px
+      10px
+      rgba(
+        15,
+        23,
+        42,
+        0.055
+      );
+
+    cursor:
+      default;
+
+    transition:
+      none;
+  }
+
+
+  .page-control:hover {
+    background:
+      #ffffff;
+
+    transform:
+      none;
+
+    box-shadow:
+      0
+      3px
+      10px
+      rgba(
+        15,
+        23,
+        42,
+        0.055
+      );
+  }
+
+
+  .pagination-text {
+    min-width:
+      84px;
+
+    color:
+      #344258;
+
+    font-family:
+      var(
+        --font-data,
+        "Geist Mono Variable",
+        monospace
+      );
+
+    font-size:
+      13px;
+
+    line-height:
+      18px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      -0.015em;
+
+    font-variant-numeric:
+      tabular-nums;
+  }
+
+
+  .pagination-buttons {
+    gap:
+      3px;
+
+    overflow:
+      visible;
+
+    border-radius:
+      8px;
+  }
+
+
+  .pagination-btn {
+    width:
+      39px;
+
+    height:
+      39px;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    justify-content:
+      center;
+
+    padding:
+      0;
+
+    border:
+      1px solid
+      transparent;
+
+    border-radius:
+      8px;
+
+    background:
+      transparent;
+
+    color:
+      #52627a;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      22px;
+
+    line-height:
+      1;
+
+    cursor:
+      pointer;
+
+    transition:
+      background-color
+      120ms
+      ease,
+      color
+      120ms
+      ease,
+      border-color
+      120ms
+      ease;
+  }
+
+
+  .pagination-btn:not(:last-child) {
+    border-right:
+      1px solid
+      transparent;
+  }
+
+
+  .pagination-btn:hover {
+    background:
+      #edf5ff;
+
+    border-color:
+      #d3e7fb;
+
+    color:
+      #1769d2;
+  }
+
+
+  /* =====================================================
+     MAIN PICKINGS CARD
+  ===================================================== */
+
+  .pickersactivecontainer {
+    width:
+      100%;
+
+    gap:
+      0;
+  }
+
+
+  .pickings-card {
+    width:
+      100%;
+
+    padding:
+      0;
+
+    overflow:
+      hidden;
+
+    background:
+      #ffffff;
+
+    border:
+      1px solid
+      #e0e7ef;
+
+    border-radius:
+      15px;
+
+    box-shadow:
+      0
+      5px
+      18px
+      rgba(
+        15,
+        23,
+        42,
+        0.045
+      );
+  }
+
+
+  /* =====================================================
+     PICKINGS CARD HEADER
+  ===================================================== */
+
+  .pickings-header {
+    min-height:
+      82px;
+
+    padding:
+      16px
+      22px;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    justify-content:
+      space-between;
+
+    gap:
+      24px;
+
+    border-bottom:
+      1px solid
+      #e6ebf1;
+
+    background:
+      #ffffff;
+  }
+
+
+  .pickings-header h3 {
+    margin:
+      0;
+
+    color:
+      var(
+        --text-primary,
+        #17233c
+      );
+
+    font-size:
+      21px;
+
+    line-height:
+      27px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-heading,
+        -0.022em
+      );
+
+    white-space:
+      nowrap;
+  }
+
+
+  /* =====================================================
+     MULTI VALUE SEARCH INPUT
+     Works with common inner input structures.
+  ===================================================== */
+
+  .pickings-header input {
+    min-height:
+      44px;
+
+    color:
+      #17233c;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      14px;
+
+    font-weight:
+      var(
+        --weight-regular,
+        430
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+
+    caret-color:
+      #1e88e5;
+  }
+
+
+  .pickings-header input::placeholder {
+    color:
+      var(
+        --text-placeholder,
+        #94a0b1
+      );
+
+    font-weight:
+      410;
+  }
+
+
+  /* =====================================================
+     TABLE
+  ===================================================== */
+
+  .pickings-table {
+    width:
+      100%;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    background:
+      #ffffff;
+  }
+
+
+  /* =====================================================
+     TABLE HEADER
+  ===================================================== */
+
+  .pickings-row-header {
+    min-height:
+      48px;
+
+    padding:
+      0
+      20px;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      minmax(
+        145px,
+        0.9fr
+      )
+      minmax(
+        280px,
+        2fr
+      )
+      minmax(
+        210px,
+        1.35fr
+      )
+      minmax(
+        120px,
+        0.7fr
+      );
+
+    align-items:
+      center;
+
+    gap:
+      18px;
+
+    background:
+      #f5f8fb;
+
+    border-bottom:
+      1px solid
+      #dfe6ee;
+
+    color:
+      #65748a;
+
+    font-size:
+      11.5px;
+
+    line-height:
+      16px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      0.035em;
+
+    text-transform:
+      uppercase;
+
+    cursor:
+      default;
+  }
+
+
+  /* =====================================================
+     TABLE ROW
+  ===================================================== */
+
+  .pickings-row {
+    min-height:
+      62px;
+
+    padding:
+      0
+      20px;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      minmax(
+        145px,
+        0.9fr
+      )
+      minmax(
+        280px,
+        2fr
+      )
+      minmax(
+        210px,
+        1.35fr
+      )
+      minmax(
+        120px,
+        0.7fr
+      );
+
+    align-items:
+      center;
+
+    gap:
+      18px;
+
+    border-bottom:
+      1px solid
+      #edf1f5;
+
+    background:
+      #ffffff;
+
+    color:
+      #273950;
+
+    font-size:
+      13.5px;
+
+    line-height:
+      19px;
+
+    font-weight:
+      var(
+        --weight-regular,
+        430
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+
+    cursor:
+      pointer;
+
+    transition:
+      background-color
+      120ms
+      ease,
+      box-shadow
+      120ms
+      ease;
+  }
+
+
+  .pickings-row:nth-child(odd),
+  .pickings-row:nth-child(even) {
+    background:
+      #ffffff;
+  }
+
+
+  .pickings-row:hover {
+    background:
+      #f5f9fe;
+
+    box-shadow:
+      inset
+      3px
+      0
+      0
+      #2486df;
+  }
+
+
+  .pickings-row:last-child {
+    border-bottom:
+      none;
+  }
+
+
+  /* =====================================================
+     ORDER NUMBER
+  ===================================================== */
+
+  .pickings-row > span:first-child {
+    color:
+      #17345c;
+
+    font-family:
+      var(
+        --font-data,
+        "Geist Mono Variable",
+        monospace
+      );
+
+    font-size:
+      13px;
+
+    line-height:
+      18px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      -0.018em;
+
+    font-variant-numeric:
+      tabular-nums;
+  }
+
+
+  /* =====================================================
+     CLIENT
+  ===================================================== */
+
+  .pickings-row > span:nth-child(2) {
+    min-width:
+      0;
+
+    overflow:
+      hidden;
+
+    color:
+      #293950;
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+
+    text-overflow:
+      ellipsis;
+
+    white-space:
+      nowrap;
+  }
+
+
+  /* =====================================================
+     PICKER
+  ===================================================== */
+
+  .picker {
+    min-width:
+      0;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    gap:
+      9px;
+
+    color:
+      #52627a;
+  }
+
+
+  .avatar {
+    width:
+      30px;
+
+    height:
+      30px;
+
+    flex:
+      0 0
+      30px;
+
+    border:
+      1px solid
+      #dce4ed;
+
+    border-radius:
+      50%;
+
+    background:
+      linear-gradient(
+        145deg,
+        #eef2f7 0%,
+        #dce4ed 100%
+      );
+
+    box-shadow:
+      inset
+      0
+      0
+      0
+      3px
+      rgba(
+        255,
+        255,
+        255,
+        0.65
+      );
+  }
+
+
+  /* =====================================================
+     STATUS
+  ===================================================== */
+
+  .status {
+    min-width:
+      78px;
+
+    min-height:
+      28px;
+
+    padding:
+      5px
+      11px;
+
+    display:
+      inline-flex;
+
+    align-items:
+      center;
+
+    justify-content:
+      center;
+
+    gap:
+      6px;
+
+    border:
+      1px solid
+      transparent;
+
+    border-radius:
+      999px;
+
+    font-size:
+      11.5px;
+
+    line-height:
+      16px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      0;
+  }
+
+
+  .status.active {
+    color:
+      #087443;
+
+    background:
+      #e5f8ed;
+
+    border-color:
+      #c9ecd8;
+  }
+
+
+  .status.inactive {
+    color:
+      #b13a43;
+
+    background:
+      #fff0f1;
+
+    border-color:
+      #f5d7da;
+  }
+
+
+  /* =====================================================
+     EMPTY STATE
+  ===================================================== */
+
+  .no-pickings {
+    min-height:
+      350px;
+
+    padding:
+      40px;
+
+    background:
+      #ffffff;
+
+    color:
+      #738095;
+  }
+
+
+  .no-pickings-icon {
+    margin-bottom:
+      5px;
+
+    font-size:
+      38px;
+  }
+
+
+  .no-pickings-title {
+    margin:
+      0;
+
+    color:
+      #17233c;
+
+    font-size:
+      18px;
+
+    line-height:
+      23px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-heading,
+        -0.022em
+      );
+  }
+
+
+  .no-pickings-sub {
+    color:
+      #7c899c;
+
+    font-size:
+      13px;
+  }
+
+
+  /* =====================================================
+     RIGHT SIDE PICKING PANEL
+  ===================================================== */
+
+  .sidebar-picking-process {
+    position:
+      absolute;
+
+    top:
+      0;
+
+    right:
+      0;
+
+    width:
+      min(
+        420px,
+        36%
+      );
+
+    height:
+      100%;
+
+    padding:
+      0;
+
+    overflow-y:
+      auto;
+
+    color:
+      #17233c;
+
+    background:
+      #ffffff;
+
+    border-left:
+      1px solid
+      #dce4ed;
+
+    box-shadow:
+      -14px
+      0
+      38px
+      rgba(
+        15,
+        23,
+        42,
+        0.12
+      );
+
+    z-index:
+      1000;
+  }
+
+
+  .sidebar-content {
+    position:
+      relative;
+
+    min-height:
+      100%;
+
+    padding:
+      25px
+      22px
+      32px;
+  }
+
+
+  /* =====================================================
+     SIDEBAR CLOSE
+  ===================================================== */
+
+  .modal-pick-close-btn {
+    position:
+      absolute;
+
+    top:
+      17px;
+
+    right:
+      17px;
+
+    width:
+      36px;
+
+    height:
+      36px;
+
+    padding:
+      0;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    justify-content:
+      center;
+
+    border:
+      none;
+
+    border-radius:
+      50%;
+
+    background:
+      #f3f6f9;
+
+    color:
+      #718096;
+
+    font-family:
+      inherit;
+
+    font-size:
+      17px;
+
+    line-height:
+      1;
+
+    font-weight:
+      500;
+
+    cursor:
+      pointer;
+
+    transition:
+      color
+      120ms
+      ease,
+      background-color
+      120ms
+      ease;
+  }
+
+
+  .modal-pick-close-btn:hover {
+    color:
+      #d53f48;
+
+    background:
+      #fff0f1;
+
+    transform:
+      none;
+  }
+
+
+  /* =====================================================
+     SIDEBAR TITLE
+  ===================================================== */
+
+  .modal-pick-title {
+    margin:
+      0
+      46px
+      18px
+      0;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    gap:
+      10px;
+
+    color:
+      #17233c;
+
+    font-size:
+      21px;
+
+    line-height:
+      27px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-heading,
+        -0.022em
+      );
+  }
+
+
+  .modal-pick-title-icon {
+    width:
+      21px;
+
+    height:
+      21px;
+  }
+
+
+  .modal-pick-title-icon svg {
+    fill:
+      #2486df;
+  }
+
+
+  /* =====================================================
+     ORDER INFO CARD
+  ===================================================== */
+
+  .modal-pick-card {
+    margin-bottom:
+      20px;
+
+    padding:
+      16px;
+
+    border:
+      1px solid
+      #e1e7ee;
+
+    border-radius:
+      12px;
+
+    background:
+      #f8fafc;
+
+    box-shadow:
+      0
+      2px
+      7px
+      rgba(
+        15,
+        23,
+        42,
+        0.025
+      );
+  }
+
+
+  .modal-pick-card p {
+    margin:
+      7px
+      0;
+
+    color:
+      #52627a;
+
+    font-size:
+      13.5px;
+
+    line-height:
+      19px;
+
+    font-weight:
+      var(
+        --weight-regular,
+        430
+      );
+  }
+
+
+  .modal-pick-card strong {
+    color:
+      #273950;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+  }
+
+
+  .modal-pick-divider {
+    margin:
+      13px
+      0;
+
+    background:
+      #e1e7ee;
+  }
+
+
+  .modal-pick-row {
+    gap:
+      7px;
+  }
+
+
+  .modal-pick-icon svg {
+    fill:
+      #2486df;
+  }
+
+
+  /* =====================================================
+     SIDEBAR SECTIONS
+  ===================================================== */
+
+  .modal-pick-section {
+    margin-bottom:
+      19px;
+  }
+
+
+  .modal-pick-subtitle {
+    margin:
+      0
+      0
+      8px;
+
+    color:
+      #52627a;
+
+    font-size:
+      12px;
+
+    line-height:
+      17px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      0.035em;
+
+    text-transform:
+      uppercase;
+  }
+
+
+  /* =====================================================
+     SIDEBAR BUTTONS
+  ===================================================== */
+
+  .modal-pick-btn {
+    min-height:
+      44px;
+
+    padding:
+      0
+      15px;
+
+    border-radius:
+      9px;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      13.5px;
+
+    line-height:
+      19px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+
+    transition:
+      background-color
+      120ms
+      ease,
+      box-shadow
+      120ms
+      ease,
+      transform
+      100ms
+      ease;
+  }
+
+
+  .modal-pick-btn-blue {
+    background:
+      linear-gradient(
+        180deg,
+        #2e91ef 0%,
+        #176fd5 100%
+      );
+
+    color:
+      #ffffff;
+
+    box-shadow:
+      0
+      4px
+      10px
+      rgba(
+        30,
+        136,
+        229,
+        0.17
+      );
+  }
+
+
+  .modal-pick-btn-blue:hover {
+    background:
+      linear-gradient(
+        180deg,
+        #2788e3 0%,
+        #1465c2 100%
+      );
+  }
+
+
+  .modal-pick-btn-red {
+    color:
+      #bc323c;
+
+    background:
+      #fff1f2;
+
+    border:
+      1px solid
+      #f3d3d6;
+  }
+
+
+  .modal-pick-btn-red:hover {
+    color:
+      #a72731;
+
+    background:
+      #ffe8ea;
+  }
+
+
+  .modal-pick-btn-yellow {
+    color:
+      #76560a;
+
+    background:
+      #fff4c8;
+
+    border:
+      1px solid
+      #eedb8b;
+  }
+
+
+  .modal-pick-btn-yellow:hover {
+    background:
+      #ffedab;
+
+    font-size:
+      13.5px;
+  }
+
+
+  .modal-pick-btn-unassign {
+    color:
+      #b12e38;
+
+    background:
+      #fff0f1;
+
+    border:
+      1px solid
+      #f2cdd1;
+
+    box-shadow:
+      none;
+  }
+
+
+  .modal-pick-btn-unassign:hover {
+    background:
+      #ffe5e7;
+
+    box-shadow:
+      none;
+  }
+
+
+  /* =====================================================
+     PICKER SELECTION VIEW
+  ===================================================== */
+
+  .modal-pick-header {
+    padding-right:
+      45px;
+  }
+
+
+  .modal-pick-header h2 {
+    margin:
+      0;
+
+    color:
+      #17233c;
+
+    font-size:
+      21px;
+
+    line-height:
+      27px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-heading,
+        -0.022em
+      );
+  }
+
+
+  .modal-pick-subtitle-select {
+    margin:
+      5px
+      0
+      16px;
+
+    color:
+      #7c899c;
+
+    font-size:
+      13px;
+
+    line-height:
+      18px;
+  }
+
+
+  .modal-pick-card-select {
+    max-height:
+      430px;
+
+    padding:
+      7px;
+
+    gap:
+      5px;
+
+    overflow-y:
+      auto;
+
+    background:
+      #f5f7fa;
+
+    border:
+      1px solid
+      #e3e8ef;
+
+    border-radius:
+      11px;
+  }
+
+
+  .modal-pick-picker-row {
+    min-height:
+      58px;
+
+    padding:
+      9px
+      11px;
+
+    gap:
+      11px;
+
+    border:
+      1px solid
+      transparent;
+
+    border-radius:
+      9px;
+
+    background:
+      #ffffff;
+
+    transition:
+      background-color
+      120ms
+      ease,
+      border-color
+      120ms
+      ease,
+      box-shadow
+      120ms
+      ease;
+  }
+
+
+  .modal-pick-picker-row:hover {
+    background:
+      #f8fbff;
+
+    border-color:
+      #d9e5f1;
+
+    transform:
+      none;
+  }
+
+
+  .modal-pick-picker-row.selected {
+    background:
+      #edf6ff;
+
+    border:
+      1px solid
+      #7db7ef;
+
+    box-shadow:
+      0
+      0
+      0
+      2px
+      rgba(
+        30,
+        136,
+        229,
+        0.07
+      );
+  }
+
+
+  .modal-pick-avatar {
+    width:
+      38px;
+
+    height:
+      38px;
+
+    background:
+      #eaf3fc;
+
+    color:
+      #287ccf;
+
+    font-size:
+      16px;
+  }
+
+
+  .modal-pick-info {
+    min-width:
+      0;
+
+    gap:
+      1px;
+  }
+
+
+  .modal-pick-name {
+    overflow:
+      hidden;
+
+    color:
+      #273950;
+
+    font-size:
+      13.5px;
+
+    line-height:
+      18px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    text-overflow:
+      ellipsis;
+
+    white-space:
+      nowrap;
+  }
+
+
+  .modal-pick-status {
+    color:
+      #7c899c;
+
+    font-size:
+      11.5px;
+
+    line-height:
+      16px;
+  }
+
+
+  .modal-pick-status .dot {
+    width:
+      6px;
+
+    height:
+      6px;
+
+    background:
+      #1aa160;
+  }
+
+
+  .modal-pick-check {
+    width:
+      23px;
+
+    height:
+      23px;
+
+    right:
+      12px;
+
+    background:
+      #2486df;
+
+    font-size:
+      12px;
+  }
+
+
+  .modal-pick-save-btn {
+    min-height:
+      45px;
+
+    margin-top:
+      12px;
+
+    padding:
+      0
+      14px;
+
+    border-radius:
+      9px;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      13.5px;
+
+    line-height:
+      19px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+  }
+
+
+  .modal-pick-save-btn:hover {
+    transform:
+      none;
+
+    box-shadow:
+      0
+      4px
+      11px
+      rgba(
+        30,
+        136,
+        229,
+        0.16
+      );
+  }
+
+}
+
+
+
+
+
+/* =========================================================
+   GARLAS WMS
+   MONITOR PICKING — DESKTOP ERP LAYOUT
+   PEGAR AL FINAL DE picking.css
+========================================================= */
+
+@media (min-width: 769px) {
+
+  /* =====================================================
+     APP SHELL
+  ===================================================== */
+
+  .appShell {
+    width: 100%;
+    height: calc(100dvh - var(--header-h, 56px));
+
+    display: flex;
+
+    overflow: hidden;
+
+    background: #f4f7fa;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    color:
+      var(
+        --text-primary,
+        #17233c
+      );
+  }
+
+
+  /* =====================================================
+     DESKTOP SIDEBAR
+  ===================================================== */
+
+  .sidebarDesktop {
+    width: 248px;
+    min-width: 248px;
+    max-width: 248px;
+
+    flex:
+      0
+      0
+      248px;
+
+    display: flex;
+
+    background: #ffffff;
+
+    border-right:
+      1px solid
+      #dde5ee;
+
+    box-shadow:
+      4px
+      0
+      18px
+      rgba(
+        15,
+        23,
+        42,
+        0.025
+      );
+
+    position: relative;
+
+    z-index: 20;
+  }
+
+
+  /* =====================================================
+     SIDEBAR INNER
+  ===================================================== */
+
+  .sidebarInner {
+    width: 100%;
+    height: 100%;
+
+    padding:
+      24px
+      14px;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    background: #ffffff;
+  }
+
+
+  /* =====================================================
+     SIDEBAR TITLE
+  ===================================================== */
+
+  .sidebarInner > h3 {
+    margin:
+      0
+      10px
+      22px;
+
+    color:
+      #7c899c;
+
+    font-size:
+      var(
+        --text-2xs,
+        11px
+      );
+
+    line-height: 16px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+
+    letter-spacing:
+      0.09em;
+
+    text-transform: uppercase;
+  }
+
+
+  /* =====================================================
+     NAVIGATION
+  ===================================================== */
+
+  .nav {
+    width: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    margin: 0;
+  }
+
+
+  /* =====================================================
+     SIDEBAR BUTTON
+  ===================================================== */
+
+  .sidebar-button {
+    position: relative;
+
+    width: 100%;
+
+    min-height: 48px;
+
+    padding:
+      0
+      13px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-start;
+
+    gap: 11px;
+
+    border:
+      1px solid
+      transparent;
+
+    border-radius:
+      9px;
+
+    background:
+      transparent;
+
+    color:
+      #52627a;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      var(
+        --text-md,
+        14px
+      );
+
+    line-height:
+      var(
+        --leading-ui,
+        1.4
+      );
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+
+    letter-spacing:
+      var(
+        --tracking-ui,
+        -0.008em
+      );
+
+    text-align: left;
+
+    cursor: pointer;
+
+    transition:
+      background-color
+      130ms
+      ease,
+      border-color
+      130ms
+      ease,
+      color
+      130ms
+      ease;
+  }
+
+
+  .sidebar-button svg {
+    width: 20px;
+    height: 20px;
+
+    flex:
+      0
+      0
+      20px;
+
+    stroke:
+      #5f7188;
+
+    transition:
+      stroke
+      130ms
+      ease;
+  }
+
+
+  .sidebar-button span {
+    min-width: 0;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+  }
+
+
+  /* =====================================================
+     BUTTON HOVER
+  ===================================================== */
+
+  .sidebar-button:hover {
+    background:
+      #f2f6fa;
+
+    border-color:
+      #e5ebf2;
+
+    color:
+      #263c59;
+
+    transform: none;
+
+    font-size:
+      var(
+        --text-md,
+        14px
+      );
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+  }
+
+
+  .sidebar-button:hover svg {
+    stroke:
+      #2486df;
+  }
+
+
+  /* =====================================================
+     ACTIVE BUTTON
+  ===================================================== */
+
+  .sidebar-button.active {
+    color:
+      #1769d2;
+
+    background:
+      linear-gradient(
+        90deg,
+        #eaf4ff 0%,
+        #f2f8ff 100%
+      );
+
+    border-color:
+      #d6e8fb;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      );
+  }
+
+
+  .sidebar-button.active::before {
+    content: "";
+
+    position: absolute;
+
+    left: -14px;
+
+    top: 8px;
+
+    bottom: 8px;
+
+    width: 3px;
+
+    border-radius:
+      0
+      3px
+      3px
+      0;
+
+    background:
+      #2486df;
+  }
+
+
+  .sidebar-button.active svg {
+    stroke:
+      #1e88e5;
+  }
+
+
+  /* =====================================================
+     MAIN CONTENT
+  ===================================================== */
+
+  .main {
+    flex:
+      1
+      1
+      auto;
+
+    min-width: 0;
+
+    height: 100%;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    background:
+      linear-gradient(
+        180deg,
+        #f4f7fa 0%,
+        #f8fafc 100%
+      );
+
+    scrollbar-width: thin;
+
+    scrollbar-color:
+      #cbd4df
+      transparent;
+  }
+
+
+  .main::-webkit-scrollbar {
+    width: 8px;
+  }
+
+
+  .main::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+
+  .main::-webkit-scrollbar-thumb {
+    background: #cbd4df;
+
+    border-radius: 999px;
+  }
+
+
+  .main::-webkit-scrollbar-thumb:hover {
+    background: #adb9c8;
+  }
+
+
+  /* =====================================================
+     SIDEBAR SCROLLBAR
+  ===================================================== */
+
+  .sidebarInner {
+    scrollbar-width: thin;
+
+    scrollbar-color:
+      #d3dbe5
+      transparent;
+  }
+
+
+  .sidebarInner::-webkit-scrollbar {
+    width: 6px;
+  }
+
+
+  .sidebarInner::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+
+  .sidebarInner::-webkit-scrollbar-thumb {
+    background: #d3dbe5;
+
+    border-radius: 999px;
+  }
+
 }

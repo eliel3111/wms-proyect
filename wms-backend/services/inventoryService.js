@@ -3,99 +3,185 @@ import { db } from "../db.js";
 
 
 
-//Service to obtain the current stock of an array of skus
-export async function getInventoryLocationsBySkus(db, skus = []) {
-
+// Service to obtain the current stock of an array of SKUs
+export async function getInventoryLocationsBySkus(
+  db,
+  skus = []
+) {
   try {
-
-    if (!Array.isArray(skus) || skus.length === 0) {
+    if (
+      !Array.isArray(skus) ||
+      skus.length === 0
+    ) {
       return new Map();
     }
 
-    const uniqueSkus = [...new Set(skus)];
+    const uniqueSkus = [
+      ...new Set(
+        skus
+          .map((sku) =>
+            String(sku).trim()
+          )
+          .filter(Boolean)
+      ),
+    ];
 
-    const result = await db.query(`
-      SELECT
-        ibl.product_sku,
-        ibl.location_id,
+    if (uniqueSkus.length === 0) {
+      return new Map();
+    }
 
-        SUM(ibl.qty_on_hand) AS qty_on_hand,
+    const result =
+      await db.query(
+        `
+          SELECT
+            ibl.product_sku,
+            ibl.location_id,
 
-        l.id,
-        l.code,
-        l.warehouse_id,
-        l.is_active
+            SUM(
+              COALESCE(
+                ibl.qty_on_hand,
+                0
+              )
+            ) AS qty_on_hand,
 
-      FROM inventory_by_location ibl
+            l.id,
+            l.code,
+            l.warehouse_id,
+            l.is_active,
+            l.location_type,
+            l.tramo,
+            l.nivel
 
-      LEFT JOIN locations l
-        ON l.id = ibl.location_id
+          FROM public.inventory_by_location AS ibl
 
-      WHERE ibl.product_sku = ANY($1)
+          INNER JOIN public.locations AS l
+            ON l.id = ibl.location_id
+           AND l.warehouse_id =
+               ibl.warehouse_id
 
-      GROUP BY
-        ibl.product_sku,
-        ibl.location_id,
-        l.id,
-        l.code,
-        l.warehouse_id,
-        l.is_active
+          WHERE ibl.product_sku =
+                ANY($1::text[])
 
-      ORDER BY
-        ibl.product_sku,
-        ibl.location_id
-    `, [uniqueSkus]);
+            -- No incluir inventario ubicado
+            -- en áreas de despacho.
+            AND l.location_type
+                IS DISTINCT FROM
+                'SHIPPING'
 
+            -- No incluir ubicaciones virtuales GENERAL.
+            AND UPPER(
+              COALESCE(
+                l.code,
+                ''
+              )
+            ) NOT LIKE 'GENERAL-%'
 
-    const inventoryMap = new Map();
+          GROUP BY
+            ibl.product_sku,
+            ibl.location_id,
+            l.id,
+            l.code,
+            l.warehouse_id,
+            l.is_active,
+            l.location_type,
+            l.tramo,
+            l.nivel
 
+          ORDER BY
+            ibl.product_sku ASC,
+            l.warehouse_id ASC,
+            l.tramo ASC NULLS LAST,
+            l.nivel ASC NULLS LAST,
+            ibl.location_id ASC
+        `,
+        [
+          uniqueSkus
+        ]
+      );
 
-    uniqueSkus.forEach(sku => {
+    const inventoryMap =
+      new Map();
 
-      inventoryMap.set(sku, {
-        total_qty_on_hand: 0,
-        locations: []
-      });
+    // Crear una entrada incluso para los productos
+    // que no tengan inventario disponible.
+    for (const sku of uniqueSkus) {
+      inventoryMap.set(
+        sku,
+        {
+          total_qty_on_hand: 0,
+          locations: [],
+        }
+      );
+    }
 
-    });
+    for (const row of result.rows) {
+      const sku =
+        row.product_sku;
 
+      const qty =
+        Number(
+          row.qty_on_hand || 0
+        );
 
-    result.rows.forEach(row => {
+      const productInventory =
+        inventoryMap.get(sku);
 
-      const sku = row.product_sku;
+      if (!productInventory) {
+        continue;
+      }
 
-      const qty = Number(row.qty_on_hand || 0);
-
-      const productInventory = inventoryMap.get(sku);
-
-      productInventory.total_qty_on_hand += qty;
+      productInventory.total_qty_on_hand +=
+        qty;
 
       productInventory.locations.push({
-        location_id: row.location_id,
-        location_code: row.code,
-        qty_on_hand: qty,
-        warehouse_id: row.warehouse_id,
-        is_active: row.is_active
+        location_id:
+          row.location_id,
+
+        location_code:
+          row.code,
+
+        location_type:
+          row.location_type,
+
+        qty_on_hand:
+          qty,
+
+        warehouse_id:
+          row.warehouse_id,
+
+        is_active:
+          row.is_active,
+
+        tramo:
+          row.tramo,
+
+        nivel:
+          row.nivel,
       });
-
-    });
-
+    }
 
     return inventoryMap;
-
   } catch (error) {
-
     console.error(
       "❌ ERROR OBTENIENDO INVENTARIO POR SKU:",
-      error
+      {
+        message:
+          error.message,
+
+        code:
+          error.code,
+
+        detail:
+          error.detail,
+
+        constraint:
+          error.constraint,
+      }
     );
 
-    // IMPORTANTE:
-    // dejamos que el controller maneje el response HTTP
     throw error;
   }
 }
-
 
 
 

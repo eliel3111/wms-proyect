@@ -160,6 +160,26 @@
     cursor: pointer;
 }
 
+.line-diff {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+    font-size: 14px;
+  /* Un dígito conserva un tamaño visual mínimo */
+  min-width: 32px;
+
+  /* Crece automáticamente para 2, 3, 4 o más dígitos */
+  width: max-content;
+  padding: 6px 6px;
+
+  box-sizing: border-box;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  /* Mantiene todos los números con ancho uniforme */
+  font-variant-numeric: tabular-nums;
+}
+
 .line-edit-btn:hover {
     opacity: 0.9;
 }
@@ -177,7 +197,7 @@
   border-radius: 6px;
   padding: 7px 12px;
   cursor: pointer;
-  
+  display: none;
   background-color: #5f6368;
   color: white;
 }

@@ -1008,6 +1008,8 @@ export async function syncAdmCloudSalesOrderByGuidService(
 
   const result = response.data;
 
+ 
+
   if (result?.success === false) {
     throw fail(
       422,
@@ -1023,6 +1025,11 @@ export async function syncAdmCloudSalesOrderByGuidService(
       "No se encontró el pedido en ADM Cloud."
     );
   }
+
+  console.log(
+  "ITEMS DE LA ORDEN:",
+  JSON.stringify(result.data.Items, null, 2)
+);
 
   const order = { ...result.data };
 
@@ -1045,29 +1052,201 @@ export async function syncAdmCloudSalesOrderByGuidService(
     );
   }
 
-  // 2. Normalizar el estado
-  const hasDispatchStatus =
-    order.DispatchStatus !== null &&
-    order.DispatchStatus !== undefined &&
-    String(order.DispatchStatus).trim() !== "";
+ // ==========================================================
+// 2. NORMALIZAR ESTADO DE DESPACHO
+// ==========================================================
 
-  if (!hasDispatchStatus) {
-    const isPending =
-      [0, "0"].includes(order.Status) &&
-      String(order.StatusDesc ?? "").trim().toLowerCase() ===
-        "pendiente de despacho";
+console.log(
+  "🚦 Estado recibido en el encabezado:",
+  {
+    Status:
+      order.Status,
 
-    if (!isPending) {
-      throw fail(
-        422,
-        "Estado del pedido sin equivalencia",
-        "El pedido no incluye DispatchStatus y su Status todavía no tiene una equivalencia definida."
-      );
-    }
+    StatusDesc:
+      order.StatusDesc,
 
-    order.DispatchStatus = 0;
-    order.DispatchStatusDesc = order.StatusDesc;
+    DispatchStatus:
+      order.DispatchStatus,
+
+    DispatchStatusDesc:
+      order.DispatchStatusDesc,
+
+    Void:
+      order.Void,
   }
+);
+
+const hasDispatchStatus =
+  order.DispatchStatus !== null &&
+  order.DispatchStatus !== undefined &&
+  String(
+    order.DispatchStatus
+  ).trim() !== "";
+
+if (hasDispatchStatus) {
+  const normalizedDispatchStatus =
+    Number(
+      order.DispatchStatus
+    );
+
+  if (
+    ![0, 1, 2].includes(
+      normalizedDispatchStatus
+    )
+  ) {
+    throw fail(
+      422,
+      "Estado de despacho inválido",
+      `ADM Cloud devolvió DispatchStatus=${order.DispatchStatus}.`
+    );
+  }
+
+  order.DispatchStatus =
+    normalizedDispatchStatus;
+} else {
+  /*
+   * La consulta individual de ADM Cloud no siempre
+   * devuelve DispatchStatus. Por eso se calcula
+   * usando las cantidades de las líneas.
+   */
+  const inventoryItems =
+    order.Items.filter(
+      (item) =>
+        item?.ItemType === "I"
+    );
+
+  if (
+    inventoryItems.length === 0
+  ) {
+    throw fail(
+      422,
+      "Pedido sin artículos",
+      "La orden no contiene artículos de inventario para calcular su estado de despacho."
+    );
+  }
+
+  const totals =
+    inventoryItems.reduce(
+      (
+        accumulator,
+        item
+      ) => {
+        const ordered =
+          Number(
+            item.Quantity ?? 0
+          );
+
+        const completed =
+          Number(
+            item.CompletedQuantity ??
+            0
+          );
+
+        const calculatedPending =
+          Math.max(
+            ordered - completed,
+            0
+          );
+
+        const pending =
+          item.PendingCompletedQuantity !==
+            null &&
+          item.PendingCompletedQuantity !==
+            undefined &&
+          String(
+            item.PendingCompletedQuantity
+          ).trim() !== ""
+            ? Number(
+                item.PendingCompletedQuantity
+              )
+            : calculatedPending;
+
+        if (
+          !Number.isFinite(
+            ordered
+          ) ||
+          !Number.isFinite(
+            completed
+          ) ||
+          !Number.isFinite(
+            pending
+          )
+        ) {
+          throw fail(
+            502,
+            "Cantidades inválidas",
+            `ADM Cloud devolvió cantidades inválidas en la línea ${item.ID ?? "sin ID"}.`
+          );
+        }
+
+        accumulator.ordered +=
+          ordered;
+
+        accumulator.completed +=
+          completed;
+
+        accumulator.pending +=
+          Math.max(
+            pending,
+            0
+          );
+
+        return accumulator;
+      },
+      {
+        ordered: 0,
+        completed: 0,
+        pending: 0,
+      }
+    );
+
+  const EPSILON =
+    0.000001;
+
+  if (
+    totals.pending <= EPSILON
+  ) {
+    // Todo despachado.
+    order.DispatchStatus = 2;
+
+    order.DispatchStatusDesc =
+      "Despachado";
+  } else if (
+    totals.completed > EPSILON
+  ) {
+    // Parte despachada y parte pendiente.
+    order.DispatchStatus = 1;
+
+    order.DispatchStatusDesc =
+      "Parcialmente despachado";
+  } else {
+    // Nada despachado.
+    order.DispatchStatus = 0;
+
+    order.DispatchStatusDesc =
+      "Pendiente de despacho";
+  }
+
+  console.log(
+    "🚚 DispatchStatus calculado desde Items:",
+    {
+      ordered:
+        totals.ordered,
+
+      completed:
+        totals.completed,
+
+      pending:
+        totals.pending,
+
+      DispatchStatus:
+        order.DispatchStatus,
+
+      DispatchStatusDesc:
+        order.DispatchStatusDesc,
+    }
+  );
+}
 
   // 3. Serializar la sincronización del mismo GUID
   await clientDb.query(
@@ -1143,6 +1322,60 @@ export async function syncAdmCloudSalesOrderByGuidService(
     picking,
     lines,
   };
+}
+
+
+
+
+
+
+function normalizeErpNumber(
+  value,
+  {
+    fieldName,
+    lineId,
+    defaultValue = 0,
+  }
+) {
+  const normalizedValue =
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+      ? defaultValue
+      : Number(value);
+
+  if (!Number.isFinite(normalizedValue)) {
+    throw new Error(
+      `${fieldName} inválido en la línea ${lineId}: ${value}`
+    );
+  }
+
+  return normalizedValue;
+}
+
+function normalizeErpInteger(
+  value,
+  {
+    fieldName,
+    lineId,
+    defaultValue = 0,
+  }
+) {
+  const normalizedValue =
+    normalizeErpNumber(value, {
+      fieldName,
+      lineId,
+      defaultValue,
+    });
+
+  if (!Number.isSafeInteger(normalizedValue)) {
+    throw new Error(
+      `${fieldName} debe ser un número entero en la línea ` +
+      `${lineId}: ${value}`
+    );
+  }
+
+  return normalizedValue;
 }
 
 
@@ -1237,12 +1470,69 @@ export async function syncAdmCloudSalesOrderLines(
       throw new Error(`Cantidad inválida en la línea ${lineId}.`);
     }
 
+
+
+    const price = normalizeErpNumber(
+  item.Price,
+  {
+    fieldName: "Price",
+    lineId,
+    defaultValue: 0,
+  }
+);
+
+const cost = normalizeErpNumber(
+  item.Cost,
+  {
+    fieldName: "Cost",
+    lineId,
+    defaultValue: 0,
+  }
+);
+
+const exchangeRate = normalizeErpNumber(
+  item.ExchangeRate ??
+    order.ExchangeRate,
+  {
+    fieldName: "ExchangeRate",
+    lineId,
+    defaultValue: 0,
+  }
+);
+
+const warrantyDays = normalizeErpInteger(
+  item.WarrantyDays,
+  {
+    fieldName: "WarrantyDays",
+    lineId,
+    defaultValue: 0,
+  }
+);
+
+const warrantyUnits = normalizeErpInteger(
+  item.WarrantyUnits,
+  {
+    fieldName: "WarrantyUnits",
+    lineId,
+    defaultValue: 0,
+  }
+);
+
+
+
+
     lines.push({
-      lineId,
-      productErpId,
-      quantity,
-      sku: item.ItemSKU,
-    });
+  lineId,
+  productErpId,
+  quantity,
+  sku: item.ItemSKU,
+
+  price,
+  cost,
+  exchangeRate,
+  warrantyDays,
+  warrantyUnits,
+});
   }
 
   // 2. Bloquear el picking durante la sincronización.
@@ -1264,26 +1554,33 @@ export async function syncAdmCloudSalesOrderLines(
 
   // 3. Leer y bloquear sus movimientos actuales.
   const moveResult = await clientDb.query(
-    `
-      SELECT
-        sm.id,
-        sm.erp_move_id,
-        sm.product_id,
-        sm.product_uom_id,
-        sm.product_qty,
-        sm.reserved_qty,
-        sm.state,
-        EXISTS (
-          SELECT 1
-          FROM stock_move_line sml
-          WHERE sml.move_id = sm.id
-        ) AS has_details
-      FROM stock_move sm
-      WHERE sm.picking_id = $1
-      FOR UPDATE OF sm
-    `,
-    [pickingIdInt]
-  );
+  `
+    SELECT
+      sm.id,
+      sm.erp_move_id,
+      sm.product_id,
+      sm.product_uom_id,
+      sm.product_qty,
+      sm.reserved_qty,
+      sm.state,
+
+      sm.erp_price,
+      sm.erp_cost,
+      sm.erp_exchange_rate,
+      sm.erp_warranty_days,
+      sm.erp_warranty_units,
+
+      EXISTS (
+        SELECT 1
+        FROM stock_move_line sml
+        WHERE sml.move_id = sm.id
+      ) AS has_details
+    FROM stock_move sm
+    WHERE sm.picking_id = $1
+    FOR UPDATE OF sm
+  `,
+  [pickingIdInt]
+);
 
   const existingMoves = new Map();
 
@@ -1330,31 +1627,59 @@ export async function syncAdmCloudSalesOrderLines(
       }
 
       await clientDb.query(
-        `
-          INSERT INTO stock_move (
-            erp_move_id,
-            picking_id,
-            name,
-            reference,
-            erp_product_id,
-            product_id,
-            product_uom_id,
-            product_qty,
-            state
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft')
-        `,
-        [
-          line.lineId,
-          pickingIdInt,
-          `MOVE-${line.lineId}`,
-          picking.name,
-          line.productErpId,
-          product.id,
-          product.uom_id,
-          line.quantity,
-        ]
-      );
+  `
+    INSERT INTO stock_move (
+      erp_move_id,
+      picking_id,
+      name,
+      reference,
+      erp_product_id,
+      product_id,
+      product_uom_id,
+      product_qty,
+
+      erp_price,
+      erp_cost,
+      erp_exchange_rate,
+      erp_warranty_days,
+      erp_warranty_units,
+
+      state
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      $7,
+      $8,
+      $9,
+      $10,
+      $11,
+      $12,
+      $13,
+      'draft'
+    )
+  `,
+  [
+    line.lineId,
+    pickingIdInt,
+    `MOVE-${line.lineId}`,
+    picking.name,
+    line.productErpId,
+    product.id,
+    product.uom_id,
+    line.quantity,
+
+    line.price,
+    line.cost,
+    line.exchangeRate,
+    line.warrantyDays,
+    line.warrantyUnits,
+  ]
+);
 
       summary.inserted++;
       continue;
@@ -1406,26 +1731,40 @@ export async function syncAdmCloudSalesOrderLines(
     }
 
     await clientDb.query(
-      `
-        UPDATE stock_move
-        SET
-          erp_product_id = $1,
-          product_id = $2,
-          product_uom_id = $3,
-          product_qty = $4,
-          reference = $5,
-          write_date = NOW()
-        WHERE id = $6
-      `,
-      [
-        line.productErpId,
-        product.id,
-        product.uom_id,
-        line.quantity,
-        picking.name,
-        currentMove.id,
-      ]
-    );
+  `
+    UPDATE stock_move
+    SET
+      erp_product_id = $1,
+      product_id = $2,
+      product_uom_id = $3,
+      product_qty = $4,
+      reference = $5,
+
+      erp_price = $6,
+      erp_cost = $7,
+      erp_exchange_rate = $8,
+      erp_warranty_days = $9,
+      erp_warranty_units = $10,
+
+      write_date = NOW()
+    WHERE id = $11
+  `,
+  [
+    line.productErpId,
+    product.id,
+    product.uom_id,
+    line.quantity,
+    picking.name,
+
+    line.price,
+    line.cost,
+    line.exchangeRate,
+    line.warrantyDays,
+    line.warrantyUnits,
+
+    currentMove.id,
+  ]
+);
 
     summary.updated++;
   }

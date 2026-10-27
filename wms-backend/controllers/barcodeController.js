@@ -608,3 +608,217 @@ export async function searchProducts(req, res) {
   }
 
 }
+
+/* =========================================================
+   BUSCAR UBICACIONES POR CODE
+========================================================= */
+
+export async function searchLocationsByCode(
+    req,
+    res
+) {
+
+    try {
+
+        const search =
+            String(
+                req.query.q || ""
+            ).trim();
+
+
+        const excludeIdsRaw =
+            String(
+                req.query.excludeIds || ""
+            ).trim();
+
+
+        /* =====================================================
+           VALIDACIÓN
+        ===================================================== */
+
+        if (!search) {
+
+            return res.status(200).json({
+                success: true,
+                data: [],
+                message:
+                    "Escriba un código de ubicación."
+            });
+
+        }
+
+
+        if (search.length > 100) {
+
+            return res.status(400).json({
+                success: false,
+                code:
+                    "INVALID_LOCATION_SEARCH",
+                message:
+                    "El texto de búsqueda es demasiado largo."
+            });
+
+        }
+
+
+        /* =====================================================
+           UBICACIONES A EXCLUIR
+
+           Ejemplo recibido:
+
+           ?excludeIds=2,5,10
+
+        ===================================================== */
+
+        const excludeIds =
+            excludeIdsRaw
+                .split(",")
+                .map(
+                    value =>
+                        Number(value)
+                )
+                .filter(
+                    value =>
+                        Number.isInteger(value) &&
+                        value > 0
+                );
+
+
+        /* =====================================================
+           SEARCH
+
+           - Solo activas
+           - No SHIPPING
+           - Que contengan lo escrito
+           - Excluir ubicaciones donde ya está el producto
+           - Máximo 5
+        ===================================================== */
+
+        const result =
+            await db.query(
+                `
+                SELECT
+                    l.id AS location_id,
+                    l.warehouse_id,
+                    l.code AS location_code,
+                    l.description,
+                    l.is_active,
+                    l.location_type,
+                    l.tramo,
+                    l.nivel
+
+                FROM locations l
+
+                WHERE
+                    l.is_active = TRUE
+
+                    AND UPPER(
+                        COALESCE(
+                            l.location_type,
+                            ''
+                        )
+                    ) <> 'SHIPPING'
+
+                    AND l.code ILIKE
+                        '%' || $1 || '%'
+
+                    AND NOT (
+                        l.id =
+                        ANY(
+                            $2::int[]
+                        )
+                    )
+
+                ORDER BY
+
+                    /*
+                     * Primero coincidencia exacta.
+                     */
+                    CASE
+
+                        WHEN UPPER(l.code) =
+                             UPPER($1)
+                        THEN 0
+
+                        /*
+                         * Después los que comienzan
+                         * con lo escrito.
+                         */
+                        WHEN l.code ILIKE
+                             $1 || '%'
+                        THEN 1
+
+                        /*
+                         * Después los que simplemente
+                         * contienen el texto.
+                         */
+                        ELSE 2
+
+                    END ASC,
+
+                    /*
+                     * Dentro de cada grupo,
+                     * los últimos creados primero.
+                     */
+                    l.id DESC
+
+                LIMIT 5
+                `,
+                [
+                    search,
+                    excludeIds
+                ]
+            );
+
+
+        /* =====================================================
+           NO EXISTE
+           
+           Esto NO es un error HTTP.
+           Es un autocomplete sin resultados.
+        ===================================================== */
+
+        if (
+            result.rows.length === 0
+        ) {
+
+            return res.status(200).json({
+                success: true,
+                data: [],
+                message:
+                    `No existe una ubicación que contenga "${search}".`
+            });
+
+        }
+
+
+        /* =====================================================
+           SUCCESS
+        ===================================================== */
+
+        return res.status(200).json({
+            success: true,
+            data:
+                result.rows
+        });
+
+
+    } catch (error) {
+
+        console.error(
+            "❌ Error buscando ubicaciones:",
+            error
+        );
+
+
+        return res.status(500).json({
+            success: false,
+            code:
+                "LOCATION_SEARCH_ERROR",
+            message:
+                "Ocurrió un error buscando las ubicaciones."
+        });
+
+    }
+
+}

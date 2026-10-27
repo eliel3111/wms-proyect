@@ -6032,3 +6032,493 @@ export async function adjustInventoryByLocation(req, res) {
     }
 }
 
+
+
+
+
+
+
+export async function addLocationStock(req, res) {
+
+    const client =
+        await db.connect();
+
+
+    try {
+
+        const {
+            warehouse_id,
+            location_id,
+            product_sku,
+            new_qty,
+        } = req.body;
+
+
+        // =========================================================
+        // 1. VALIDACIONES BÁSICAS
+        // =========================================================
+
+        if (
+            warehouse_id == null ||
+            location_id == null ||
+            !product_sku ||
+            new_qty == null
+        ) {
+
+            return res.status(400).json({
+                success: false,
+                title: "Datos incompletos",
+                message:
+                    "warehouse_id, location_id, product_sku y new_qty son requeridos",
+            });
+
+        }
+
+
+        const warehouseId =
+            Number(warehouse_id);
+
+
+        const locationId =
+            Number(location_id);
+
+
+        const qty =
+            Number(new_qty);
+
+
+        if (
+            !Number.isInteger(warehouseId) ||
+            warehouseId <= 0
+        ) {
+
+            return res.status(400).json({
+                success: false,
+                title: "Almacén inválido",
+                message:
+                    "warehouse_id debe ser un valor válido",
+            });
+
+        }
+
+
+        if (
+            !Number.isInteger(locationId) ||
+            locationId <= 0
+        ) {
+
+            return res.status(400).json({
+                success: false,
+                title: "Ubicación inválida",
+                message:
+                    "location_id debe ser un valor válido",
+            });
+
+        }
+
+
+        if (
+            !Number.isFinite(qty) ||
+            qty <= 0
+        ) {
+
+            return res.status(400).json({
+                success: false,
+                title: "Cantidad inválida",
+                message:
+                    "La cantidad debe ser un número mayor que 0",
+            });
+
+        }
+
+
+        const sku =
+            String(product_sku)
+                .trim();
+
+
+        if (!sku) {
+
+            return res.status(400).json({
+                success: false,
+                title: "Producto inválido",
+                message:
+                    "El producto no tiene un SKU válido",
+            });
+
+        }
+
+
+        // =========================================================
+        // 2. INICIAR TRANSACCIÓN
+        // =========================================================
+
+        await client.query(
+            "BEGIN"
+        );
+
+
+        // =========================================================
+        // 3. VALIDAR PRODUCTO
+        // =========================================================
+
+        const productResult =
+            await client.query(
+                `
+                SELECT
+                    id,
+                    sku,
+                    description,
+                    erp_name
+
+                FROM products
+
+                WHERE sku = $1
+
+                LIMIT 1
+                `,
+                [
+                    sku
+                ]
+            );
+
+
+        if (
+            productResult.rows.length === 0
+        ) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+
+            return res.status(404).json({
+                success: false,
+                title: "Producto no encontrado",
+                message:
+                    "No existe un producto con ese SKU",
+            });
+
+        }
+
+
+        // =========================================================
+        // 4. VALIDAR UBICACIÓN
+        // =========================================================
+
+        const locationResult =
+            await client.query(
+                `
+                SELECT
+                    id,
+                    warehouse_id,
+                    code,
+                    description,
+                    is_active,
+                    location_type
+
+                FROM locations
+
+                WHERE id = $1
+
+                LIMIT 1
+
+                FOR UPDATE
+                `,
+                [
+                    locationId
+                ]
+            );
+
+
+        if (
+            locationResult.rows.length === 0
+        ) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+
+            return res.status(404).json({
+                success: false,
+                title: "Ubicación no encontrada",
+                message:
+                    "La ubicación seleccionada no existe",
+            });
+
+        }
+
+
+        const location =
+            locationResult.rows[0];
+
+
+        // =========================================================
+        // 5. VALIDAR QUE ESTÉ ACTIVA
+        // =========================================================
+
+        if (!location.is_active) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+
+            return res.status(400).json({
+                success: false,
+                title: "Ubicación inactiva",
+                message:
+                    "No se puede agregar inventario a una ubicación inactiva",
+            });
+
+        }
+
+
+        // =========================================================
+        // 6. NO PERMITIR SHIPPING
+        // =========================================================
+
+        if (
+            String(
+                location.location_type || ""
+            )
+                .trim()
+                .toUpperCase() ===
+            "SHIPPING"
+        ) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+
+            return res.status(400).json({
+                success: false,
+                title: "Ubicación no permitida",
+                message:
+                    "No se puede agregar inventario directamente a una ubicación de despacho",
+            });
+
+        }
+
+
+        // =========================================================
+        // 7. VALIDAR WAREHOUSE
+        // =========================================================
+
+        if (
+            Number(
+                location.warehouse_id
+            ) !==
+            warehouseId
+        ) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+
+            return res.status(400).json({
+                success: false,
+                title: "Almacén incorrecto",
+                message:
+                    "La ubicación seleccionada no pertenece al almacén indicado",
+            });
+
+        }
+
+
+        // =========================================================
+        // 8. VERIFICAR SI YA EXISTE INVENTARIO
+        // =========================================================
+
+        const inventoryResult =
+            await client.query(
+                `
+                SELECT
+                    id,
+                    warehouse_id,
+                    location_id,
+                    product_sku,
+                    qty_on_hand,
+                    qty_reserved
+
+                FROM inventory_by_location
+
+                WHERE warehouse_id = $1
+                  AND location_id = $2
+                  AND product_sku = $3
+
+                LIMIT 1
+
+                FOR UPDATE
+                `,
+                [
+                    warehouseId,
+                    locationId,
+                    sku
+                ]
+            );
+
+
+        // =========================================================
+        // 9. SI YA EXISTE, NO CREAR DUPLICADO
+        // =========================================================
+
+        if (
+            inventoryResult.rows.length > 0
+        ) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+
+            return res.status(409).json({
+                success: false,
+                title: "Inventario existente",
+                message:
+                    "Este producto ya tiene inventario registrado en esa ubicación",
+            });
+
+        }
+
+
+        // =========================================================
+        // 10. CREAR INVENTARIO
+        // =========================================================
+
+        const insertResult =
+            await client.query(
+                `
+                INSERT INTO inventory_by_location
+                (
+                    warehouse_id,
+                    location_id,
+                    product_sku,
+                    qty_on_hand,
+                    qty_reserved,
+                    old_qty_on_hand,
+                    updated_at
+                )
+
+                VALUES
+                (
+                    $1,
+                    $2,
+                    $3,
+                    $4,
+                    0,
+                    0,
+                    NOW()
+                )
+
+                RETURNING
+                    id,
+                    warehouse_id,
+                    location_id,
+                    product_sku,
+                    qty_on_hand,
+                    qty_reserved,
+                    qty_available,
+                    old_qty_on_hand,
+                    updated_at
+                `,
+                [
+                    warehouseId,
+                    locationId,
+                    sku,
+                    qty
+                ]
+            );
+
+
+        // =========================================================
+        // 11. COMMIT
+        // =========================================================
+
+        await client.query(
+            "COMMIT"
+        );
+
+
+        // =========================================================
+        // 12. RESPONSE
+        // =========================================================
+
+        return res.status(201).json({
+            success: true,
+            title: "Inventario agregado",
+            message:
+                `${qty} unidades fueron agregadas a la ubicación ${location.code}`,
+            data:
+                insertResult.rows[0],
+        });
+
+
+    } catch (error) {
+
+        try {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+        } catch (
+            rollbackError
+        ) {
+
+            console.error(
+                "Error ejecutando ROLLBACK:",
+                rollbackError
+            );
+
+        }
+
+
+        console.error(
+            "Error agregando inventario a ubicación:",
+            error
+        );
+
+
+        /*
+         * Si tienes UNIQUE:
+         *
+         * warehouse_id,
+         * location_id,
+         * product_sku
+         *
+         * PostgreSQL devuelve 23505
+         */
+
+        if (
+            error.code === "23505"
+        ) {
+
+            return res.status(409).json({
+                success: false,
+                title: "Inventario existente",
+                message:
+                    "Este producto ya tiene inventario registrado en esa ubicación",
+            });
+
+        }
+
+
+        return res.status(500).json({
+            success: false,
+            title: "Error interno",
+            message:
+                "No se pudo agregar el inventario a la ubicación",
+        });
+
+
+    } finally {
+
+        client.release();
+
+    }
+
+}

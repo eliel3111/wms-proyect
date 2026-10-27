@@ -7,7 +7,7 @@ import PickingActive from "../components/PickingActive.tsx"
 export default function MonitorPicking() {
     const [isMobile, setIsMobile] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [view, setView] = useState("pickers-active");
+    const [view, setView] = useState("picking-process");
 
 
 
@@ -44,15 +44,47 @@ export default function MonitorPicking() {
                     <h3>Sidebar</h3>
                     <nav className="nav">
 
-                        <button onClick={() => setView("pickers-active")} className="sidebar-button">
-                            <Package size={22} />
-                            <span>Pickets</span>
-                        </button>
+                        <button
+    onClick={() =>
+        setView("picking-process")
+    }
+    className={`
+        sidebar-button
+        ${
+            view === "picking-process"
+                ? "active"
+                : ""
+        }
+    `}
+>
+    <Activity size={22} />
 
-                        <button onClick={() => setView("picking-process")} className="sidebar-button">
-                            <Activity size={22} />
-                            <span>Proceso de Picking</span>
-                        </button>
+    <span>
+        Proceso de Picking
+    </span>
+</button>
+
+                        <button
+    onClick={() =>
+        setView("pickers-active")
+    }
+    className={`
+        sidebar-button
+        ${
+            view === "pickers-active"
+                ? "active"
+                : ""
+        }
+    `}
+>
+    <Package size={22} />
+
+    <span>
+        Pickers
+    </span>
+</button>
+
+                        
                         
                     </nav>
                 </div>

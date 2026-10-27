@@ -175,6 +175,74 @@ export default function PickingRoute() {
         }
     };
 
+    const fetchUpdatedMoveLines = async () => {
+  if (!pickingId) {
+    return false;
+  }
+
+  try {
+    const response = await apiClient.get(
+      `/picking/${pickingId}/move-lines`
+    );
+
+    const result = response.data;
+
+    console.log(
+      "📦 Move lines actualizadas:",
+      result
+    );
+
+    if (!result.success) {
+      openModal({
+        title:
+          result.title ||
+          "No se pudieron actualizar las líneas",
+
+        message:
+          result.message ||
+          "Ocurrió un error obteniendo las líneas del picking.",
+      });
+
+      return false;
+    }
+
+    const updatedLines =
+      Array.isArray(result.data)
+        ? result.data
+        : [];
+
+    // Guardar las líneas nuevas en pickings.
+    setPickings(updatedLines);
+
+    console.log(
+      "✅ Pickings actualizado:",
+      updatedLines
+    );
+
+    return true;
+  } catch (error: any) {
+    const backendError =
+      error.response?.data;
+
+    console.error(
+      "❌ Error obteniendo move lines:",
+      backendError || error
+    );
+
+    openModal({
+      title:
+        backendError?.title ||
+        "Información guardada",
+
+      message:
+        backendError?.message ||
+        "La línea fue guardada, pero no se pudo actualizar la lista del picking.",
+    });
+
+    return false;
+  }
+};
+
     const alreadyCheckedRef = useRef(false);
 
     useEffect(() => {
@@ -666,7 +734,7 @@ export default function PickingRoute() {
 
             // ✅ TODO BIEN → LIMPIAR UI
 
-            await fetchData();
+            await fetchUpdatedMoveLines();
             setGoNext(true);
             setFromLocation(null);
             setSelectedProduct(null);
@@ -822,30 +890,111 @@ export default function PickingRoute() {
 
     return (
         <div className="page-orden-compra">
-            <div className="container-title">
-                <div className="order-div-a">
-                    {/* SVG */}
-                    <div className="order-icon-picking">
-                        <svg id="fi_19025404" height={50} width={50} enable-background="new 0 0 1024 1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><g id="XMLID_1129_"><g id="XMLID_24_"><path id="XMLID_28_" d="m408 317h48.1 115.6 140.4 121c19.6 0 39.2.5 58.8 0h.8c-9.6-12.7-19.3-25.3-28.9-38-2.7 11.9-5.5 23.7-8.2 35.6-6.6 28.3-13.1 56.6-19.7 85-8 34.4-16 68.8-23.9 103.3-6.9 29.8-13.8 59.5-20.7 89.3-3.3 14.4-7.1 28.8-10 43.3 0 .2-.1.4-.1.6 9.6-7.3 19.3-14.7 28.9-22-16.5 0-33 0-49.4 0-39.4 0-78.8 0-118.2 0-47.8 0-95.6 0-143.4 0-41.2 0-82.4 0-123.5 0-20 0-40.1-.6-60.1 0-.3 0-.6 0-.9 0 9.6 7.3 19.3 14.7 28.9 22-3-16.9-6-33.8-8.9-50.8-7.2-40.7-14.3-81.3-21.5-122-8.7-49.2-17.3-98.4-26-147.6-7.5-42.5-15-85.1-22.5-127.6-3.6-20.6-6.3-41.7-10.9-62.2-.1-.3-.1-.6-.2-.9-1.1-6.2-6-11.9-10.8-15.6-5.2-4-11.4-6.4-18.2-6.4-41.9 0-83.8 0-125.7 0-5.9 0-11.8 0-17.8 0-15.7 0-30.7 13.8-30 30 .7 16.3 13.2 30 30 30h125.7 17.8c-9.6-7.3-19.3-14.7-28.9-22 3 16.9 6 33.8 8.9 50.8 7.2 40.7 14.3 81.3 21.5 122 8.7 49.2 17.3 98.4 26 147.6 7.5 42.5 15 85.1 22.5 127.6 3.6 20.6 6.3 41.7 10.9 62.2.1.3.1.6.2.9 1.1 6.2 6 11.9 10.8 15.6 5.2 4 11.4 6.4 18.2 6.4h49.4 118.2 143.4 123.5c20 0 40.1.6 60.1 0h.9c12.7 0 26-9.3 28.9-22 2.7-11.9 5.5-23.7 8.2-35.6 6.6-28.3 13.1-56.6 19.7-85 8-34.4 16-68.8 23.9-103.3 6.9-29.8 13.8-59.5 20.7-89.3 3.3-14.4 6.9-28.8 10-43.3 0-.2.1-.4.1-.6 4.4-18.9-8.8-38-28.9-38-16 0-32.1 0-48.1 0-38.5 0-77.1 0-115.6 0-46.8 0-93.6 0-140.4 0-40.3 0-80.6 0-121 0-19.6 0-39.2-.4-58.8 0-.3 0-.6 0-.8 0-15.7 0-30.7 13.8-30 30 .7 16.3 13.2 30 30 30z"></path></g></g><g id="XMLID_1125_"><g id="XMLID_18_"><path id="XMLID_22_" d="m420.4 813.5c0 3.2-.3 6.4-.7 9.6.4-2.7.7-5.3 1.1-8-.9 5.8-2.4 11.3-4.6 16.7 1-2.4 2-4.8 3-7.2-1.7 3.8-3.6 7.5-5.9 10.9-.2.3-1.7 2.7-1.9 2.7-.1 0 5-6.1 2.3-3-1.4 1.6-2.8 3.3-4.4 4.8-1.4 1.4-2.9 2.6-4.3 3.9-1.9 1.7-4.8 2.5 2.5-1.9-.7.4-1.4 1-2.1 1.5-3.6 2.4-7.5 4.5-11.5 6.2l7.2-3c-5.4 2.2-10.9 3.8-16.7 4.6 2.7-.4 5.3-.7 8-1.1-6.4.8-12.8.8-19.2 0 2.7.4 5.3.7 8 1.1-5.8-.9-11.3-2.4-16.7-4.6l7.2 3c-3.8-1.7-7.5-3.6-10.9-5.9-.3-.2-2.7-1.7-2.7-1.9 0-.1 6.1 5 3 2.3-1.6-1.4-3.3-2.8-4.8-4.4-1.4-1.4-2.6-2.9-3.9-4.3-1.7-1.9-2.5-4.8 1.9 2.5-.4-.7-1-1.4-1.5-2.1-2.4-3.6-4.5-7.5-6.2-11.5 1 2.4 2 4.8 3 7.2-2.2-5.4-3.8-10.9-4.6-16.7.4 2.7.7 5.3 1.1 8-.8-6.4-.8-12.8 0-19.2-.4 2.7-.7 5.3-1.1 8 .9-5.8 2.4-11.3 4.6-16.7-1 2.4-2 4.8-3 7.2 1.7-3.8 3.6-7.5 5.9-10.9.2-.3 1.7-2.7 1.9-2.7.1 0-5 6.1-2.3 3 1.4-1.6 2.8-3.3 4.4-4.8 1.4-1.4 2.9-2.6 4.3-3.9 1.9-1.7 4.8-2.5-2.5 1.9.7-.4 1.4-1 2.1-1.5 3.6-2.4 7.5-4.5 11.5-6.2-2.4 1-4.8 2-7.2 3 5.4-2.2 10.9-3.8 16.7-4.6-2.7.4-5.3.7-8 1.1 6.4-.8 12.8-.8 19.2 0-2.7-.4-5.3-.7-8-1.1 5.8.9 11.3 2.4 16.7 4.6-2.4-1-4.8-2-7.2-3 3.8 1.7 7.5 3.6 10.9 5.9.3.2 2.7 1.7 2.7 1.9 0 .1-6.1-5-3-2.3 1.6 1.4 3.3 2.8 4.8 4.4 1.4 1.4 2.6 2.9 3.9 4.3 1.7 1.9 2.5 4.8-1.9-2.5.4.7 1 1.4 1.5 2.1 2.4 3.6 4.5 7.5 6.2 11.5-1-2.4-2-4.8-3-7.2 2.2 5.4 3.8 10.9 4.6 16.7-.4-2.7-.7-5.3-1.1-8 .4 3.2.6 6.4.7 9.6.2 15.7 13.7 30.7 30 30 16.1-.7 30.2-13.2 30-30-.2-19.3-5.8-39.3-17.1-55.1-12.5-17.4-28.6-29.6-48.6-37.1-35.8-13.5-80.9-1.5-105.2 28-14.2 17.2-22.2 36.4-24 58.7-1.6 19 3.8 39.5 13.7 55.7 9.6 15.8 24.1 29.7 41 37.5 20.4 9.3 41.6 11.9 63.6 7.6 44.6-8.7 76.2-50.8 76.7-95.3.2-15.7-13.9-30.7-30-30-16.5.8-30 13.2-30.1 30z"></path></g></g><g id="XMLID_1127_"><g id="XMLID_14_"><path id="XMLID_23_" d="m786.4 813.5c0 3.2-.3 6.4-.7 9.6.4-2.7.7-5.3 1.1-8-.9 5.8-2.4 11.3-4.6 16.7 1-2.4 2-4.8 3-7.2-1.7 3.8-3.6 7.5-5.9 10.9-.2.3-1.7 2.7-1.9 2.7-.1 0 5-6.1 2.3-3-1.4 1.6-2.8 3.3-4.4 4.8-1.4 1.4-2.9 2.6-4.3 3.9-1.9 1.7-4.8 2.5 2.5-1.9-.7.4-1.4 1-2.1 1.5-3.6 2.4-7.5 4.5-11.5 6.2l7.2-3c-5.4 2.2-10.9 3.8-16.7 4.6 2.7-.4 5.3-.7 8-1.1-6.4.8-12.8.8-19.2 0 2.7.4 5.3.7 8 1.1-5.8-.9-11.3-2.4-16.7-4.6l7.2 3c-3.8-1.7-7.5-3.6-10.9-5.9-.3-.2-2.7-1.7-2.7-1.9 0-.1 6.1 5 3 2.3-1.6-1.4-3.3-2.8-4.8-4.4-1.4-1.4-2.6-2.9-3.9-4.3-1.7-1.9-2.5-4.8 1.9 2.5-.4-.7-1-1.4-1.5-2.1-2.4-3.6-4.5-7.5-6.2-11.5 1 2.4 2 4.8 3 7.2-2.2-5.4-3.8-10.9-4.6-16.7.4 2.7.7 5.3 1.1 8-.8-6.4-.8-12.8 0-19.2-.4 2.7-.7 5.3-1.1 8 .9-5.8 2.4-11.3 4.6-16.7-1 2.4-2 4.8-3 7.2 1.7-3.8 3.6-7.5 5.9-10.9.2-.3 1.7-2.7 1.9-2.7.1 0-5 6.1-2.3 3 1.4-1.6 2.8-3.3 4.4-4.8 1.4-1.4 2.9-2.6 4.3-3.9 1.9-1.7 4.8-2.5-2.5 1.9.7-.4 1.4-1 2.1-1.5 3.6-2.4 7.5-4.5 11.5-6.2-2.4 1-4.8 2-7.2 3 5.4-2.2 10.9-3.8 16.7-4.6-2.7.4-5.3.7-8 1.1 6.4-.8 12.8-.8 19.2 0-2.7-.4-5.3-.7-8-1.1 5.8.9 11.3 2.4 16.7 4.6-2.4-1-4.8-2-7.2-3 3.8 1.7 7.5 3.6 10.9 5.9.3.2 2.7 1.7 2.7 1.9 0 .1-6.1-5-3-2.3 1.6 1.4 3.3 2.8 4.8 4.4 1.4 1.4 2.6 2.9 3.9 4.3 1.7 1.9 2.5 4.8-1.9-2.5.4.7 1 1.4 1.5 2.1 2.4 3.6 4.5 7.5 6.2 11.5-1-2.4-2-4.8-3-7.2 2.2 5.4 3.8 10.9 4.6 16.7-.4-2.7-.7-5.3-1.1-8 .4 3.2.7 6.4.7 9.6.2 15.7 13.7 30.7 30 30 16.1-.7 30.2-13.2 30-30-.2-19.3-5.8-39.3-17.1-55.1-12.5-17.4-28.6-29.6-48.6-37.1-35.8-13.5-80.9-1.5-105.2 28-14.2 17.2-22.2 36.4-24 58.7-1.6 19 3.8 39.5 13.7 55.7 9.6 15.8 24.1 29.7 41 37.5 20.4 9.3 41.6 11.9 63.6 7.6 44.6-8.7 76.2-50.8 76.7-95.3.2-15.7-13.9-30.7-30-30-16.5.8-29.9 13.2-30.1 30z"></path></g></g></svg>
+
+            <div className="sv-picking-header">
+                {/* INFORMACIÓN DEL PEDIDO */}
+                <div className="sv-picking-header-info">
+
+                    {/* ICONO */}
+                    <div className="sv-picking-header-icon">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="44"
+                            height="44"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                        >
+                            <circle cx="9" cy="21" r="1" />
+                            <circle cx="20" cy="21" r="1" />
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                        </svg>
                     </div>
 
-                    {/* DETAILS */}
-                    <div className="order-details">
-                        <div className="order-number">PEDIDO PENDIENTE:</div>
-                        {/*<div className="order-number-title">Orden de Compra</div>*/}
+                    {/* DETALLES */}
+                    <div className="sv-picking-header-content">
+
+                        <span className="sv-picking-header-subtitle">
+                            ORDEN DE PREPARACIÓN
+                        </span>
+
+                        <h1 className="sv-picking-header-title">
+                            PEDIDO PENDIENTE
+                        </h1>
+
+                        {/* METADATA */}
+                        <div className="sv-picking-header-metadata">
+
+                            <div className="sv-picking-meta-item">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="4" y="3" width="16" height="18" rx="2" />
+                                    <path d="M8 8h8M8 12h8M8 16h5" />
+                                </svg>
+
+                                <span>{pickings.length} líneas</span>
+                            </div>
+
+                            <span className="sv-picking-meta-divider" />
+
+                            <div className="sv-picking-meta-item">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M4 7h16M4 12h16M4 17h16" />
+                                    <circle cx="2" cy="7" r="0.5" />
+                                    <circle cx="2" cy="12" r="0.5" />
+                                    <circle cx="2" cy="17" r="0.5" />
+                                </svg>
+
+                                <span>
+                                    {pickings.reduce(
+                                        (total, line) =>
+                                            total + Number(line.product_uom_qty || 0),
+                                        0
+                                    ).toLocaleString("es-DO")} unidades
+                                </span>
+                            </div>
+
+                            <span className="sv-picking-meta-divider" />
+
+                            <div className="sv-picking-meta-item">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="3" y="4" width="18" height="17" rx="2" />
+                                    <path d="M8 2v4M16 2v4M3 10h18" />
+                                </svg>
+
+                                <span>Pedido #{pickingId ?? "—"}</span>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
-                <div className="order-div-b">
 
+                {/* BOTÓN FINALIZAR */}
+                <div className="sv-picking-header-actions">
+                    <button
+                        type="button"
+                        className="sv-picking-header-finish"
+                        onClick={handleFinish}
+                    >
+                        <svg
+                            className="sv-picking-finish-check"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                        >
+                            <path d="M20 6 9 17l-5-5" />
+                        </svg>
 
-                    {/* ✅ FINALIZAR */}
-                    <button className="picking-user-finish" onClick={handleFinish}>
-                        <span className="icon">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z" />
-                            </svg>
-                        </span>
-                        <span className="label">Finalizar</span>
+                        <span>Finalizar</span>
+
+                        <svg
+                            className="sv-picking-finish-arrow"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                        >
+                            <path d="m9 18 6-6-6-6" />
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -1057,8 +1206,8 @@ export default function PickingRoute() {
                             <button
                                 type="button"
                                 className={`origin-option-btn ${selectedOriginWarehouseId === 2
-                                        ? "origin-option-selected"
-                                        : ""
+                                    ? "origin-option-selected"
+                                    : ""
                                     }`}
                                 onClick={() => handleSelectOriginWarehouse(2)}
                             >
@@ -1069,8 +1218,8 @@ export default function PickingRoute() {
                             <button
                                 type="button"
                                 className={`origin-option-btn ${selectedOriginWarehouseId === 1
-                                        ? "origin-option-selected"
-                                        : ""
+                                    ? "origin-option-selected"
+                                    : ""
                                     }`}
                                 onClick={() => handleSelectOriginWarehouse(1)}
                             >

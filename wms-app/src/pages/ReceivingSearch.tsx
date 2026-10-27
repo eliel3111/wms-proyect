@@ -7,6 +7,11 @@ import TextInput from "../components/TextInput.tsx";
 import MultiSelectInput from "../components/MultiSelectInput.tsx";
 import apiClient from "../services/apiClient.ts";
 import ReceivingOrdersTable from "../components/ReceivingOrdersTable.tsx";
+import {
+  FilePlus2,
+  Search,
+  RotateCcw,
+} from "lucide-react";
 
 export default function ReceivingSearch() {
 
@@ -175,69 +180,210 @@ export default function ReceivingSearch() {
     }, 300);
   }
 
+  const handleClearFilters = () => {
+
+  setSelectedPOs([]);
+
+  setInvoiceNo("");
+
+  setSupplier("");
+
+  setErrors({});
+
+};
 
 
 
 
   return (
     <div className="page">
-      <div className="container">
-        {/* TOP SECTION */}
-        <div className="section top">
-          <div ref={poRef} className="box div-a">
-            <MultiSelectInput
-  label="Órdenes de Compra"
-  options={poOptions}
-  value={selectedPOs}
-  onChange={(selected) => {
-                setSelectedPOs(selected);
-                setErrors({});
-              }}
-  placeholder="Seleccione órdenes"
-   required
-              error={errors.po}
-              onFocus={() => {
-                poRef.current?.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }}
-/>
-            
-          </div>
-          <div className="box div-b">
-            <TextInput
-              ref={invoiceInputRef}
-              label="No. de Factura"
-              value={invoiceNo}
-              onChange={setInvoiceNo}
-              //required 
-              error={errors.invoiceNo}
-              placeholder="Ej: FAC-2025-001"
-              onFocus={handleInvoiceFocus}
-            />
-          </div>
-        </div>
+      {/* =========================================================
+    RECEIVING SEARCH TOP AREA
+========================================================= */}
 
-        {/* BOTTOM SECTION */}
-        <div className="section bottom">
-          <div className="box div-c">
-            <TextInput
-              label="Proveedor"
-              value={supplier}
-              onChange={setSupplier}
-              placeholder="Nombre del proveedor"
-              ref={supplierInputRef}
-              onFocus={scrollToSupplierInput}
-            />
-          </div>
-          <div className="box div-d">
-            <button className="btn-primary" onClick={handleSubmit}>Buscar</button>
-          </div>
+<div className="receiving-search-top">
 
 
-        </div>
-      </div>
+  {/* =======================================================
+      PAGE TITLE
+  ======================================================= */}
+
+  <div className="receiving-search-hero">
+
+    <div className="receiving-search-hero-icon">
+
+      <FilePlus2
+        size={25}
+        strokeWidth={2}
+      />
+
+    </div>
+
+
+    <div className="receiving-search-hero-content">
+
+      <h1 className="receiving-search-hero-title">
+
+        Recepción de Órdenes
+
+      </h1>
+
+
+      <p className="receiving-search-hero-subtitle">
+
+        Consulta y gestiona las órdenes de compra con recepción registrada.
+
+      </p>
+
+    </div>
+
+  </div>
+
+
+  {/* =======================================================
+      FILTER CARD
+  ======================================================= */}
+
+  <div className="receiving-search-filters">
+
+
+    {/* =====================================================
+        PURCHASE ORDERS
+    ===================================================== */}
+
+    <div
+      ref={poRef}
+      className="
+        receiving-search-field
+        receiving-search-field-po
+      "
+    >
+
+      <MultiSelectInput
+        label="Órdenes de Compra"
+        options={poOptions}
+        value={selectedPOs}
+        onChange={(selected) => {
+
+          setSelectedPOs(selected);
+
+          setErrors({});
+
+        }}
+        placeholder="Seleccione órdenes"
+        required
+        error={errors.po}
+        onFocus={() => {
+
+          poRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+
+        }}
+      />
+
+    </div>
+
+
+    {/* =====================================================
+        INVOICE
+    ===================================================== */}
+
+    <div
+      className="
+        receiving-search-field
+        receiving-search-field-invoice
+      "
+    >
+
+      <TextInput
+        ref={invoiceInputRef}
+        label="No. de Factura"
+        value={invoiceNo}
+        onChange={setInvoiceNo}
+        error={errors.invoiceNo}
+        placeholder="Ej: FAC-2025-001"
+        onFocus={handleInvoiceFocus}
+      />
+
+    </div>
+
+
+    {/* =====================================================
+        SUPPLIER
+    ===================================================== */}
+
+    <div
+      className="
+        receiving-search-field
+        receiving-search-field-supplier
+      "
+    >
+
+      <TextInput
+        label="Proveedor"
+        value={supplier}
+        onChange={setSupplier}
+        placeholder="Nombre del proveedor"
+        ref={supplierInputRef}
+        onFocus={scrollToSupplierInput}
+      />
+
+    </div>
+
+
+    {/* =====================================================
+        ACTIONS
+    ===================================================== */}
+
+    <div className="receiving-search-actions">
+
+
+      {/* SEARCH */}
+
+      <button
+        type="button"
+        className="receiving-search-button receiving-search-button-primary"
+        onClick={handleSubmit}
+      >
+
+        <Search
+          size={18}
+          strokeWidth={2.1}
+        />
+
+        <span>
+          Buscar
+        </span>
+
+      </button>
+
+
+      {/* CLEAR */}
+
+      <button
+        type="button"
+        className="receiving-search-button receiving-search-button-secondary"
+        onClick={handleClearFilters}
+      >
+
+        <RotateCcw
+          size={17}
+          strokeWidth={2}
+        />
+
+        <span>
+          Limpiar
+        </span>
+
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
 
 
  {/* =========================================

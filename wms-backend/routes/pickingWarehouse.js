@@ -1,5 +1,5 @@
 import express from "express";
-import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode, confirmPickingLine, getPickingDifferences, getBestShippingLocation, closePicking, updateOriginWarehouse } from "../controllers/pickingController.js"
+import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode, confirmPickingLine, getPickingDifferences, getBestShippingLocation, closePicking, updateOriginWarehouse, unassignPicking, getPickingMoveLinesController } from "../controllers/pickingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
@@ -37,6 +37,13 @@ router.get("/active-pickers", authMiddleware, getActivePickers);
 //Reasignar un picking
 router.post("/reassign", authMiddleware, reassignPicking);
 
+router.post(
+  "/unassign",
+  authMiddleware,
+  unassignPicking
+);
+
+
 //Obtener todos los pickings asignados a un usuario
 router.get("/assigned", authMiddleware, getAssignedPickings);
 
@@ -67,5 +74,12 @@ router.post(
     updateOriginWarehouse
 );
 
+
+//obtain all move lines updated when a product is scanned
+router.get(
+  "/:pickingId/move-lines",
+  authMiddleware,
+  getPickingMoveLinesController
+);
 
 export default router;

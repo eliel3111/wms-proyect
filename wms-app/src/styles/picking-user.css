@@ -208,7 +208,7 @@
 }
 
 .pick-user-product-code {
-  font-size: clamp(1rem, 4vw, 1.5 rem);
+  font-size: clamp(1rem, 4vw, 1.5rem);
   font-weight: 900;
   color: #212121;
   letter-spacing: 1px;
@@ -569,5 +569,849 @@
   max-width: 130px;
 }
 
+
+}
+
+/* =========================================
+   SEÑOR VINO WMS - PICKING HEADER
+========================================= */
+
+.sv-picking-header {
+    width: min(1376px, calc(100% - 48px));
+    min-height: 154px;
+    margin: 24px auto 16px;
+    padding: 26px 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+
+    background: #FFFFFF;
+    border: 1px solid #E8ECF2;
+    border-radius: 16px;
+
+    box-shadow: 0 5px 22px rgba(22, 40, 70, 0.08);
+
+    box-sizing: border-box;
+}
+
+/* =========================================
+   LEFT SECTION
+========================================= */
+
+.sv-picking-header-info {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ICON */
+
+.sv-picking-header-icon {
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    background: linear-gradient(
+        135deg,
+        #FFB526 0%,
+        #FFA500 100%
+    );
+
+    color: #111111;
+    border-radius: 16px;
+}
+
+.sv-picking-header-icon svg {
+    width: 48px;
+    height: 48px;
+}
+
+/* CONTENT */
+
+.sv-picking-header-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.sv-picking-header-subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #647084;
+    letter-spacing: 0.6px;
+}
+
+.sv-picking-header-title {
+    margin: 0;
+    padding: 0;
+
+    font-size: clamp(22px, 2vw, 30px);
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+
+    color: #173F9B;
+}
+
+/* =========================================
+   METADATA
+========================================= */
+
+.sv-picking-header-metadata {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 6px;
+}
+
+.sv-picking-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    font-size: 13px;
+    font-weight: 500;
+    color: #4B5563;
+    white-space: nowrap;
+}
+
+.sv-picking-meta-item svg {
+    width: 17px;
+    height: 17px;
+
+    fill: none;
+    stroke: #455166;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sv-picking-meta-divider {
+    width: 1px;
+    height: 19px;
+    background: #CDD5E1;
+}
+
+/* =========================================
+   RIGHT SECTION
+========================================= */
+
+.sv-picking-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+/* FINALIZAR BUTTON */
+
+.sv-picking-header-finish {
+    width: 270px;
+    height: 64px;
+    padding: 0 22px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+
+    background: #333333;
+    border: 1px solid #333333;
+    border-radius: 15px;
+
+    color: #FFFFFF;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: inherit;
+
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.sv-picking-header-finish:hover {
+    background: #252525;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.17);
+    transform: translateY(-2px);
+}
+
+.sv-picking-header-finish:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.sv-picking-header-finish:focus-visible {
+    outline: 3px solid #1976D2;
+    outline-offset: 3px;
+}
+
+/* BUTTON ICONS */
+
+.sv-picking-finish-check {
+    width: 25px;
+    height: 25px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sv-picking-finish-arrow {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* =========================================
+   TABLET
+========================================= */
+
+@media (max-width: 1024px) {
+    .sv-picking-header {
+        padding: 24px;
+        gap: 20px;
+    }
+
+    .sv-picking-header-info {
+        gap: 18px;
+    }
+
+    .sv-picking-header-icon {
+        width: 76px;
+        height: 76px;
+        min-width: 76px;
+    }
+
+    .sv-picking-header-icon svg {
+        width: 38px;
+        height: 38px;
+    }
+
+    .sv-picking-header-finish {
+        width: 200px;
+        height: 56px;
+        font-size: 16px;
+    }
+}
+
+/* =========================================
+   MOBILE / PDA
+========================================= */
+
+@media (max-width: 700px) {
+    .sv-picking-header {
+        width: calc(100% - 24px);
+        min-height: auto;
+        margin: 14px auto;
+
+        padding: 20px;
+        flex-direction: column;
+        align-items: stretch;
+
+        gap: 20px;
+        border-radius: 14px;
+    }
+
+    .sv-picking-header-info {
+        align-items: center;
+        gap: 15px;
+    }
+
+    .sv-picking-header-icon {
+        width: 62px;
+        height: 62px;
+        min-width: 62px;
+        border-radius: 12px;
+    }
+
+    .sv-picking-header-icon svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    .sv-picking-header-subtitle {
+        font-size: 10px;
+    }
+
+    .sv-picking-header-title {
+        font-size: 20px;
+        letter-spacing: -0.3px;
+    }
+
+    .sv-picking-header-metadata {
+        gap: 8px 12px;
+    }
+
+    .sv-picking-meta-item {
+        font-size: 11px;
+    }
+
+    .sv-picking-meta-divider {
+        display: none;
+    }
+
+    .sv-picking-header-actions {
+        width: 100%;
+    }
+
+    .sv-picking-header-finish {
+        width: 100%;
+        height: 52px;
+        border-radius: 12px;
+    }
+}
+
+
+
+/* =========================================================
+   GARLAS WMS
+   PICKING TYPOGRAPHY SYSTEM
+========================================================= */
+
+.page-orden-compra {
+  font-family: var(--font-ui);
+
+  font-size: 15px;
+
+  line-height: 1.45;
+
+  font-weight: var(--weight-regular);
+
+  letter-spacing: -0.006em;
+
+  color: var(--text-primary);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  font-kerning: normal;
+}
+
+
+/* =========================================================
+   PICKING HEADER
+========================================================= */
+
+.sv-picking-header-subtitle {
+  font-family: var(--font-ui);
+
+  font-size: 13px;
+
+  line-height: 18px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: 0.045em;
+
+  color: #647084;
+
+  text-transform: uppercase;
+}
+
+
+.sv-picking-header-title {
+  margin: 0;
+
+  font-family: var(--font-ui);
+
+  font-size: clamp(
+    26px,
+    1.8vw,
+    30px
+  );
+
+  line-height: 1.15;
+
+  font-weight: 680;
+
+  letter-spacing: -0.035em;
+
+  color: #173f9b;
+}
+
+
+/* =========================================================
+   HEADER METADATA
+========================================================= */
+
+.sv-picking-meta-item {
+  font-family: var(--font-ui);
+
+  font-size: 14px;
+
+  line-height: 20px;
+
+  font-weight: var(--weight-medium);
+
+  letter-spacing: -0.008em;
+
+  color: #526174;
+}
+
+
+/* Números dentro del metadata */
+.sv-picking-meta-item strong,
+.sv-picking-meta-item b {
+  font-family: var(--font-data);
+
+  font-weight: 560;
+
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* =========================================================
+   FINALIZAR BUTTON
+========================================================= */
+
+.sv-picking-header-finish {
+  font-family: var(--font-ui);
+
+  font-size: 16px;
+
+  line-height: 20px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: -0.01em;
+}
+
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
+
+.order-lines-header {
+  font-family: var(--font-ui);
+
+  font-size: 13px;
+
+  line-height: 18px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: -0.004em;
+
+  color: #405068;
+}
+
+
+/* =========================================================
+   BOTTOM PICK BUTTON
+========================================================= */
+
+.pick-button {
+  font-family: var(--font-ui);
+
+  font-size: 17px;
+
+  line-height: 22px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: -0.012em;
+}
+
+
+/* =========================================================
+   SCANNER LABELS
+
+   "Lea la ubicación"
+   "Lea el producto"
+========================================================= */
+
+.pick-user-location-label {
+  font-family: var(--font-ui);
+
+  font-size: 14px;
+
+  line-height: 20px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: -0.006em;
+
+  color: #263444;
+}
+
+
+/* =========================================================
+   LOCATION CODE
+
+   Dato crítico para picking.
+========================================================= */
+
+.pick-user-location-code {
+  font-family: var(--font-data);
+
+  font-size: clamp(
+    30px,
+    4vw,
+    40px
+  );
+
+  line-height: 1.05;
+
+  font-weight: 650;
+
+  letter-spacing: -0.035em;
+
+  font-variant-numeric: tabular-nums;
+
+  color: #ffffff;
+
+  background: #212121;
+
+  padding:
+    9px
+    14px;
+
+  border-radius: 9px;
+}
+
+
+/* =========================================================
+   PRODUCT CODE / DESCRIPTION
+========================================================= */
+
+.pick-user-product-code {
+  font-family: var(--font-ui);
+
+  font-size: 17px;
+
+  line-height: 24px;
+
+  font-weight: 560;
+
+  letter-spacing: -0.015em;
+
+  color: #ffffff;
+
+  background: #212121;
+
+  padding:
+    9px
+    14px;
+
+  border-radius: 9px;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* =========================================================
+   QUANTITY LABEL
+========================================================= */
+
+.block-title {
+  font-family: var(--font-ui);
+
+  font-size: 14px;
+
+  line-height: 19px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: -0.006em;
+
+  color: #46556a;
+}
+
+
+/* =========================================================
+   QUANTITY NUMBER
+========================================================= */
+
+.qty-display {
+  font-family: var(--font-data);
+
+  font-size: 40px;
+
+  line-height: 1;
+
+  font-weight: 680;
+
+  letter-spacing: -0.04em;
+
+  font-variant-numeric: tabular-nums;
+
+  color: #182230;
+}
+
+
+/* =========================================================
+   QUANTITY INPUT
+========================================================= */
+
+.qty-input {
+  font-family: var(--font-data);
+
+  font-size: 32px;
+
+  line-height: 1;
+
+  font-weight: 650;
+
+  letter-spacing: -0.035em;
+
+  font-variant-numeric: tabular-nums;
+
+  text-align: center;
+}
+
+
+/* =========================================================
+   MODAL ACTION BUTTONS
+========================================================= */
+
+.btn,
+.btn-finalize-back,
+.origin-option-btn {
+  font-family: var(--font-ui);
+
+  font-size: 15px;
+
+  line-height: 20px;
+
+  font-weight: var(--weight-semibold);
+
+  letter-spacing: -0.008em;
+}
+
+
+/* =========================================================
+   ORIGIN MODAL
+========================================================= */
+
+.origin-modal-header h3 {
+  margin: 0;
+
+  font-family: var(--font-ui);
+
+  font-size: 20px;
+
+  line-height: 26px;
+
+  font-weight: 670;
+
+  letter-spacing: -0.025em;
+
+  color: var(--text-primary);
+}
+
+
+.origin-option-btn {
+  font-size: 15px;
+
+  line-height: 20px;
+
+  font-weight: var(--weight-semibold);
+}
+
+
+/* =========================================================
+   BARCODE VALUE
+========================================================= */
+
+.pick-user-barcode-value {
+  font-family: var(--font-data);
+
+  font-size: 20px;
+
+  line-height: 26px;
+
+  font-weight: 580;
+
+  letter-spacing: -0.02em;
+
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   MOBILE / PDA TYPOGRAPHY
+========================================================= */
+
+@media (max-width: 700px) {
+
+  .page-orden-compra {
+    font-size: 16px;
+
+    line-height: 1.5;
+  }
+
+
+  /* =====================================
+     HEADER
+  ===================================== */
+
+  .sv-picking-header-subtitle {
+    font-size: 12px;
+
+    line-height: 17px;
+
+    font-weight: var(--weight-semibold);
+
+    letter-spacing: 0.04em;
+  }
+
+
+  .sv-picking-header-title {
+    font-size: 24px;
+
+    line-height: 29px;
+
+    font-weight: 680;
+
+    letter-spacing: -0.03em;
+  }
+
+
+  .sv-picking-meta-item {
+    font-size: 14px;
+
+    line-height: 20px;
+
+    font-weight: var(--weight-medium);
+  }
+
+
+  /* =====================================
+     FINALIZAR
+  ===================================== */
+
+  .sv-picking-header-finish {
+    font-size: 17px;
+
+    line-height: 22px;
+
+    font-weight: var(--weight-semibold);
+  }
+
+
+  /* =====================================
+     LABELS
+  ===================================== */
+
+  .pick-user-location-label {
+    font-size: 15px;
+
+    line-height: 21px;
+
+    font-weight: var(--weight-semibold);
+  }
+
+
+  /* =====================================
+     LOCATION
+  ===================================== */
+
+  .pick-user-location-code {
+    font-size: clamp(
+      28px,
+      8vw,
+      34px
+    );
+
+    line-height: 1.05;
+
+    font-weight: 650;
+
+    letter-spacing: -0.035em;
+  }
+
+
+  /* =====================================
+     PRODUCT
+  ===================================== */
+
+  .pick-user-product-code {
+    font-size: 17px;
+
+    line-height: 24px;
+
+    font-weight: 560;
+
+    letter-spacing: -0.012em;
+  }
+
+
+  /* =====================================
+     QUANTITY
+  ===================================== */
+
+  .block-title {
+    font-size: 15px;
+
+    line-height: 20px;
+
+    font-weight: var(--weight-semibold);
+  }
+
+
+  .qty-display {
+    font-size: 36px;
+
+    line-height: 1;
+
+    font-weight: 680;
+  }
+
+
+  .qty-input {
+    font-size: 34px;
+
+    line-height: 1;
+
+    font-weight: 650;
+  }
+
+
+  /* =====================================
+     PICK BUTTON
+  ===================================== */
+
+  .pick-button {
+    font-size: 17px;
+
+    line-height: 22px;
+
+    font-weight: var(--weight-semibold);
+  }
+
+
+  /* =====================================
+     ORIGIN MODAL
+  ===================================== */
+
+  .origin-modal-header h3 {
+    font-size: 19px;
+
+    line-height: 24px;
+  }
+
+
+  .origin-option-btn {
+    font-size: 15px;
+
+    line-height: 20px;
+  }
 
 }

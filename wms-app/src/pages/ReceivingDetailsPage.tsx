@@ -12,12 +12,14 @@ import {
 import apiClient from "../services/apiClient.ts";
 
 import {
-    ArrowLeft,
-    FileText,
-    UsersRound,
-    Activity,
-    ClipboardList,
-    Package,
+  ArrowLeft,
+  FileText,
+  UsersRound,
+  Activity,
+  ClipboardList,
+  Package,
+  WifiOff,
+  RefreshCw,
 } from "lucide-react";
 
 import "../styles/ReceivingDetailsPage.css";
@@ -170,6 +172,9 @@ export default function ReceivingDetailsPage() {
         useState<string | null>(
             null
         );
+
+        const [isClosing, setIsClosing] =
+    useState(false);
 
 
     useEffect(
@@ -396,9 +401,13 @@ export default function ReceivingDetailsPage() {
 
     const handleBack = () => {
 
-        navigate(-1);
+    if (isClosing) {
+        return;
+    }
 
-    };
+    setIsClosing(true);
+
+};
 
 
     // =========================================
@@ -415,48 +424,424 @@ export default function ReceivingDetailsPage() {
     };*/
 
 
-    if (
-        loading
-    ) {
+    if (loading) {
 
-        return (
+  return (
 
-            <div className="receiving-details-page">
+    <div className="receiving-details-page receiving-details-loading-page">
 
-                Cargando detalles...
-
-            </div>
-
-        );
-
-    }
+      <div className="receiving-details-loading-layout">
 
 
-    if (
-        error
-    ) {
+        {/* =========================================
+            LEFT SIDE
+        ========================================= */}
 
-        return (
+        <aside className="receiving-loading-left">
 
-            <div className="receiving-details-page">
 
-                {
-                    error
-                }
+          {/* BACK BUTTON PLACEHOLDER */}
+
+          <div className="receiving-loading-back-card">
+
+            <div className="receiving-loading-back-button skeleton-shimmer">
+
+              <div className="receiving-loading-back-icon" />
+
+              <div className="receiving-loading-back-text" />
 
             </div>
 
-        );
+          </div>
 
-    }
+
+          {/* INFORMATION CARD */}
+
+          <div className="receiving-loading-info-card">
+
+
+            {/* PURCHASE ORDER */}
+
+            <div className="receiving-loading-info-row receiving-loading-order-row">
+
+              <div className="receiving-loading-main-icon skeleton-shimmer" />
+
+
+              <div className="receiving-loading-text-group">
+
+                <div className="receiving-loading-label skeleton-shimmer" />
+
+                <div className="receiving-loading-order-number skeleton-shimmer" />
+
+              </div>
+
+            </div>
+
+
+            {/* SUPPLIER */}
+
+            <div className="receiving-loading-info-row">
+
+              <div className="receiving-loading-small-icon skeleton-shimmer" />
+
+              <div className="receiving-loading-text-group">
+
+                <div className="receiving-loading-label skeleton-shimmer" />
+
+                <div className="receiving-loading-value receiving-loading-value-long skeleton-shimmer" />
+
+              </div>
+
+            </div>
+
+
+            {/* ERP ID */}
+
+            <div className="receiving-loading-info-row">
+
+              <div className="receiving-loading-small-icon skeleton-shimmer" />
+
+              <div className="receiving-loading-text-group">
+
+                <div className="receiving-loading-label skeleton-shimmer" />
+
+                <div className="receiving-loading-value receiving-loading-value-medium skeleton-shimmer" />
+
+              </div>
+
+            </div>
+
+
+            {/* STATUS */}
+
+            <div className="receiving-loading-info-row">
+
+              <div className="receiving-loading-small-icon skeleton-shimmer" />
+
+              <div className="receiving-loading-text-group">
+
+                <div className="receiving-loading-label skeleton-shimmer" />
+
+                <div className="receiving-loading-status skeleton-shimmer" />
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </aside>
+
+
+        {/* =========================================
+            RIGHT SIDE
+        ========================================= */}
+
+        <main className="receiving-loading-right">
+
+
+          {/* TABS */}
+
+          <div className="receiving-loading-tabs">
+
+            <div className="receiving-loading-tab receiving-loading-tab-main skeleton-shimmer" />
+
+            <div className="receiving-loading-tab skeleton-shimmer" />
+
+            <div className="receiving-loading-tab skeleton-shimmer" />
+
+          </div>
+
+
+          {/* LOADING MESSAGE */}
+
+          <div className="receiving-loading-message">
+
+            <div className="receiving-loading-spinner">
+
+              <div className="receiving-loading-spinner-ring" />
+
+              <div className="receiving-loading-spinner-center" />
+
+            </div>
+
+
+            <div className="receiving-loading-message-content">
+
+              <div className="receiving-loading-message-title">
+                Cargando detalles
+              </div>
+
+              <div className="receiving-loading-message-subtitle">
+                Estamos preparando la orden de compra y sus recepciones.
+              </div>
+
+            </div>
+
+          </div>
+
+
+          {/* TABLE */}
+
+          <div className="receiving-loading-table">
+
+            {/* HEADER */}
+
+            <div className="receiving-loading-table-header">
+
+              <div className="receiving-loading-header-cell receiving-loading-cell-check" />
+              <div className="receiving-loading-header-cell receiving-loading-cell-number" />
+              <div className="receiving-loading-header-cell" />
+              <div className="receiving-loading-header-cell receiving-loading-cell-description" />
+              <div className="receiving-loading-header-cell" />
+              <div className="receiving-loading-header-cell" />
+              <div className="receiving-loading-header-cell" />
+              <div className="receiving-loading-header-cell" />
+
+            </div>
+
+
+            {/* ROWS */}
+
+            {Array.from({ length: 6 }).map((_, index) => (
+
+              <div
+                className="receiving-loading-table-row"
+                key={index}
+              >
+
+                <div className="receiving-loading-checkbox skeleton-shimmer" />
+
+                <div className="receiving-loading-number skeleton-shimmer" />
+
+                <div className="receiving-loading-table-line receiving-loading-line-code skeleton-shimmer" />
+
+                <div className="receiving-loading-table-line receiving-loading-line-description skeleton-shimmer" />
+
+                <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
+
+                <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
+
+                <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
+
+                <div className="receiving-loading-pill skeleton-shimmer" />
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </main>
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+
+    if (error) {
+
+  const isNetworkError =
+    error
+      .toLowerCase()
+      .includes("network");
+
+
+  return (
+
+    <div
+      className={`
+        receiving-details-page
+        receiving-details-error-page
+
+        ${
+          isClosing
+            ? "receiving-details-page-closing"
+            : ""
+        }
+      `}
+      onAnimationEnd={(event) => {
+
+        if (
+          isClosing &&
+          event.animationName ===
+            "receivingDetailsExitLeft"
+        ) {
+
+          navigate(-1);
+
+        }
+
+      }}
+    >
+
+      <div className="receiving-details-error-container">
+
+
+        {/* =====================================
+            ERROR ICON
+        ===================================== */}
+
+        <div className="receiving-details-error-icon">
+
+          <WifiOff
+            size={32}
+            strokeWidth={1.8}
+          />
+
+        </div>
+
+
+        {/* =====================================
+            CONTENT
+        ===================================== */}
+
+        <div className="receiving-details-error-content">
+
+
+          <span className="receiving-details-error-eyebrow">
+
+            No pudimos cargar la información
+
+          </span>
+
+
+          <h2 className="receiving-details-error-title">
+
+            {
+              isNetworkError
+                ? "No hay conexión con el servidor"
+                : "Ocurrió un problema"
+            }
+
+          </h2>
+
+
+          <p className="receiving-details-error-description">
+
+            {
+              isNetworkError
+                ? "No fue posible conectarse al servidor del WMS. Verifica tu conexión o intenta nuevamente."
+                : "No pudimos obtener los detalles de esta orden de compra. Puedes intentar nuevamente."
+            }
+
+          </p>
+
+
+          {/* =====================================
+              TECHNICAL MESSAGE
+          ===================================== */}
+
+          <div className="receiving-details-error-technical">
+
+            <span className="receiving-details-error-technical-label">
+              Detalle técnico
+            </span>
+
+            <span className="receiving-details-error-technical-value">
+              {error}
+            </span>
+
+          </div>
+
+
+          {/* =====================================
+              ACTIONS
+          ===================================== */}
+
+          <div className="receiving-details-error-actions">
+
+
+            <button
+              type="button"
+              className="
+                receiving-details-error-button
+                receiving-details-error-button-primary
+              "
+              onClick={() => {
+
+                window.location.reload();
+
+              }}
+            >
+
+              <RefreshCw
+                size={17}
+                strokeWidth={2}
+              />
+
+              <span>
+                Intentar nuevamente
+              </span>
+
+            </button>
+
+
+            <button
+              type="button"
+              className="
+                receiving-details-error-button
+                receiving-details-error-button-secondary
+              "
+              onClick={handleBack}
+            >
+
+              <ArrowLeft
+                size={17}
+                strokeWidth={2}
+              />
+
+              <span>
+                Volver atrás
+              </span>
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  );
+
+}
 
 
 
     return (
 
-        <div className="receiving-details-page">
+    <div
+        className={`
+            receiving-details-page
+            ${
+                isClosing
+                    ? "receiving-details-page-closing"
+                    : ""
+            }
+        `}
+        onAnimationEnd={(event) => {
 
-            <div className="receiving-details-layout">
+            if (
+                isClosing &&
+                event.animationName ===
+                    "receivingDetailsExitLeft"
+            ) {
+
+                navigate(-1);
+
+            }
+
+        }}
+    >
+
+        <div className="receiving-details-layout">
 
 
                 {/* =====================================
@@ -472,22 +857,23 @@ export default function ReceivingDetailsPage() {
 
                     <div className="receiving-details-back-section">
 
-                        <button
-                            type="button"
-                            className="receiving-details-back-button"
-                            onClick={handleBack}
-                        >
+                       <button
+    type="button"
+    className="receiving-details-back-button"
+    onClick={handleBack}
+    disabled={isClosing}
+>
 
-                            <ArrowLeft
-                                size={20}
-                                strokeWidth={2.2}
-                            />
+    <ArrowLeft
+        size={20}
+        strokeWidth={2.2}
+    />
 
-                            <span>
-                                Volver atrás
-                            </span>
+    <span>
+        Volver atrás
+    </span>
 
-                        </button>
+</button>
 
                     </div>
 

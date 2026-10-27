@@ -1,719 +1,1489 @@
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: auto; /* 🔥 cambiar esto */
-}
+/* =========================================================
+   GARLAS CONTROL — BARCODE
+   Clean replacement stylesheet
+   Desktop + Tablet + Mobile / PDA
+========================================================= */
+
+
+/* =========================================================
+   PAGE
+========================================================= */
 
 .barcode-container {
-  height: calc(100vh - 56px);
-  overflow-y: auto;
-}
+  width: 100%;
+  height: calc(100dvh - 56px);
+  min-height: 520px;
 
-.red {
-  background-color: red;
-}
-
-.barcode-container {
+  display: flex;
   flex-direction: column;
-  min-height: 100dvh; /* 🔥 clave moderna */
-  justify-content: start;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  box-sizing: border-box;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f4f6f9 0%,
+      #f7f9fb 100%
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Inter",
+      "Segoe UI",
+      sans-serif
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
 }
 
-/* Cada sección ocupa todo el ancho */
+
 .section {
   width: 100%;
-  
+
   padding: 0;
+
   box-sizing: border-box;
 }
 
+
+/* =========================================================
+   SEARCH SECTION
+========================================================= */
 
 .barcode-section-search {
   width: 100%;
-  padding: 10px 0;
-  background: #D1D5DB;
-border-bottom: 1px solid #939393;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
 
-/* contenedor */
-.section-content {
-  width: 100%;
-  max-width: 500px;
- padding: 0 10px;
+  padding:
+    12px
+    0;
+
   box-sizing: border-box;
 
-}
-
-/* 🔥 SEARCH INPUT */
-.barcode-search-input {
-  width: 100%;
-  height: 56px; /* 👈 ideal para touch */
-
   display: flex;
+
   align-items: center;
-  gap: 10px;
+  justify-content: center;
 
-  background: #FFFFFF;
-  border-radius: 14px;
+  background:
+    #d7dce3;
 
-  padding: 0 16px;
-
-  /* 🎯 borde elegante */
-  border: 1px solid #E5E7EB;
-  border-bottom: 2px solid #D1D5DB;
-
-  /* sombra suave */
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-
-  transition: all 0.2s ease;
+  border-bottom:
+    1px solid
+    #bcc4ce;
 }
 
-/* focus estado pro */
-.barcode-search-input:focus-within {
-  border: 1px solid #2F6FED;
-  border-bottom: 2px solid #2F6FED;
-  box-shadow: 0 0 0 2px rgba(47,111,237,0.1);
+
+.section-content {
+  width: 100%;
+  max-width: 560px;
+
+  padding:
+    0
+    12px;
+
+  box-sizing: border-box;
 }
 
-/* input */
-.barcode-search-input input {
-  flex: 1;
-  border: none;
-  outline: none;
-
-  font-size: 16px;
-  background: red;
-  color: #1F2937;
-}
-
-/* icono */
-.barcode-search-input .icon {
-  font-size: 18px;
-  color: #6B7280;
-}
-
-/* botón clear */
-.barcode-search-input .clear {
-  background: transparent;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  color: #ebebec;
-}
-
-/* hover UX */
-.barcode-search-input .clear:hover {
-  color: #EF4444;
-}
 
 .barcode-search-dark {
   width: 100%;
-  height: 56px; /* 🔥 touch-friendly */
+  height: 56px;
+
+  padding:
+    0
+    16px;
+
+  box-sizing: border-box;
 
   display: flex;
+
   align-items: center;
+
   gap: 12px;
 
-  padding: 0 16px;
+  background:
+    #101216;
 
-  /* 🌑 DARK */
-  background: #0F0F10;
+  border:
+    1px solid
+    #252a31;
 
-  border-radius: 14px;
+  border-radius:
+    14px;
 
-  /* borde sutil */
-  border: 1px solid #1F2937;
+  box-shadow:
+    0
+    3px
+    10px
+    rgba(
+      15,
+      23,
+      42,
+      0.2
+    );
 
-  /* profundidad */
-  box-shadow: 
-    inset 0 0 0 1px rgba(255,255,255,0.02),
-    0 2px 6px rgba(0,0,0,0.3);
-
-  transition: all 0.2s ease;
+  transition:
+    border-color
+    150ms
+    ease,
+    box-shadow
+    150ms
+    ease,
+    transform
+    100ms
+    ease;
 }
 
-/* 🔵 FOCUS (branding) */
+
 .barcode-search-dark:focus-within {
-  border: 1px solid #2F6FED;
-  box-shadow: 0 0 0 2px rgba(47,111,237,0.2);
+  border-color:
+    #3b82f6;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    rgba(
+      59,
+      130,
+      246,
+      0.16
+    ),
+    0
+    4px
+    12px
+    rgba(
+      15,
+      23,
+      42,
+      0.2
+    );
 }
 
-/* input */
+
 .barcode-search-dark input {
+  min-width: 0;
+
   flex: 1;
+
   border: none;
   outline: none;
 
-  background: transparent;
+  background:
+    transparent;
 
-  font-size: 16px;
-  color: #E5E7EB;
+  color:
+    #f8fafc;
+
+  font-family:
+    inherit;
+
+  font-size:
+    16px;
+
+  line-height:
+    22px;
+
+  font-weight:
+    450;
+
+  letter-spacing:
+    -0.006em;
 }
 
-/* placeholder */
+
 .barcode-search-dark input::placeholder {
-  color: #6B7280;
+  color:
+    #7e8795;
 }
 
-/* icon */
-.barcode-search-dark .icon {
-  font-size: 18px;
-  color: #9CA3AF;
-}
 
-/* clear */
 .barcode-search-dark .clear {
-  background: transparent;
+  width: 38px;
+  height: 38px;
+
+  flex:
+    0
+    0
+    38px;
+
+  padding: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
   border: none;
-  font-size: 18px;
+
+  border-radius:
+    9px;
+
+  background:
+    transparent;
+
+  color:
+    #98a2b1;
+
+  font-size:
+    18px;
+
   cursor: pointer;
-  color: #9CA3AF;
+
+  transition:
+    color
+    130ms
+    ease,
+    background-color
+    130ms
+    ease,
+    transform
+    100ms
+    ease;
 }
+
 
 .barcode-search-dark .clear:hover {
-  color: #FFFFFF;
+  color:
+    #ffffff;
+
+  background:
+    #272b31;
 }
 
-/* 🔥 DESKTOP (por defecto) */
+
+.barcode-search-dark .clear:active {
+  transform:
+    scale(0.94);
+}
+
+
+/* =========================================================
+   PRODUCT GRID
+========================================================= */
+
 .barcode-container-grid {
   width: 100%;
 
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3 columnas */
+  padding:
+    18px
+    32px
+    34px;
 
-  gap: 16px;
-
-  padding: 15px 50px; /* 👈 lo que pediste */
   box-sizing: border-box;
 
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    14px;
 }
 
+
+/* =========================================================
+   PRODUCT CARD
+========================================================= */
+
 .barcode-product-card {
-  width: 100%; /* 👈 ocupa todo el ancho del grid */
+  width: 100%;
 
-  min-height: 100px; /* 🔥 altura mínima fija */
+  min-width: 0;
+  min-height: 132px;
 
-
-  background: #FFFFFF;
- 
-  border: 1px solid #D1D5DB;
+  padding:
+    17px;
 
   box-sizing: border-box;
 
   display: flex;
+
   flex-direction: column;
 
-    cursor: pointer;
-  gap: 6px;
-border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
-  transition: transform 0.1s ease;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-  transition: 0.2s ease;
+  gap: 10px;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #dde4ec;
+
+  border-radius:
+    14px;
+
+  box-shadow:
+    0
+    3px
+    10px
+    rgba(
+      15,
+      23,
+      42,
+      0.055
+    );
+
+  cursor: pointer;
+
+  transition:
+    border-color
+    150ms
+    ease,
+    box-shadow
+    150ms
+    ease,
+    transform
+    120ms
+    ease;
 }
+
 
 .barcode-product-card:hover {
- border: 2px solid #0F0F10;
- border-radius: 5px;
-  transition: transform 0.1s ease;
+  border-color:
+    #aec1d6;
+
+  box-shadow:
+    0
+    7px
+    20px
+    rgba(
+      15,
+      23,
+      42,
+      0.09
+    );
+
+  transform:
+    translateY(-2px);
 }
 
-/* touch feedback */
+
 .barcode-product-card:active {
-  transform: scale(0.98);
-  border: 1px solid #0F0F10;
+  transform:
+    scale(0.992);
 }
 
+
+/* =========================================================
+   PRODUCT DESCRIPTION
+========================================================= */
 
 .barcode-description {
   width: 100%;
- height: 100%;
-  font-size: 18px;
-  font-weight: 600;
-  color: #18263b;
 
-  line-height: 1.5;
-    margin-bottom: 14px;
- padding: 5px 15px;
-  /* 👇 evita que rompa layout */
-  word-break: break-word;
+  min-width: 0;
+
+  flex:
+    1;
+
+  margin: 0;
+
+  padding: 0;
+
+  color:
+    #1b2b44;
+
+  font-size:
+    16px;
+
+  line-height:
+    1.45;
+
+  font-weight:
+    610;
+
+  letter-spacing:
+    -0.012em;
+
+  overflow-wrap:
+    anywhere;
 }
 
-.barcode-details {
-  width: 100%;
- padding: 10px 15px;
-  font-size: 14px;
-  color: #6B7280;
-border-top: 1px solid #D1D5DB;
-  word-break: break-word;
-}
 
-
-/* =========================
-   PARTE INFERIOR
-========================= */
+/* =========================================================
+   PRODUCT CARD BOTTOM
+========================================================= */
 
 .barcode-card-bottom {
-    border-top: 1px solid #e5e7eb;
-    padding-top: 12px;
+  width: 100%;
 
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
+  padding-top:
+    11px;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap:
+    12px;
+
+  border-top:
+    1px solid
+    #e7ebf0;
 }
 
-
-/* =========================
-   CÓDIGOS
-========================= */
 
 .barcode-details {
-    font-size: 13px;
-    color: #687386;
-    line-height: 1.6;
+  min-width: 0;
+
+  padding: 0;
+
+  border: none;
+
+  color:
+    #68778b;
+
+  font-size:
+    12.5px;
+
+  line-height:
+    1.55;
+
+  font-weight:
+    470;
+
+  overflow-wrap:
+    anywhere;
 }
 
 
-/* =========================
-   STOCK
-========================= */
+/* =========================================================
+   PRODUCT STOCK PILL
+========================================================= */
 
 .product-stock {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  flex:
+    0
+    0
+    auto;
 
-    background: #effbf4;
-    border: 1px solid #b7e5c9;
+  display: flex;
 
-    border-radius: 10px;
-    padding: 9px 14px;
+  align-items: center;
 
-    flex-shrink: 0;
+  gap:
+    8px;
+
+  padding:
+    8px
+    11px;
+
+  box-sizing: border-box;
+
+  background:
+    #effaf3;
+
+  border:
+    1px solid
+    #c4e8d1;
+
+  border-radius:
+    10px;
 }
 
-
-/* Círculo verde */
 
 .product-stock-icon {
-    width: 38px;
-    height: 38px;
+  width: 31px;
+  height: 31px;
 
-    border-radius: 50%;
+  flex:
+    0
+    0
+    31px;
 
-    background: #079447;
-    color: white;
+  display: flex;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  align-items: center;
+  justify-content: center;
 
-    font-size: 24px;
-    font-weight: bold;
+  border-radius:
+    50%;
+
+  background:
+    #149452;
+
+  color:
+    #ffffff;
+
+  font-size:
+    18px;
+
+  font-weight:
+    700;
 }
 
 
-/* Texto */
-
 .product-stock-info {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+
+  flex-direction: column;
+
+  gap:
+    1px;
 }
 
 
 .product-stock-label {
-    color: #08783d;
-    font-size: 13px;
-    font-weight: 500;
+  color:
+    #3c7154;
+
+  font-size:
+    10.5px;
+
+  line-height:
+    14px;
+
+  font-weight:
+    560;
 }
 
 
 .product-stock-quantity {
-    color: #08783d;
-    font-size: 18px;
-    font-weight: 700;
+  color:
+    #137b44;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    14px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    650;
+
+  font-variant-numeric:
+    tabular-nums;
 }
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
 
 .empty-state {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: #9ca3af; /* gris elegante */
-  opacity: 0.6;
+  width: 100%;
+
+  min-height:
+    52vh;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap:
+    10px;
+
+  color:
+    #9aa5b4;
+
+  opacity:
+    0.72;
+
+  text-align:
+    center;
 }
 
+
 .empty-state p {
-  margin-top: 10px;
-  font-size: 20px;
+  margin: 0;
+
+  font-size:
+    18px;
+
+  line-height:
+    24px;
+
+  font-weight:
+    510;
 }
+
+
+/* =========================================================
+   BARCODE MODAL OVERLAY
+========================================================= */
 
 .barcode-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.50);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+
+  inset: 0;
+
   z-index: 9999;
-}
 
-
-.barcode-modal-container {
-  display: flex;
-  flex-direction: column;
-
-  width: 80%;
-  max-width: 800px;
-
-  /* CLAVE PARA EL SCROLL EN DESKTOP */
-  height: 85vh;
-  max-height: 85vh;
-
-  background: #fff;
-
-  margin-top: 7vh;
-
-  border-radius: 12px;
-  overflow: hidden;
-
-  padding: 20px;
+  padding:
+    24px;
 
   box-sizing: border-box;
 
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background:
+    rgba(
+      15,
+      23,
+      42,
+      0.56
+    );
+
+  backdrop-filter:
+    blur(7px);
+
+  -webkit-backdrop-filter:
+    blur(7px);
+
+  animation:
+    barcodeOverlayOpen
+    180ms
+    ease-out
+    both;
 }
 
 
+/* =========================================================
+   MAIN BARCODE MODAL
+========================================================= */
 
-/* 🔹 Secciones */
-.barcode-container-center,
-.barcode-container-footer {
-  width: 100%;
-  padding: 5px;
+.barcode-modal-container {
+  position: relative;
+
+  width:
+    min(
+      840px,
+      100%
+    );
+
+  height:
+    min(
+      680px,
+      calc(
+        100dvh - 64px
+      )
+    );
+
+  max-height:
+    calc(
+      100dvh - 64px
+    );
+
+  min-height:
+    0;
+
+  padding: 0;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  flex-direction: column;
+
+  overflow:
+    hidden;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    rgba(
+      214,
+      223,
+      233,
+      0.96
+    );
+
+  border-radius:
+    20px;
+
+  box-shadow:
+    0
+    28px
+    70px
+    rgba(
+      15,
+      23,
+      42,
+      0.27
+    ),
+    0
+    7px
+    22px
+    rgba(
+      15,
+      23,
+      42,
+      0.1
+    );
+
+  color:
+    #17233c;
+
+  font-family:
+    var(
+      --font-ui,
+      "Inter",
+      "Segoe UI",
+      sans-serif
+    );
+
+  transform-origin:
+    center;
+
+  animation:
+    barcodeModalOpen
+    250ms
+    cubic-bezier(
+      0.16,
+      1,
+      0.3,
+      1
+    )
+    both;
 }
 
 
+/* =========================================================
+   CLOSE ANIMATION
+========================================================= */
 
-/* Header como flex */
+.barcode-modal-overlay.closing {
+  animation:
+    barcodeOverlayClose
+    210ms
+    ease-in
+    both;
+}
+
+
+.barcode-modal-container.closing {
+  animation:
+    barcodeModalClose
+    210ms
+    cubic-bezier(
+      0.4,
+      0,
+      1,
+      1
+    )
+    both;
+}
+
+
+/* =========================================================
+   NORMAL MODAL HEADER
+========================================================= */
+
 .barcode-container-header {
-  display: flex;
-  background: #afb1b3; /* gris muy claro */
-  justify-content: space-between; /* 👈 separa */
-  align-items: center;
   width: 100%;
-  padding-bottom: 0;
-  padding-right: 15px;
-}
 
-/* Ambos lados ocupan espacio */
-.barcode-header-left,
-.barcode-header-right {
-  flex: 1; /* 👈 cada uno ocupa espacio */
-}
+  min-height:
+    68px;
 
-/* Alineaciones opcionales */
-.barcode-header-left {
+  flex:
+    0
+    0
+    auto;
+
+  padding:
+    10px
+    16px;
+
+  box-sizing: border-box;
+
   display: flex;
-  justify-content: flex-start;
-}
 
-/* Contenedor tabs */
-.barcode-header-left {
-  display: flex;
-  gap: 0; /* pegados */
-}
-
-/* Tab base */
-.barcode-tab {
-  padding: 8px 16px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 16px;
-  height: 50px;
-  color: #0F0F10;
-}
-
-/* Hover */
-.barcode-tab:hover {
-  background: #F9FAFB;
-}
-
-/* Activo (el que pediste 🔥) */
-.barcode-tab.active {
-  background: #fff; /* gris suave */
-  border-left: 1px solid #0F0F10;
-  border-top: 1px solid #0F0F10;
-  border-right: 1px solid #0F0F10;
-  border-bottom: none; /* 👈 clave */
- gap: 10px;
-  color: #111827;
-  font-weight: 500;
-}
-
-.barcode-header-right {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.barcode-close-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 6px 15px;
-  border-radius: 6px;
-  color: #111827; /* gris suave */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Hover */
-.barcode-close-btn:hover {
-  background: #F3F4F6;
-  color: #111827;
-}
-
-
-/* AREA CENTRAL DEL MODAL */
-.barcode-container-center {
-    width: 100%;
-
-    flex: 1;
-
-    /* MUY IMPORTANTE EN FLEX */
-    min-height: 0;
-
-    overflow: hidden;
-
-    background: #ffffff;
-}
-
-/* ESTA ES LA PARTE QUE HACE SCROLL */
-.barcode-print-view {
-    width: 100%;
-    height: 100%;
-
-    display: flex;
-    justify-content: center;
-
-    /* SCROLL */
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    /* mejor scroll para PDA / mobile */
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-}
-
-/* CONTENIDO */
-.barcode-print-content {
-    width: 100%;
-    max-width: 500px;
-
-    padding: 10px 10px 30px;
-
-    box-sizing: border-box;
-}
-
-
-/* TITLES */
-.barcode-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: #374151;
-}
-.barcode-title-product {
-  font-size: 20px;
-  font-weight: 500;
-  color: #283954;
-}
-.barcode-mt {
-  margin-top: 20px;
-}
-
-/* OPCIONES */
-.barcode-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border: 2px solid #E5E7EB;
-  border-radius: 10px;
-  margin-top: 10px;
-  cursor: pointer;
-  background: #F9FAFB;
-  transition: all 0.2s ease;
-}
-
-.barcode-option:hover {
-  background: #F3F4F6;
-}
-
-/* ACTIVO */
-.barcode-option-active {
-  border-color: #2563EB;
-  background: #EFF6FF;
-}
-
-/* RADIO */
-.barcode-radio {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #9CA3AF;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.barcode-radio-dot {
-  width: 10px;
-  height: 10px;
-  background: #2563EB;
-  border-radius: 50%;
-}
-
-/* TEXTO */
-.barcode-option-text {
-  font-size: 14px;
-  color: #111827;
-}
-
-/* CANTIDAD */
-.barcode-quantity {
-  display: flex;
   align-items: center;
   justify-content: space-between;
 
-  border: 2px solid #E5E7EB;
-  border-radius: 10px;
+  gap:
+    14px;
 
-  padding: 10px;
-  margin-top: 10px;
+  background:
+    #ffffff;
+
+  border-bottom:
+    1px solid
+    #e4e9ef;
+}
+
+
+.barcode-header-left {
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap:
+    5px;
+}
+
+
+.barcode-header-right {
+  flex:
+    0
+    0
+    auto;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: flex-end;
+}
+
+
+/* =========================================================
+   TABS
+========================================================= */
+
+.barcode-tab {
+  min-width:
+    126px;
+
+  height:
+    42px;
+
+  padding:
+    0
+    14px;
+
+  box-sizing: border-box;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap:
+    7px;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:
+    9px;
+
+  background:
+    transparent;
+
+  color:
+    #68778b;
+
+  font-family:
+    inherit;
+
+  font-size:
+    14px;
+
+  line-height:
+    19px;
+
+  font-weight:
+    530;
+
+  letter-spacing:
+    -0.008em;
+
+  cursor: pointer;
+
+  user-select: none;
 
   transition:
-    padding 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
+    background-color
+    140ms
+    ease,
+    border-color
+    140ms
+    ease,
+    color
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
 }
 
-.barcode-quantity:focus-within {
-  padding-top: 17px;
-  padding-bottom: 17px;
 
-  border-color: #374151;
+.barcode-tab:hover {
+  color:
+    #273950;
+
+  background:
+    #f3f6f9;
+}
+
+
+.barcode-tab.active {
+  color:
+    #1769d2;
+
+  background:
+    #edf5ff;
+
+  border-color:
+    #cfe3fb;
+
+  font-weight:
+    620;
+}
+
+
+.barcode-tab:active {
+  transform:
+    scale(0.98);
+}
+
+
+/* =========================================================
+   CLOSE BUTTON
+========================================================= */
+
+.barcode-close-btn {
+  width:
+    40px;
+
+  height:
+    40px;
+
+  padding: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+
+  border-radius:
+    50%;
+
+  background:
+    transparent;
+
+  color:
+    #738095;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color
+    140ms
+    ease,
+    color
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.barcode-close-btn:hover {
+  color:
+    #dc3f45;
+
+  background:
+    #fff0f1;
+}
+
+
+.barcode-close-btn:active {
+  transform:
+    scale(0.93);
+}
+
+
+/* =========================================================
+   NORMAL MODAL CENTER
+========================================================= */
+
+.barcode-container-center {
+  width: 100%;
+
+  flex:
+    1
+    1
+    auto;
+
+  min-height: 0;
+
+  padding: 0;
+
+  box-sizing: border-box;
+
+  overflow:
+    hidden;
+
+  background:
+    linear-gradient(
+      160deg,
+      #fbfcfe 0%,
+      #f6f8fb 100%
+    );
+}
+
+
+/* =========================================================
+   SCROLLABLE CONTENT
+========================================================= */
+
+.barcode-print-view {
+  width: 100%;
+  height: 100%;
+
+  box-sizing: border-box;
+
+  overflow-y:
+    auto;
+
+  overflow-x:
+    hidden;
+
+  -webkit-overflow-scrolling:
+    touch;
+
+  overscroll-behavior:
+    contain;
+
+  scrollbar-width:
+    thin;
+
+  scrollbar-color:
+    #cbd4df
+    transparent;
+}
+
+
+.barcode-print-view::-webkit-scrollbar {
+  width:
+    7px;
+}
+
+
+.barcode-print-view::-webkit-scrollbar-track {
+  background:
+    transparent;
+}
+
+
+.barcode-print-view::-webkit-scrollbar-thumb {
+  background:
+    #cbd4df;
+
+  border-radius:
+    999px;
+}
+
+
+.barcode-print-content {
+  width: 100%;
+
+  max-width:
+    630px;
+
+  margin:
+    0
+    auto;
+
+  padding:
+    22px
+    24px
+    30px;
+
+  box-sizing:
+    border-box;
+}
+
+
+/* =========================================================
+   TITLES
+========================================================= */
+
+.barcode-title-product {
+  margin:
+    0
+    0
+    20px;
+
+  color:
+    #17233c;
+
+  font-size:
+    21px;
+
+  line-height:
+    1.32;
+
+  font-weight:
+    650;
+
+  letter-spacing:
+    -0.025em;
+
+  overflow-wrap:
+    anywhere;
+}
+
+
+.barcode-title {
+  margin:
+    0
+    0
+    8px;
+
+  color:
+    #425168;
+
+  font-size:
+    13.5px;
+
+  line-height:
+    19px;
+
+  font-weight:
+    610;
+
+  letter-spacing:
+    -0.006em;
+}
+
+
+.barcode-mt {
+  margin-top:
+    22px;
+}
+
+
+/* =========================================================
+   PRINT OPTIONS
+========================================================= */
+
+.barcode-option {
+  width: 100%;
+
+  min-height:
+    58px;
+
+  margin-top:
+    8px;
+
+  padding:
+    12px
+    14px;
+
+  box-sizing:
+    border-box;
+
+  display: flex;
+
+  align-items: center;
+
+  gap:
+    12px;
+
+  border:
+    1.5px solid
+    #dfe6ee;
+
+  border-radius:
+    11px;
+
+  background:
+    #ffffff;
+
+  cursor:
+    pointer;
+
+  transition:
+    border-color
+    140ms
+    ease,
+    background-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.barcode-option:hover {
+  border-color:
+    #c5d2df;
+
+  background:
+    #fbfdff;
+}
+
+
+.barcode-option:active {
+  transform:
+    scale(0.993);
+}
+
+
+.barcode-option-active {
+  border-color:
+    #72aef2;
+
+  background:
+    #f0f7ff;
 
   box-shadow:
-    0 0 0 3px rgba(55, 65, 81, 0.08);
+    0
+    0
+    0
+    3px
+    rgba(
+      30,
+      136,
+      229,
+      0.07
+    );
 }
 
-.barcode-quantity-input {
-  border: none;
-  outline: none;
-  width: 100%;
-
-  font-size: 14px;
-  background: transparent;
-
-  transition: font-size 0.25s ease;
-}
-
-.barcode-quantity:focus-within .barcode-quantity-input {
-  font-size: 16px;
-}
-
-/* ACCIONES */
-.barcode-quantity-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.barcode-qty-btn {
-  border: none;
-  background: #F3F4F6;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-}
-
-.barcode-qty-btn:hover {
-  background: #E5E7EB;
-}
-
-.barcode-qty-value {
-  font-weight: 500;
-  min-width: 20px;
-  text-align: center;
-}
-
-/* BOTÓN */
-.barcode-submit {
-  margin-top: 20px;
-  width: 100%;
-  padding: 12px;
-  background: #2563EB;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 16px;
-}
-
-.barcode-cancel {
-  margin-top: 20px;
-  width: 100%;
-  padding: 12px;
-  background: #111827;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 16px;
-}
-
-.barcode-submit:hover {
-  background: #1D4ED8;
-}
-
-.barcode-container-footer {
-
-  display: flex;
-  gap: 15px;
-}
 
 .barcode-option-disabled {
-  opacity: 0.4;
-  pointer-events: none;
-  cursor: not-allowed;
+  opacity:
+    0.42;
+
+  pointer-events:
+    none;
+
+  cursor:
+    not-allowed;
 }
 
 
+.barcode-radio {
+  width:
+    20px;
 
+  height:
+    20px;
+
+  flex:
+    0
+    0
+    20px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  box-sizing:
+    border-box;
+
+  border:
+    2px solid
+    #a6b1bf;
+
+  border-radius:
+    50%;
+
+  background:
+    #ffffff;
+}
+
+
+.barcode-option-active
+.barcode-radio {
+  border-color:
+    #1e88e5;
+}
+
+
+.barcode-radio-dot {
+  width:
+    10px;
+
+  height:
+    10px;
+
+  border-radius:
+    50%;
+
+  background:
+    #1e88e5;
+}
+
+
+.barcode-option-text {
+  color:
+    #283950;
+
+  font-size:
+    14px;
+
+  line-height:
+    19px;
+
+  font-weight:
+    520;
+}
+
+
+/* =========================================================
+   STANDARD INPUT
+========================================================= */
+
+.barcode-quantity {
+  width: 100%;
+
+  min-height:
+    54px;
+
+  margin-top:
+    7px;
+
+  padding:
+    0
+    14px;
+
+  box-sizing:
+    border-box;
+
+  display: flex;
+
+  align-items: center;
+
+  background:
+    #ffffff;
+
+  border:
+    1.5px solid
+    #d6dfe9;
+
+  border-radius:
+    10px;
+
+  transition:
+    border-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease;
+}
+
+
+.barcode-quantity:focus-within {
+  border-color:
+    #1e88e5;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    rgba(
+      30,
+      136,
+      229,
+      0.1
+    );
+}
+
+
+.barcode-quantity-input {
+  width: 100%;
+
+  min-width: 0;
+
+  height:
+    52px;
+
+  padding: 0;
+
+  border: none;
+
+  outline: none;
+
+  background:
+    transparent;
+
+  color:
+    #172842;
+
+  font-family:
+    inherit;
+
+  font-size:
+    16px;
+
+  line-height:
+    22px;
+
+  font-weight:
+    500;
+
+  letter-spacing:
+    -0.008em;
+}
+
+
+.barcode-quantity-input::placeholder {
+  color:
+    #96a2b2;
+
+  font-weight:
+    430;
+}
+
+
+/* =========================================================
+   INVENTORY CONTENT
+========================================================= */
 
 .product-stock-container {
-    width: 100%;
-  margin-top: 15px;
-    display: flex;
-    flex-direction: column;
+  width: 100%;
 
-    gap: 20px;
+  margin-top:
+    20px;
+
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    16px;
 }
 
 
@@ -722,134 +1492,209 @@ border-top: 1px solid #D1D5DB;
 ========================================================= */
 
 .stock-summary-card {
-    width: 100%;
+  width: 100%;
 
-    display: flex;
-    align-items: center;
+  padding:
+    15px
+    17px;
 
-    gap: 18px;
+  box-sizing:
+    border-box;
 
-    padding: 18px 20px;
+  display: flex;
 
-    background:
-        linear-gradient(
-            135deg,
-            #ecfdf5 0%,
-            #f0fdf4 100%
-        );
+  align-items:
+    center;
 
-    border: 1px solid #d1fae5;
-    border-radius: 16px;
+  gap:
+    14px;
 
-    box-sizing: border-box;
+  background:
+    linear-gradient(
+      135deg,
+      #f4fcf7 0%,
+      #edf9f2 100%
+    );
+
+  border:
+    1px solid
+    #d1e9da;
+
+  border-radius:
+    13px;
 }
 
-
-/* ICON */
 
 .stock-summary-icon {
-    width: 64px;
-    height: 64px;
+  width:
+    48px;
 
-    flex-shrink: 0;
+  height:
+    48px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  flex:
+    0
+    0
+    48px;
 
-    border-radius: 16px;
+  display: flex;
 
-    background-color: #d1fae5;
+  align-items: center;
+  justify-content: center;
 
-    color: #059669;
+  border-radius:
+    11px;
 
-    font-size: 30px;
+  background:
+    #dcf4e5;
+
+  color:
+    #149052;
+
+  font-size:
+    23px;
 }
 
 
-/* CONTENT */
-
 .stock-summary-content {
-    display: flex;
-    flex-direction: column;
+  min-width: 0;
 
-    gap: 5px;
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    2px;
 }
 
 
 .stock-summary-label {
-    font-size: 14px;
-    font-weight: 500;
+  color:
+    #65746b;
 
-    color: #64748b;
+  font-size:
+    12px;
+
+  line-height:
+    17px;
+
+  font-weight:
+    520;
 }
 
 
 .stock-summary-value-container {
-    display: flex;
-    align-items: baseline;
+  display: flex;
 
-    gap: 10px;
+  align-items:
+    baseline;
+
+  gap:
+    7px;
 }
 
 
 .stock-summary-value {
-    font-size: 36px;
-    line-height: 1;
+  color:
+    #11834a;
 
-    font-weight: 700;
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
 
-    color: #059669;
+  font-size:
+    28px;
 
-    letter-spacing: -1px;
+  line-height:
+    31px;
+
+  font-weight:
+    680;
+
+  letter-spacing:
+    -0.035em;
+
+  font-variant-numeric:
+    tabular-nums;
 }
 
 
 .stock-summary-unit {
-    font-size: 14px;
-    font-weight: 600;
+  color:
+    #738079;
 
-    color: #64748b;
+  font-size:
+    11px;
 
-    text-transform: uppercase;
+  line-height:
+    16px;
+
+  font-weight:
+    620;
+
+  letter-spacing:
+    0.02em;
+
+  text-transform:
+    uppercase;
 }
 
 
 /* =========================================================
-   LOCATIONS
+   STOCK LOCATIONS
 ========================================================= */
 
 .stock-locations-panel {
-    width: 100%;
+  width: 100%;
 
-    display: flex;
-    flex-direction: column;
+  display: flex;
 
-    gap: 12px;
+  flex-direction:
+    column;
+
+  gap:
+    9px;
 }
 
 
 .stock-locations-title {
-    font-size: 17px;
-    font-weight: 700;
+  color:
+    #18263d;
 
-    color: #0f172a;
+  font-size:
+    14.5px;
+
+  line-height:
+    20px;
+
+  font-weight:
+    630;
+
+  letter-spacing:
+    -0.01em;
 }
 
 
-/* =========================================================
-   GRID
-
-   Desktop = 2 columnas
-   Mobile = 1 columna
-========================================================= */
-
 .stock-locations-grid {
-    display: grid;
+  width: 100%;
 
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
 
-    gap: 12px;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap:
+    9px;
 }
 
 
@@ -858,106 +1703,2410 @@ border-top: 1px solid #D1D5DB;
 ========================================================= */
 
 .stock-location-card {
-    min-width: 0;
+  width: 100%;
 
-    display: grid;
+  min-width: 0;
 
-    grid-template-columns: minmax(0, 1fr) auto;
+  min-height:
+    64px;
 
-    align-items: center;
+  padding:
+    11px
+    13px;
 
-    gap: 20px;
+  box-sizing:
+    border-box;
 
-    padding: 15px 18px;
+  display: grid;
 
-    background-color: #ffffff;
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    auto;
 
-    border: 1px solid #e2e8f0;
+  align-items:
+    center;
 
-    border-radius: 12px;
+  gap:
+    14px;
 
-    transition:
-        border-color 0.2s ease,
-        box-shadow 0.2s ease,
-        transform 0.2s ease;
+  appearance:
+    none;
+
+  border:
+    1px solid
+    #dfe5ed;
+
+  border-radius:
+    10px;
+
+  background:
+    #ffffff;
+
+  color:
+    inherit;
+
+  font-family:
+    inherit;
+
+  text-align:
+    left;
+
+  cursor:
+    pointer;
+
+  transition:
+    border-color
+    140ms
+    ease,
+    background-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
 }
 
 
 .stock-location-card:hover {
-    border-color: #cbd5e1;
+  border-color:
+    #bdd0e3;
 
-    box-shadow:
-        0 4px 14px rgba(15, 23, 42, 0.06);
+  background:
+    #fbfdff;
 
-    transform: translateY(-1px);
+  box-shadow:
+    0
+    4px
+    11px
+    rgba(
+      31,
+      45,
+      61,
+      0.06
+    );
+
+  transform:
+    translateY(-1px);
 }
 
 
-/* COLUMNS */
+.stock-location-card:active {
+  transform:
+    scale(0.99);
+}
+
 
 .stock-location-column {
-    min-width: 0;
+  min-width: 0;
 
-    display: flex;
-    flex-direction: column;
+  display: flex;
 
-    gap: 5px;
+  flex-direction:
+    column;
+
+  gap:
+    2px;
 }
 
 
 .stock-location-quantity-column {
-    align-items: flex-end;
+  align-items:
+    flex-end;
 }
 
-
-/* HEADER / LABEL */
 
 .stock-location-label {
-    font-size: 11px;
-    font-weight: 600;
+  color:
+    #8995a5;
 
-    color: #94a3b8;
+  font-size:
+    10px;
 
-    text-transform: uppercase;
+  line-height:
+    14px;
 
-    letter-spacing: 0.5px;
+  font-weight:
+    620;
+
+  letter-spacing:
+    0.045em;
+
+  text-transform:
+    uppercase;
 }
 
-
-/* LOCATION */
 
 .stock-location-name {
-    overflow: hidden;
+  max-width:
+    100%;
 
-    color: #0f172a;
+  overflow:
+    hidden;
 
-    font-size: 15px;
-    font-weight: 650;
+  color:
+    #162a49;
 
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    14.5px;
+
+  line-height:
+    19px;
+
+  font-weight:
+    590;
+
+  letter-spacing:
+    -0.012em;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 }
 
 
-/* QUANTITY */
-
 .stock-location-quantity {
-    min-width: 64px;
+  min-width:
+    52px;
 
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  padding:
+    5px
+    9px;
 
-    padding: 6px 12px;
+  box-sizing:
+    border-box;
 
-    border-radius: 8px;
+  display:
+    inline-flex;
 
-    background-color: #dcfce7;
+  align-items:
+    center;
 
-    color: #15803d;
+  justify-content:
+    center;
 
-    font-size: 15px;
-    font-weight: 700;
+  border-radius:
+    7px;
+
+  background:
+    #e3f7e9;
+
+  color:
+    #167a43;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    14px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    650;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   ADD STOCK LOCATION CARD
+========================================================= */
+
+.stock-location-add-card {
+  width: 100%;
+
+  min-height:
+    64px;
+
+  padding:
+    11px
+    13px;
+
+  box-sizing:
+    border-box;
+
+  display: flex;
+
+  align-items:
+    center;
+
+  gap:
+    11px;
+
+  appearance:
+    none;
+
+  border:
+    1px dashed
+    #e2b947;
+
+  border-radius:
+    10px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #fffdf3 0%,
+      #fff7d8 100%
+    );
+
+  color:
+    #71500b;
+
+  font-family:
+    inherit;
+
+  text-align:
+    left;
+
+  cursor:
+    pointer;
+
+  transition:
+    border-color
+    140ms
+    ease,
+    background-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.stock-location-add-card:hover {
+  border-color:
+    #d19e0c;
+
+  background:
+    #fff3c1;
+
+  box-shadow:
+    0
+    4px
+    11px
+    rgba(
+      169,
+      125,
+      15,
+      0.1
+    );
+
+  transform:
+    translateY(-1px);
+}
+
+
+.stock-location-add-card:active {
+  transform:
+    scale(0.99);
+}
+
+
+.stock-location-add-icon {
+  width:
+    38px;
+
+  height:
+    38px;
+
+  flex:
+    0
+    0
+    38px;
+
+  display: flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    9px;
+
+  background:
+    #ffea98;
+
+  color:
+    #9e6800;
+
+  font-size:
+    25px;
+
+  line-height:
+    1;
+
+  font-weight:
+    520;
+}
+
+
+.stock-location-add-content {
+  min-width: 0;
+
+  flex: 1;
+
+  display: flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    1px;
+}
+
+
+.stock-location-add-description {
+  color:
+    #70571c;
+
+  font-size:
+    12.5px;
+
+  line-height:
+    17px;
+
+  font-weight:
+    610;
+}
+
+
+/* =========================================================
+   NORMAL MODAL FOOTER
+   IMPORTANT: always visible
+========================================================= */
+
+.barcode-container-footer {
+  position:
+    relative;
+
+  z-index:
+    30;
+
+  width: 100%;
+
+  min-height:
+    70px;
+
+  flex:
+    0
+    0
+    auto;
+
+  padding:
+    10px
+    16px;
+
+  box-sizing:
+    border-box;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    minmax(
+      0,
+      1fr
+    );
+
+  align-items:
+    center;
+
+  gap:
+    9px;
+
+  background:
+    #ffffff;
+
+  border-top:
+    1px solid
+    #e3e8ee;
+
+  box-shadow:
+    0
+    -6px
+    18px
+    rgba(
+      15,
+      23,
+      42,
+      0.035
+    );
+}
+
+
+/* =========================================================
+   NORMAL FOOTER BUTTONS
+========================================================= */
+
+.barcode-submit,
+.barcode-cancel {
+  width:
+    100%;
+
+  height:
+    48px;
+
+  margin:
+    0;
+
+  padding:
+    0
+    16px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    9px;
+
+  font-family:
+    inherit;
+
+  font-size:
+    14.5px;
+
+  line-height:
+    20px;
+
+  font-weight:
+    620;
+
+  letter-spacing:
+    -0.008em;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.barcode-cancel {
+  color:
+    #344258;
+
+  background:
+    #eef2f6;
+
+  border:
+    1px solid
+    #dce3eb;
+}
+
+
+.barcode-cancel:hover {
+  background:
+    #e5eaf0;
+}
+
+
+.barcode-submit {
+  color:
+    #ffffff;
+
+  border:
+    none;
+
+  background:
+    linear-gradient(
+      180deg,
+      #3093f4 0%,
+      #1673df 100%
+    );
+
+  box-shadow:
+    0
+    4px
+    10px
+    rgba(
+      30,
+      136,
+      229,
+      0.18
+    );
+}
+
+
+.barcode-submit:hover {
+  background:
+    linear-gradient(
+      180deg,
+      #2789e9 0%,
+      #1168ce 100%
+    );
+}
+
+
+.barcode-submit:active,
+.barcode-cancel:active {
+  transform:
+    scale(0.98);
+}
+
+
+/* =========================================================
+   ADD STOCK VIEW
+========================================================= */
+
+.barcode-add-stock-view {
+  width: 100%;
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  box-sizing:
+    border-box;
+
+  display: flex;
+
+  flex-direction:
+    column;
+
+  overflow:
+    hidden;
+
+  background:
+    #ffffff;
+
+  font-family:
+    inherit;
+
+  animation:
+    barcodeAddStockEnter
+    240ms
+    cubic-bezier(
+      0.16,
+      1,
+      0.3,
+      1
+    )
+    both;
+}
+
+
+/* =========================================================
+   ADD STOCK HEADER
+========================================================= */
+
+.barcode-add-stock-header {
+  width: 100%;
+
+  min-height:
+    70px;
+
+  flex:
+    0
+    0
+    auto;
+
+  padding:
+    10px
+    16px;
+
+  box-sizing:
+    border-box;
+
+  display: flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    14px;
+
+  background:
+    #ffffff;
+
+  border-bottom:
+    1px solid
+    #e4e9ef;
+}
+
+
+.barcode-add-stock-header-left {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+}
+
+
+.barcode-add-stock-header-icon {
+  width:
+    46px;
+
+  height:
+    46px;
+
+  flex:
+    0
+    0
+    46px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  color:
+    #1e88e5;
+
+  background:
+    #eaf4ff;
+
+  border:
+    1px solid
+    #d3e8fd;
+
+  border-radius:
+    11px;
+}
+
+
+.barcode-add-stock-heading {
+  min-width:
+    0;
+}
+
+
+.barcode-add-stock-heading h2 {
+  margin:
+    0;
+
+  color:
+    #17233c;
+
+  font-size:
+    20px;
+
+  line-height:
+    25px;
+
+  font-weight:
+    670;
+
+  letter-spacing:
+    -0.03em;
+}
+
+
+.barcode-add-stock-heading p {
+  margin:
+    1px
+    0
+    0;
+
+  color:
+    #748196;
+
+  font-size:
+    12px;
+
+  line-height:
+    16px;
+
+  font-weight:
+    440;
+}
+
+
+.barcode-add-stock-close {
+  width:
+    40px;
+
+  height:
+    40px;
+
+  flex:
+    0
+    0
+    40px;
+
+  padding: 0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    none;
+
+  border-radius:
+    50%;
+
+  background:
+    transparent;
+
+  color:
+    #738095;
+
+  cursor:
+    pointer;
+
+  transition:
+    color
+    140ms
+    ease,
+    background-color
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.barcode-add-stock-close:hover {
+  color:
+    #dc3f45;
+
+  background:
+    #fff0f1;
+}
+
+
+.barcode-add-stock-close:active {
+  transform:
+    scale(0.94);
+}
+
+
+/* =========================================================
+   ADD STOCK BODY
+========================================================= */
+
+.barcode-add-stock-body {
+  width:
+    100%;
+
+  flex:
+    1
+    1
+    auto;
+
+  min-height:
+    0;
+
+  padding:
+    20px
+    22px;
+
+  box-sizing:
+    border-box;
+
+  overflow-y:
+    auto;
+
+  overflow-x:
+    hidden;
+
+  background:
+    linear-gradient(
+      160deg,
+      #fbfcfe 0%,
+      #f6f8fb 100%
+    );
+
+  -webkit-overflow-scrolling:
+    touch;
+
+  overscroll-behavior:
+    contain;
+
+  scrollbar-width:
+    thin;
+
+  scrollbar-color:
+    #cbd4df
+    transparent;
+}
+
+
+.barcode-add-stock-body::-webkit-scrollbar {
+  width:
+    7px;
+}
+
+
+.barcode-add-stock-body::-webkit-scrollbar-track {
+  background:
+    transparent;
+}
+
+
+.barcode-add-stock-body::-webkit-scrollbar-thumb {
+  background:
+    #cbd4df;
+
+  border-radius:
+    999px;
+}
+
+
+/* =========================================================
+   ADD STOCK PRODUCT CARD
+========================================================= */
+
+.barcode-add-stock-product {
+  width:
+    100%;
+
+  margin-bottom:
+    18px;
+
+  padding:
+    14px
+    16px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    3px;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #e0e7ef;
+
+  border-radius:
+    11px;
+
+  box-shadow:
+    0
+    3px
+    9px
+    rgba(
+      31,
+      45,
+      61,
+      0.04
+    );
+}
+
+
+.barcode-add-stock-product-label {
+  color:
+    #8995a5;
+
+  font-size:
+    10px;
+
+  line-height:
+    14px;
+
+  font-weight:
+    620;
+
+  letter-spacing:
+    0.05em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.barcode-add-stock-product-sku {
+  color:
+    #11264c;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    19px;
+
+  line-height:
+    24px;
+
+  font-weight:
+    650;
+
+  letter-spacing:
+    -0.025em;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+.barcode-add-stock-product-description {
+  color:
+    #66758a;
+
+  font-size:
+    13px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    440;
+
+  overflow-wrap:
+    anywhere;
+}
+
+
+/* =========================================================
+   ADD STOCK FIELD
+========================================================= */
+
+.barcode-add-stock-field {
+  position:
+    relative;
+
+  width:
+    100%;
+
+  margin-bottom:
+    17px;
+}
+
+
+.barcode-add-stock-label {
+  display:
+    block;
+
+  margin-bottom:
+    6px;
+
+  color:
+    #283951;
+
+  font-size:
+    13px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    610;
+}
+
+
+.barcode-add-stock-label span {
+  margin-left:
+    3px;
+
+  color:
+    #dc3f45;
+}
+
+
+/* =========================================================
+   LOCATION COMBOBOX
+========================================================= */
+
+.barcode-add-location-select {
+  position:
+    relative;
+
+  width:
+    100%;
+
+  height:
+    54px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  background:
+    #ffffff;
+
+  border:
+    1.5px solid
+    #d5dee8;
+
+  border-radius:
+    10px;
+
+  transition:
+    border-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease;
+}
+
+
+.barcode-add-location-select:focus-within,
+.barcode-add-location-select.open {
+  border-color:
+    #1e88e5;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    rgba(
+      30,
+      136,
+      229,
+      0.1
+    );
+}
+
+
+.barcode-add-location-main-icon {
+  margin-left:
+    14px;
+
+  flex:
+    0
+    0
+    auto;
+
+  color:
+    #728096;
+}
+
+
+.barcode-add-location-select input {
+  min-width:
+    0;
+
+  flex:
+    1;
+
+  height:
+    100%;
+
+  padding:
+    0
+    10px;
+
+  box-sizing:
+    border-box;
+
+  border:
+    none;
+
+  outline:
+    none;
+
+  background:
+    transparent;
+
+  color:
+    #11264c;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    16px;
+
+  line-height:
+    22px;
+
+  font-weight:
+    560;
+
+  letter-spacing:
+    -0.012em;
+}
+
+
+.barcode-add-location-select input::placeholder {
+  color:
+    #97a3b2;
+
+  font-family:
+    var(
+      --font-ui,
+      "Inter",
+      "Segoe UI",
+      sans-serif
+    );
+
+  font-weight:
+    430;
+}
+
+
+.barcode-add-location-toggle {
+  width:
+    48px;
+
+  height:
+    100%;
+
+  flex:
+    0
+    0
+    48px;
+
+  padding:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    none;
+
+  background:
+    transparent;
+
+  color:
+    #50647f;
+
+  cursor:
+    pointer;
+
+  border-radius:
+    0
+    9px
+    9px
+    0;
+}
+
+
+.barcode-add-location-toggle:hover {
+  background:
+    #f4f7fa;
+}
+
+
+/* =========================================================
+   LOCATION OPTIONS
+========================================================= */
+
+.barcode-add-location-options {
+  position:
+    absolute;
+
+  top:
+    calc(
+      100% + 6px
+    );
+
+  left:
+    0;
+
+  right:
+    0;
+
+  z-index:
+    100;
+
+  max-height:
+    190px;
+
+  padding:
+    5px;
+
+  box-sizing:
+    border-box;
+
+  overflow-y:
+    auto;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #d9e2ec;
+
+  border-radius:
+    10px;
+
+  box-shadow:
+    0
+    15px
+    34px
+    rgba(
+      31,
+      45,
+      61,
+      0.16
+    );
+
+  animation:
+    barcodeLocationDropdownEnter
+    140ms
+    ease-out
+    both;
+}
+
+
+.barcode-add-location-option {
+  width:
+    100%;
+
+  min-height:
+    44px;
+
+  padding:
+    0
+    11px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    9px;
+
+  border:
+    none;
+
+  border-radius:
+    8px;
+
+  background:
+    transparent;
+
+  color:
+    #293e5c;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    14.5px;
+
+  line-height:
+    19px;
+
+  font-weight:
+    530;
+
+  text-align:
+    left;
+
+  cursor:
+    pointer;
+
+  transition:
+    color
+    120ms
+    ease,
+    background-color
+    120ms
+    ease;
+}
+
+
+.barcode-add-location-option:hover {
+  background:
+    #f2f6fa;
+}
+
+
+.barcode-add-location-option.selected {
+  color:
+    #1769d2;
+
+  background:
+    #edf5ff;
+}
+
+
+.barcode-add-location-check {
+  margin-left:
+    auto;
+
+  color:
+    #1e88e5;
+}
+
+
+.barcode-add-location-empty {
+  padding:
+    13px;
+
+  color:
+    #8490a0;
+
+  font-size:
+    12.5px;
+
+  line-height:
+    18px;
+
+  text-align:
+    center;
+}
+
+
+/* =========================================================
+   ADD STOCK QUANTITY
+========================================================= */
+
+.barcode-add-stock-quantity {
+  width:
+    100%;
+
+  height:
+    58px;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    58px
+    minmax(
+      0,
+      1fr
+    )
+    58px;
+
+  box-sizing:
+    border-box;
+
+  overflow:
+    hidden;
+
+  background:
+    #ffffff;
+
+  border:
+    1.5px solid
+    #d5dee8;
+
+  border-radius:
+    10px;
+}
+
+
+.barcode-add-qty-button {
+  padding:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    none;
+
+  color:
+    #29405f;
+
+  background:
+    #f4f7fa;
+
+  cursor:
+    pointer;
+
+  transition:
+    color
+    130ms
+    ease,
+    background-color
+    130ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.barcode-add-qty-button:first-child {
+  border-right:
+    1px solid
+    #dee5ed;
+}
+
+
+.barcode-add-qty-button:last-child {
+  border-left:
+    1px solid
+    #dee5ed;
+}
+
+
+.barcode-add-qty-button:hover {
+  color:
+    #1769d2;
+
+  background:
+    #eaf3fc;
+}
+
+
+.barcode-add-qty-button:active {
+  transform:
+    scale(0.93);
+}
+
+
+.barcode-add-stock-quantity input {
+  width:
+    100%;
+
+  height:
+    100%;
+
+  padding:
+    0;
+
+  border:
+    none;
+
+  outline:
+    none;
+
+  background:
+    #ffffff;
+
+  color:
+    #11264c;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    26px;
+
+  line-height:
+    31px;
+
+  font-weight:
+    670;
+
+  letter-spacing:
+    -0.035em;
+
+  text-align:
+    center;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  appearance:
+    textfield;
+}
+
+
+.barcode-add-stock-quantity
+input::-webkit-inner-spin-button,
+
+.barcode-add-stock-quantity
+input::-webkit-outer-spin-button {
+  appearance:
+    none;
+
+  margin:
+    0;
+}
+
+
+/* =========================================================
+   ADD STOCK FOOTER
+   IMPORTANT: always visible on mobile
+========================================================= */
+
+.barcode-add-stock-footer {
+  position:
+    relative;
+
+  z-index:
+    40;
+
+  width:
+    100%;
+
+  min-height:
+    70px;
+
+  flex:
+    0
+    0
+    auto;
+
+  padding:
+    10px
+    16px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    minmax(
+      0,
+      1fr
+    );
+
+  align-items:
+    center;
+
+  gap:
+    9px;
+
+  background:
+    #ffffff;
+
+  border-top:
+    1px solid
+    #e3e8ee;
+
+  box-shadow:
+    0
+    -6px
+    18px
+    rgba(
+      15,
+      23,
+      42,
+      0.04
+    );
+}
+
+
+.barcode-add-stock-cancel,
+.barcode-add-stock-save {
+  width:
+    100%;
+
+  height:
+    48px;
+
+  min-width:
+    0;
+
+  padding:
+    0
+    14px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    7px;
+
+  border-radius:
+    9px;
+
+  font-family:
+    inherit;
+
+  font-size:
+    14.5px;
+
+  line-height:
+    20px;
+
+  font-weight:
+    620;
+
+  letter-spacing:
+    -0.008em;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.barcode-add-stock-cancel {
+  color:
+    #344258;
+
+  background:
+    #eef2f6;
+
+  border:
+    1px solid
+    #dce3eb;
+}
+
+
+.barcode-add-stock-cancel:hover {
+  background:
+    #e5eaf0;
+}
+
+
+.barcode-add-stock-save {
+  color:
+    #ffffff;
+
+  border:
+    none;
+
+  background:
+    linear-gradient(
+      180deg,
+      #3093f4 0%,
+      #1673df 100%
+    );
+
+  box-shadow:
+    0
+    4px
+    10px
+    rgba(
+      30,
+      136,
+      229,
+      0.18
+    );
+}
+
+
+.barcode-add-stock-save:hover:not(:disabled) {
+  background:
+    linear-gradient(
+      180deg,
+      #2789e9 0%,
+      #1168ce 100%
+    );
+}
+
+
+.barcode-add-stock-save:disabled {
+  opacity:
+    0.44;
+
+  cursor:
+    not-allowed;
+
+  box-shadow:
+    none;
+}
+
+
+.barcode-add-stock-cancel:active,
+.barcode-add-stock-save:active:not(:disabled) {
+  transform:
+    scale(0.98);
+}
+
+
+/* =========================================================
+   EXISTING LOCATION ADJUSTMENT OVERLAY
+========================================================= */
+
+.location-detail-overlay {
+  position:
+    fixed;
+
+  inset:
+    0;
+
+  z-index:
+    10000;
+
+  padding:
+    16px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  background:
+    rgba(
+      15,
+      23,
+      42,
+      0.5
+    );
+
+  backdrop-filter:
+    blur(4px);
+
+  -webkit-backdrop-filter:
+    blur(4px);
+
+  animation:
+    locationOverlayIn
+    170ms
+    ease-out
+    both;
+}
+
+
+/* =========================================================
+   EXISTING LOCATION ADJUSTMENT MODAL
+========================================================= */
+
+.location-detail-modal {
+  width:
+    min(
+      500px,
+      100%
+    );
+
+  min-height:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  padding:
+    0;
+
+  box-sizing:
+    border-box;
+
+  overflow:
+    hidden;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #dde4ec;
+
+  border-radius:
+    16px;
+
+  box-shadow:
+    0
+    22px
+    55px
+    rgba(
+      15,
+      23,
+      42,
+      0.24
+    );
+
+  animation:
+    locationModalOpen
+    220ms
+    cubic-bezier(
+      0.16,
+      1,
+      0.3,
+      1
+    )
+    both;
+}
+
+
+.location-detail-header {
+  width:
+    100%;
+
+  min-height:
+    60px;
+
+  padding:
+    9px
+    12px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+
+  border-bottom:
+    1px solid
+    #e5eaf0;
+
+  background:
+    #ffffff;
+}
+
+
+.location-detail-header h3 {
+  margin:
+    0;
+
+  color:
+    #344258;
+
+  font-size:
+    16px;
+
+  line-height:
+    21px;
+
+  font-weight:
+    620;
+
+  letter-spacing:
+    -0.012em;
+}
+
+
+.location-detail-close-icon {
+  width:
+    36px;
+
+  height:
+    36px;
+
+  flex:
+    0
+    0
+    36px;
+
+  padding:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    none;
+
+  border-radius:
+    50%;
+
+  background:
+    transparent;
+
+  color:
+    #748196;
+
+  font-size:
+    27px;
+
+  line-height:
+    1;
+
+  font-weight:
+    300;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color
+    140ms
+    ease,
+    color
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.location-detail-close-icon:hover {
+  color:
+    #dc3f45;
+
+  background:
+    #fff0f1;
+}
+
+
+.location-detail-close-icon:active {
+  transform:
+    scale(0.94);
+}
+
+
+.location-detail-location {
+  width:
+    100%;
+
+  min-height:
+    126px;
+
+  padding:
+    22px
+    18px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    7px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #f8fbff 0%,
+      #eef6ff 100%
+    );
+}
+
+
+.location-detail-location-label {
+  color:
+    #738095;
+
+  font-size:
+    11px;
+
+  line-height:
+    15px;
+
+  font-weight:
+    620;
+
+  letter-spacing:
+    0.06em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.location-detail-location-code {
+  max-width:
+    100%;
+
+  color:
+    #132646;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    29px;
+
+  line-height:
+    34px;
+
+  font-weight:
+    680;
+
+  letter-spacing:
+    -0.04em;
+
+  text-align:
+    center;
+
+  overflow-wrap:
+    anywhere;
+}
+
+
+.location-detail-adjustment {
+  width:
+    100%;
+
+  padding:
+    10px;
+
+  box-sizing:
+    border-box;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    minmax(
+      0,
+      1fr
+    )
+    72px;
+
+  gap:
+    8px;
+
+  background:
+    #ffffff;
+}
+
+
+.location-detail-quantity-input {
+  width:
+    100%;
+
+  min-width:
+    0;
+
+  height:
+    58px;
+
+  padding:
+    0
+    16px;
+
+  box-sizing:
+    border-box;
+
+  border:
+    1.5px solid
+    #d7e0ea;
+
+  border-radius:
+    9px;
+
+  outline:
+    none;
+
+  background:
+    #ffffff;
+
+  color:
+    #122542;
+
+  font-family:
+    var(
+      --font-data,
+      "Roboto Mono",
+      monospace
+    );
+
+  font-size:
+    25px;
+
+  line-height:
+    30px;
+
+  font-weight:
+    650;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  transition:
+    border-color
+    140ms
+    ease,
+    box-shadow
+    140ms
+    ease;
+}
+
+
+.location-detail-quantity-input:focus {
+  border-color:
+    #1e88e5;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    rgba(
+      30,
+      136,
+      229,
+      0.1
+    );
+}
+
+
+.location-detail-quantity-input::-webkit-outer-spin-button,
+.location-detail-quantity-input::-webkit-inner-spin-button {
+  appearance:
+    none;
+
+  margin:
+    0;
+}
+
+
+.location-detail-quantity-input[type="number"] {
+  -moz-appearance:
+    textfield;
+}
+
+
+.location-detail-save {
+  height:
+    58px;
+
+  padding:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    none;
+
+  border-radius:
+    9px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #3093f4 0%,
+      #1673df 100%
+    );
+
+  color:
+    #ffffff;
+
+  font-size:
+    27px;
+
+  font-weight:
+    620;
+
+  cursor:
+    pointer;
+
+  box-shadow:
+    0
+    4px
+    10px
+    rgba(
+      30,
+      136,
+      229,
+      0.18
+    );
+
+  transition:
+    background-color
+    140ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+.location-detail-save:hover {
+  background:
+    #1769d2;
+}
+
+
+.location-detail-save:active {
+  transform:
+    scale(0.96);
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (
+  max-width:
+    980px
+) {
+
+  .barcode-container-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(
+          0,
+          1fr
+        )
+      );
+
+    padding:
+      16px
+      20px
+      28px;
+  }
+
+
+  .barcode-modal-overlay {
+    padding:
+      18px;
+  }
+
+
+  .barcode-modal-container {
+    width:
+      min(
+        760px,
+        100%
+      );
+
+    height:
+      min(
+        650px,
+        calc(
+          100dvh - 44px
+        )
+      );
+
+    max-height:
+      calc(
+        100dvh - 44px
+      );
+  }
+
 }
 
 
@@ -965,777 +4114,1730 @@ border-top: 1px solid #D1D5DB;
    MOBILE / PDA
 ========================================================= */
 
-@media (max-width: 700px) {
+@media (
+  max-width:
+    700px
+) {
 
-    .product-stock-container {
-        gap: 16px;
-    }
+  /* ---------------------------------------------------------
+     PAGE
+  --------------------------------------------------------- */
 
+  .barcode-container {
+    height:
+      calc(
+        100dvh - 56px
+      );
 
-    .stock-summary-card {
-        padding: 18px;
-
-        gap: 14px;
-
-        border-radius: 14px;
-    }
-
-
-    .stock-summary-icon {
-        width: 54px;
-        height: 54px;
-
-        border-radius: 14px;
-
-        font-size: 25px;
-    }
-
-
-    .stock-summary-value {
-        font-size: 30px;
-    }
-
-
-    .stock-summary-unit {
-        font-size: 12px;
-    }
-
-
-    /* 1 COLUMNA */
-
-    .stock-locations-grid {
-        grid-template-columns: 1fr;
-
-        gap: 9px;
-    }
-
-
-    .stock-location-card {
-        padding: 13px 15px;
-
-        border-radius: 10px;
-    }
-
-}
-
-@media (max-width: 768px) {
-  .barcode-container-header,
-  .barcode-container-center,
-  .barcode-container-footer {
-    padding: 0; /* 👈 quita padding en móvil */
-  }
-}
-@media (max-width: 768px) {
-  .barcode-modal-overlay {
-    align-items: stretch;
+    min-height:
+      0;
   }
 
-  .barcode-modal-container {
-        width: 100%;
-        max-width: none;
 
-        height: 100dvh;
-        max-height: 100dvh;
-
-        margin-top: 0;
-
-        border-radius: 0;
-
-        padding: 0;
-    }
-
-    .barcode-container-center {
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
-    }
-
-     .barcode-print-view {
-        height: 100%;
-        overflow-y: auto;
-        overflow-x: hidden;
-
-        -webkit-overflow-scrolling: touch;
-    }
-
-
-    .barcode-print-content {
-        max-width: none;
-
-        padding: 16px;
-
-        box-sizing: border-box;
-    }
-
-}
-
-@media (hover: hover) {
-  .barcode-product-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  }
-}
-
-@media (max-width: 768px) {
-  .barcode-product-card {
-    min-height: 90px;
+  .barcode-section-search {
+    padding:
+      9px
+      0;
   }
 
-  .barcode-description {
-    font-size: 16px;
+
+  .section-content {
+    max-width:
+      none;
+
+    padding:
+      0
+      9px;
   }
 
-  .barcode-details {
-    font-size: 13px;
-  }
-}
 
-
-@media (max-width: 768px) {
-  .barcode-container-grid {
-    grid-template-columns: 1fr; /* 🔥 una sola columna */
-    
-    padding: 10px 16px; /* 👈 mejor para móvil */
-    gap: 12px;
-  }
-}
-
-@media (max-width: 768px) {
-  
   .barcode-search-dark {
-    height: 64px; /* 🔥 más grande para dedo */
-    padding: 0 18px;
-    border-radius: 16px;
+    height:
+      58px;
+
+    padding:
+      0
+      14px;
+
+    border-radius:
+      13px;
   }
+
 
   .barcode-search-dark input {
-    font-size: 18px; /* 🔥 más legible */
-    width: 50px;
+    font-size:
+      16px;
   }
 
-  .barcode-search-dark .icon {
-    font-size: 22px; /* 🔥 más tocable */
+
+  .barcode-container-grid {
+    grid-template-columns:
+      1fr;
+
+    padding:
+      10px
+      10px
+      22px;
+
+    gap:
+      9px;
   }
 
-  .barcode-search-dark .clear {
-    font-size: 22px;
-    width: 40px;
-    height: 40px;
 
-    display: flex;
+  .barcode-product-card {
+    min-height:
+      108px;
+
+    padding:
+      14px;
+
+    border-radius:
+      12px;
+  }
+
+
+  .barcode-description {
+    font-size:
+      15px;
+  }
+
+
+  .barcode-card-bottom {
+    align-items:
+      flex-end;
+
+    gap:
+      9px;
+  }
+
+
+  .barcode-details {
+    font-size:
+      12px;
+  }
+
+
+  .product-stock {
+    padding:
+      7px
+      9px;
+  }
+
+
+  .product-stock-icon {
+    width:
+      28px;
+
+    height:
+      28px;
+
+    flex-basis:
+      28px;
+
+    font-size:
+      16px;
+  }
+
+
+  .product-stock-label {
+    font-size:
+      9.5px;
+  }
+
+
+  .product-stock-quantity {
+    font-size:
+      13px;
+  }
+
+
+  /* ---------------------------------------------------------
+     OVERLAY
+  --------------------------------------------------------- */
+
+ .barcode-modal-overlay {
+    padding: 0;
+
     align-items: center;
     justify-content: center;
+
+    background:
+      rgba(
+        15,
+        23,
+        42,
+        0.52
+      );
+
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
 
-/* 🔥 evita zoom raro en iPhone/PDA */
-input {
-  font-size: 16px;
-}
 
-/* 🔥 mejora interacción táctil */
-.barcode-search-dark {
-  -webkit-tap-highlight-color: transparent;
-}
+  .barcode-modal-container {
+    width: 100%;
+    max-width: none;
 
-/* 🔥 mejor area táctil */
-.barcode-search-dark .clear {
-  touch-action: manipulation;
-}
+    /* sigue siendo más pequeño verticalmente */
+    height: min(
+      78dvh,
+      640px
+    );
 
-}
+    max-height:
+      calc(100dvh - 20px);
 
+    min-height: 0;
 
-/* Ajustes para pantallas con altura típica de laptop de 15" */
-@media screen and (min-height: 600px) and (max-height: 950px) {
-  .barcode-container {
-  min-height: 500px; /* 👈 ocupa toda la pantalla mínimo */
-}
-
-
-}
-
-
-/* Dispositivos móviles típicos (Portrait) */
-@media screen and (max-width: 480px) {
-  .barcode-container {
-  min-height: calc(100dvh - 40px);
-  height: calc(100dvh - 40px);
-
-}
-
-  .barcode-quantity-input {
-  height: 40px;
-  font-size: 18px;
-}
-
-.barcode-option {
-    height: 80px;
-}
-
-.barcode-submit {
-     height: 60px;
-  font-size: 18px;
-}
-
-.barcode-cancel {
- height: 60px;
-  font-size: 18px;
-}
-
-.barcode-print-tab {
-  display: none;
-}
-
-}
-
-
-
-
-
-/* ============================================
-   OVERLAY
-============================================ */
-
-.location-detail-overlay {
-    position: fixed;
-    inset: 0;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    padding: 16px;
-
-    background: rgba(15, 23, 42, 0.48);
-
-    backdrop-filter: blur(2px);
-
-    z-index: 99999;
-
-    animation: locationOverlayIn 0.18s ease-out;
-}
-
-
-/* ============================================
-   MODAL
-============================================ */
-
-.location-detail-modal {
-    width: 520px;
-    min-height: 320px;
-
-    display: flex;
-    flex-direction: column;
-
-    padding: 5px;
-
-    background: #ffffff;
+    /* ocupa todo el ancho */
+    border-left: 0;
+    border-right: 0;
 
     border-radius: 16px;
 
-    box-sizing: border-box;
-
     box-shadow:
-        0 20px 45px rgba(15, 23, 42, 0.22),
-        0 5px 15px rgba(15, 23, 42, 0.12);
+      0
+      22px
+      55px
+      rgba(
+        15,
+        23,
+        42,
+        0.28
+      );
+  }
 
-    overflow: hidden;
+  /* ---------------------------------------------------------
+     NORMAL HEADER
+  --------------------------------------------------------- */
 
-    transform-origin: center;
+  .barcode-container-header {
+    min-height:
+      60px;
 
-    animation: locationModalOpen 0.22s ease-out;
-}
+    padding:
+      8px
+      9px
+      8px
+      11px;
 
-
-/* ============================================
-   HEADER
-============================================ */
-
-.location-detail-header {
-    width: 100%;
-
-    min-height: 64px;
-
-    display: flex;
-    align-items: center;
-
-    gap: 14px;
-
-    padding: 10px 14px;
-
-    box-sizing: border-box;
-
-    border-bottom: 1px solid #e5e7eb;
-}
+    gap:
+      7px;
+  }
 
 
-.location-detail-header h3 {
-    margin: 0;
+  .barcode-header-left {
+    flex:
+      1;
 
-    font-size: 18px;
-    font-weight: 600;
-
-    color: #374151;
-
-    line-height: 1.3;
-}
+    gap:
+      3px;
+  }
 
 
-/* CLOSE */
+  .barcode-tab {
+    min-width:
+      0;
 
-.location-detail-close-icon {
-    width: 38px;
-    height: 38px;
+    height:
+      40px;
 
-    flex-shrink: 0;
+    padding:
+      0
+      11px;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    gap:
+      5px;
 
-    padding: 0;
+    font-size:
+      13px;
 
-    border: none;
-    border-radius: 50%;
-
-    background: transparent;
-
-    color: #6b7280;
-
-    font-size: 30px;
-    font-weight: 300;
-
-    cursor: pointer;
-
-    transition:
-        background-color 0.15s ease,
-        color 0.15s ease,
-        transform 0.15s ease;
-}
+    border-radius:
+      8px;
+  }
 
 
-.location-detail-close-icon:hover {
-    background: #fee2e2;
+  .barcode-tab svg {
+    width:
+      19px;
 
-    color: #dc2626;
+    height:
+      19px;
+  }
 
-    transform: scale(1.05);
-}
+
+  .barcode-close-btn {
+    width:
+      38px;
+
+    height:
+      38px;
+  }
 
 
-/* ============================================
-   LOCATION
-============================================ */
+  /* ---------------------------------------------------------
+     CENTER CONTENT
+  --------------------------------------------------------- */
 
-.location-detail-location {
-    width: 100%;
+  .barcode-container-center {
+    min-height:
+      0;
 
-    flex: 1;
+    overflow:
+      hidden;
+  }
 
-    min-height: 150px;
 
-    display: flex;
-    flex-direction: column;
+  .barcode-print-view {
+    height:
+      100%;
 
-    align-items: center;
-    justify-content: center;
+    overflow-y:
+      auto;
+  }
 
-    gap: 10px;
 
-    padding: 30px 20px;
+  .barcode-print-content {
+    max-width:
+      none;
 
-    box-sizing: border-box;
+    padding:
+      14px
+      12px
+      20px;
+  }
+
+
+  .barcode-title-product {
+    margin-bottom:
+      15px;
+
+    font-size:
+      18px;
+
+    line-height:
+      23px;
+  }
+
+
+  .barcode-title {
+    font-size:
+      13px;
+
+    line-height:
+      18px;
+  }
+
+
+  .barcode-mt {
+    margin-top:
+      17px;
+  }
+
+
+  .barcode-option {
+    min-height:
+      54px;
+
+    padding:
+      10px
+      12px;
+
+    border-radius:
+      10px;
+  }
+
+
+  .barcode-option-text {
+    font-size:
+      13.5px;
+
+    line-height:
+      18px;
+  }
+
+
+  .barcode-quantity {
+    min-height:
+      52px;
+
+    padding:
+      0
+      12px;
+  }
+
+
+  .barcode-quantity-input {
+    height:
+      50px;
+
+    /*
+      >=16px prevents iOS zoom
+      when focusing the input.
+    */
+
+    font-size:
+      16px;
+  }
+
+
+  /* ---------------------------------------------------------
+     STOCK
+  --------------------------------------------------------- */
+
+  .product-stock-container {
+    margin-top:
+      15px;
+
+    gap:
+      13px;
+  }
+
+
+  .stock-summary-card {
+    padding:
+      12px
+      13px;
+
+    gap:
+      11px;
+
+    border-radius:
+      11px;
+  }
+
+
+  .stock-summary-icon {
+    width:
+      42px;
+
+    height:
+      42px;
+
+    flex-basis:
+      42px;
+
+    border-radius:
+      10px;
+
+    font-size:
+      21px;
+  }
+
+
+  .stock-summary-label {
+    font-size:
+      11.5px;
+  }
+
+
+  .stock-summary-value {
+    font-size:
+      24px;
+
+    line-height:
+      28px;
+  }
+
+
+  .stock-summary-unit {
+    font-size:
+      10px;
+  }
+
+
+  .stock-locations-title {
+    font-size:
+      14px;
+  }
+
+
+  .stock-locations-grid {
+    grid-template-columns:
+      1fr;
+
+    gap:
+      7px;
+  }
+
+
+  .stock-location-card,
+  .stock-location-add-card {
+    min-height:
+      58px;
+
+    padding:
+      9px
+      11px;
+
+    border-radius:
+      9px;
+  }
+
+
+  .stock-location-label {
+    font-size:
+      9.5px;
+  }
+
+
+  .stock-location-name {
+    font-size:
+      14px;
+  }
+
+
+  .stock-location-quantity {
+    min-width:
+      48px;
+
+    font-size:
+      13.5px;
+  }
+
+
+  .stock-location-add-icon {
+    width:
+      35px;
+
+    height:
+      35px;
+
+    flex-basis:
+      35px;
+
+    font-size:
+      22px;
+
+    border-radius:
+      8px;
+  }
+
+
+  .stock-location-add-description {
+    font-size:
+      12px;
+
+    line-height:
+      16px;
+  }
+
+
+  /* ---------------------------------------------------------
+     NORMAL FOOTER
+     Always visible.
+  --------------------------------------------------------- */
+
+  .barcode-container-footer {
+    position:
+      relative;
+
+    z-index:
+      50;
+
+    min-height:
+      64px;
+
+    flex:
+      0
+      0
+      auto;
+
+    padding:
+      8px
+      10px
+      max(
+        8px,
+        env(
+          safe-area-inset-bottom
+        )
+      );
+
+    gap:
+      7px;
 
     background:
-        linear-gradient(
-            135deg,
-            #f8fbff 0%,
-            #eff6ff 100%
-        );
-}
-
-
-.location-detail-location-label {
-    font-size: 13px;
-    font-weight: 600;
-
-    color: #64748b;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.7px;
-}
-
-
-.location-detail-location-code {
-    max-width: 100%;
-
-    color: #0f172a;
-
-    font-size: 34px;
-    font-weight: 700;
-
-    text-align: center;
-
-    line-height: 1.2;
-
-    word-break: break-word;
-
-    letter-spacing: -0.6px;
-}
-
-
-/* ============================================
-   INPUT + SAVE
-============================================ */
-
-.location-detail-adjustment {
-    width: 100%;
-
-    display: grid;
-
-    grid-template-columns: minmax(0, 1fr) 84px;
-
-    gap: 8px;
-
-    padding: 8px;
-
-    box-sizing: border-box;
-
-    border: 2px solid #2563eb;
-    border-radius: 12px;
-
-    background: #ffffff;
-}
-
-
-.location-detail-quantity-input {
-    width: 100%;
-    min-width: 0;
-
-    height: 64px;
-
-    padding: 0 20px;
-
-    box-sizing: border-box;
-
-    border: 1px solid #dbe2ea;
-    border-radius: 9px;
-
-    outline: none;
-
-    background: #ffffff;
-
-    color: #111827;
-
-    font-size: 28px;
-    font-weight: 600;
-
-    transition:
-        border-color 0.15s ease,
-        box-shadow 0.15s ease;
-}
-
-
-.location-detail-quantity-input:focus {
-    border-color: #93c5fd;
+      #ffffff;
 
     box-shadow:
-        0 0 0 3px rgba(37, 99, 235, 0.12);
-}
+      0
+      -8px
+      22px
+      rgba(
+        15,
+        23,
+        42,
+        0.055
+      );
+  }
 
 
-/* remove number arrows */
+  .barcode-submit,
+  .barcode-cancel {
+    height:
+      46px;
 
-.location-detail-quantity-input::-webkit-outer-spin-button,
-.location-detail-quantity-input::-webkit-inner-spin-button {
-    appearance: none;
-    margin: 0;
-}
+    padding:
+      0
+      9px;
 
-/* SAVE */
-.location-detail-quantity-input[type="number"] {
-    appearance: textfield;
-    -moz-appearance: textfield;
-}
+    font-size:
+      14px;
 
+    border-radius:
+      8px;
+  }
 
-/* SAVE */
 
-.location-detail-save {
-    height: 64px;
+  /* ---------------------------------------------------------
+     ADD STOCK HEADER
+  --------------------------------------------------------- */
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .barcode-add-stock-header {
+    min-height:
+      60px;
 
-    border: none;
-    border-radius: 9px;
+    padding:
+      7px
+      10px;
 
-    background: #2563eb;
+    gap:
+      8px;
+  }
 
-    color: #ffffff;
 
-    font-size: 30px;
-    font-weight: 600;
+  .barcode-add-stock-header-left {
+    gap:
+      9px;
+  }
 
-    cursor: pointer;
 
-    box-shadow:
-        0 3px 8px rgba(37, 99, 235, 0.25);
+  .barcode-add-stock-header-icon {
+    width:
+      40px;
 
-    transition:
-        background-color 0.15s ease,
-        transform 0.1s ease,
-        box-shadow 0.15s ease;
-}
+    height:
+      40px;
 
+    flex-basis:
+      40px;
 
-.location-detail-save:hover {
-    background: #1d4ed8;
+    border-radius:
+      9px;
+  }
 
-    box-shadow:
-        0 5px 12px rgba(37, 99, 235, 0.3);
-}
 
+  .barcode-add-stock-header-icon svg {
+    width:
+      21px;
 
-.location-detail-save:active {
-    transform: scale(0.97);
-}
+    height:
+      21px;
+  }
 
 
-/* ============================================
-   OPEN ANIMATION
-============================================ */
+  .barcode-add-stock-heading h2 {
+    font-size:
+      18px;
 
-@keyframes locationModalOpen {
+    line-height:
+      22px;
+  }
 
-    from {
-        opacity: 0;
-        transform: scale(0.78);
-    }
 
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+  .barcode-add-stock-heading p {
+    font-size:
+      11px;
 
-}
+    line-height:
+      15px;
+  }
 
 
-@keyframes locationOverlayIn {
+  .barcode-add-stock-close {
+    width:
+      38px;
 
-    from {
-        opacity: 0;
-    }
+    height:
+      38px;
 
-    to {
-        opacity: 1;
-    }
+    flex-basis:
+      38px;
+  }
 
-}
 
+  /* ---------------------------------------------------------
+     ADD STOCK BODY
+  --------------------------------------------------------- */
 
-/* ============================================
-   MOBILE / PDA
-============================================ */
+  .barcode-add-stock-body {
+    flex:
+      1
+      1
+      auto;
 
-@media (max-width: 600px) {
+    min-height:
+      0;
 
-    .location-detail-overlay {
-        align-items: flex-start;
+    /*
+      Only this area scrolls.
+      Footer never disappears.
+    */
 
-        padding: 12px;
-    }
+    overflow-y:
+      auto;
 
+    padding:
+      12px
+      11px
+      14px;
+  }
 
-    .location-detail-modal {
-        width: 100%;
 
-        min-height: auto;
+  .barcode-add-stock-product {
+    margin-bottom:
+      12px;
 
-        margin-top: 12vh;
+    padding:
+      11px
+      12px;
 
-        border-radius: 14px;
-    }
+    border-radius:
+      10px;
+  }
 
 
-    .location-detail-header {
-        min-height: 56px;
+  .barcode-add-stock-product-label {
+    font-size:
+      9.5px;
+  }
 
-        padding: 8px 10px;
 
-        gap: 8px;
-    }
+  .barcode-add-stock-product-sku {
+    font-size:
+      17px;
 
+    line-height:
+      21px;
+  }
 
-    .location-detail-header h3 {
-        font-size: 16px;
-    }
 
+  .barcode-add-stock-product-description {
+    font-size:
+      12px;
 
-    .location-detail-close-icon {
-        width: 36px;
-        height: 36px;
+    line-height:
+      16px;
+  }
 
-        font-size: 27px;
-    }
 
+  .barcode-add-stock-field {
+    margin-bottom:
+      12px;
+  }
 
-    .location-detail-location {
-        min-height: 125px;
 
-        padding: 24px 14px;
-    }
+  .barcode-add-stock-label {
+    margin-bottom:
+      5px;
 
+    font-size:
+      12.5px;
 
-    .location-detail-location-code {
-        font-size: 27px;
-    }
+    line-height:
+      17px;
+  }
 
 
-    .location-detail-adjustment {
-        grid-template-columns: minmax(0, 1fr) 70px;
-    }
+  /* ---------------------------------------------------------
+     ADD STOCK LOCATION
+  --------------------------------------------------------- */
 
+  .barcode-add-location-select {
+    height:
+      50px;
 
-    .location-detail-quantity-input {
-        height: 60px;
+    border-radius:
+      9px;
+  }
 
-        padding: 0 16px;
 
-        font-size: 25px;
-    }
+  .barcode-add-location-main-icon {
+    margin-left:
+      11px;
+  }
 
 
-    .location-detail-save {
-        height: 60px;
+  .barcode-add-location-main-icon {
+    width:
+      20px;
 
-        font-size: 27px;
-    }
+    height:
+      20px;
+  }
 
-}
 
-/* =========================
-   OVERLAY
-========================= */
+  .barcode-add-location-select input {
+    padding:
+      0
+      8px;
 
-.barcode-modal-overlay {
-    animation: barcodeOverlayOpen 0.22s ease-out forwards;
-}
+    font-size:
+      16px;
+  }
 
 
-/* =========================
-   MODAL OPEN
-========================= */
+  .barcode-add-location-toggle {
+    width:
+      44px;
 
-.barcode-modal-container {
-    transform-origin: center center;
+    flex-basis:
+      44px;
+  }
 
-    animation: barcodeModalOpen 0.22s cubic-bezier(
-        0.22,
-        1,
-        0.36,
-        1
-    ) forwards;
-}
 
+  .barcode-add-location-options {
+    max-height:
+      160px;
 
-/* =========================
-   CLOSE
-========================= */
+    top:
+      calc(
+        100% + 5px
+      );
+  }
 
-.barcode-modal-overlay.closing {
-    animation: barcodeOverlayClose 0.22s ease-in forwards;
-}
 
+  .barcode-add-location-option {
+    min-height:
+      42px;
 
-.barcode-modal-container.closing {
-    animation: barcodeModalClose 0.22s cubic-bezier(
-        0.4,
+    font-size:
+      14px;
+  }
+
+
+  /* ---------------------------------------------------------
+     ADD STOCK QUANTITY
+  --------------------------------------------------------- */
+
+  .barcode-add-stock-quantity {
+    height:
+      52px;
+
+    grid-template-columns:
+      50px
+      minmax(
         0,
-        1,
-        1
-    ) forwards;
+        1fr
+      )
+      50px;
+
+    border-radius:
+      9px;
+  }
+
+
+  .barcode-add-stock-quantity input {
+    font-size:
+      23px;
+  }
+
+
+  .barcode-add-qty-button svg {
+    width:
+      21px;
+
+    height:
+      21px;
+  }
+
+
+  /* ---------------------------------------------------------
+     ADD STOCK FOOTER
+     Always visible.
+  --------------------------------------------------------- */
+
+  .barcode-add-stock-footer {
+    position:
+      relative;
+
+    z-index:
+      60;
+
+    min-height:
+      64px;
+
+    flex:
+      0
+      0
+      auto;
+
+    padding:
+      8px
+      10px
+      max(
+        8px,
+        env(
+          safe-area-inset-bottom
+        )
+      );
+
+    gap:
+      7px;
+
+    background:
+      #ffffff;
+
+    box-shadow:
+      0
+      -8px
+      22px
+      rgba(
+        15,
+        23,
+        42,
+        0.055
+      );
+  }
+
+
+  .barcode-add-stock-cancel,
+  .barcode-add-stock-save {
+    height:
+      46px;
+
+    min-width:
+      0;
+
+    padding:
+      0
+      8px;
+
+    font-size:
+      14px;
+
+    border-radius:
+      8px;
+  }
+
+
+  .barcode-add-stock-save svg {
+    width:
+      19px;
+
+    height:
+      19px;
+  }
+
+
+  /* ---------------------------------------------------------
+     EXISTING LOCATION ADJUSTMENT
+  --------------------------------------------------------- */
+
+  .location-detail-overlay {
+    padding:
+      10px;
+  }
+
+
+  .location-detail-modal {
+    width:
+      100%;
+
+    max-width:
+      460px;
+
+    border-radius:
+      14px;
+  }
+
+
+  .location-detail-header {
+    min-height:
+      54px;
+
+    padding:
+      7px
+      9px;
+  }
+
+
+  .location-detail-header h3 {
+    font-size:
+      15px;
+
+    line-height:
+      20px;
+  }
+
+
+  .location-detail-close-icon {
+    width:
+      34px;
+
+    height:
+      34px;
+
+    flex-basis:
+      34px;
+
+    font-size:
+      25px;
+  }
+
+
+  .location-detail-location {
+    min-height:
+      104px;
+
+    padding:
+      17px
+      12px;
+  }
+
+
+  .location-detail-location-code {
+    font-size:
+      25px;
+
+    line-height:
+      30px;
+  }
+
+
+  .location-detail-adjustment {
+    grid-template-columns:
+      minmax(
+        0,
+        1fr
+      )
+      64px;
+
+    padding:
+      8px;
+  }
+
+
+  .location-detail-quantity-input,
+  .location-detail-save {
+    height:
+      54px;
+  }
+
+
+  .location-detail-quantity-input {
+    padding:
+      0
+      13px;
+
+    font-size:
+      23px;
+  }
+
+
+  .location-detail-save {
+    font-size:
+      25px;
+  }
+
 }
 
 
-/* =========================
-   OPEN ANIMATION
-========================= */
+/* =========================================================
+   SHORT MOBILE SCREENS
+   Keeps footer visible even when browser UI / keyboard
+   reduces usable height.
+========================================================= */
 
-@keyframes barcodeModalOpen {
+@media (
+  max-width:
+    700px
+) and (
+  max-height:
+    650px
+) {
 
-    from {
-        opacity: 0;
+  .barcode-modal-container {
+    height:
+      calc(
+        100dvh - 16px
+      );
 
-        transform:
-            scale(0.72)
-            translateY(15px);
-    }
+    max-height:
+      calc(
+        100dvh - 16px
+      );
+  }
 
-    to {
-        opacity: 1;
 
-        transform:
-            scale(1)
-            translateY(0);
-    }
+  .barcode-container-header,
+  .barcode-add-stock-header {
+    min-height:
+      56px;
+  }
+
+
+  .barcode-container-footer,
+  .barcode-add-stock-footer {
+    min-height:
+      60px;
+  }
+
+
+  .barcode-print-content {
+    padding-top:
+      11px;
+  }
+
+
+  .barcode-add-stock-body {
+    padding-top:
+      10px;
+  }
 
 }
 
 
-/* =========================
-   CLOSE ANIMATION
-========================= */
+/* =========================================================
+   SMALL PDA / PHONE
+========================================================= */
 
-@keyframes barcodeModalClose {
+@media (
+  max-width:
+    390px
+) {
 
-    from {
-        opacity: 1;
+  .barcode-modal-overlay {
+    padding: 0;
+  }
 
-        transform:
-            scale(1)
-            translateY(0);
-    }
 
-    to {
-        opacity: 0;
+  .barcode-modal-container {
+    width: 100%;
+    max-width: none;
 
-        transform:
-            scale(0.72)
-            translateY(15px);
-    }
+    height: min(
+      80dvh,
+      610px
+    );
+
+    max-height:
+      calc(100dvh - 14px);
+
+    border-left: 0;
+    border-right: 0;
+
+    border-radius: 14px;
+  }
+
+
+  .barcode-tab {
+    padding:
+      0
+      8px;
+
+    font-size:
+      12.5px;
+  }
+
+
+  .barcode-tab svg {
+    width:
+      18px;
+
+    height:
+      18px;
+  }
+
+
+  .barcode-print-content {
+    padding:
+      11px
+      9px
+      18px;
+  }
+
+
+  .barcode-title-product {
+    font-size:
+      17px;
+
+    line-height:
+      22px;
+  }
+
+
+  .barcode-add-stock-heading h2 {
+    font-size:
+      17px;
+  }
+
+
+  .barcode-add-stock-heading p {
+    display:
+      none;
+  }
+
+
+  .barcode-add-stock-product {
+    padding:
+      10px;
+  }
+
+
+  .barcode-add-stock-product-sku {
+    font-size:
+      16px;
+  }
+
+
+  .barcode-container-footer,
+  .barcode-add-stock-footer {
+    padding-left:
+      8px;
+
+    padding-right:
+      8px;
+
+    gap:
+      6px;
+  }
+
+
+  .barcode-submit,
+  .barcode-cancel,
+  .barcode-add-stock-cancel,
+  .barcode-add-stock-save {
+    font-size:
+      13.5px;
+  }
 
 }
 
 
-/* =========================
-   OVERLAY ANIMATION
-========================= */
+/* =========================================================
+   VERY SMALL WIDTH
+   Keep buttons side-by-side without overflow.
+========================================================= */
+
+@media (
+  max-width:
+    340px
+) {
+
+  .barcode-add-stock-save {
+    gap:
+      4px;
+  }
+
+
+  .barcode-add-stock-save svg {
+    width:
+      17px;
+
+    height:
+      17px;
+  }
+
+
+  .barcode-submit,
+  .barcode-cancel,
+  .barcode-add-stock-cancel,
+  .barcode-add-stock-save {
+    padding:
+      0
+      5px;
+
+    font-size:
+      13px;
+  }
+
+}
+
+
+/* =========================================================
+   HOVER ONLY ON DEVICES THAT SUPPORT IT
+========================================================= */
+
+@media (
+  hover:
+    hover
+) {
+
+  .barcode-product-card:hover {
+    box-shadow:
+      0
+      7px
+      20px
+      rgba(
+        15,
+        23,
+        42,
+        0.09
+      );
+  }
+
+}
+
+
+/* =========================================================
+   ANIMATIONS
+========================================================= */
 
 @keyframes barcodeOverlayOpen {
 
-    from {
-        opacity: 0;
-    }
+  from {
+    opacity:
+      0;
+  }
 
-    to {
-        opacity: 1;
-    }
+  to {
+    opacity:
+      1;
+  }
 
 }
 
 
 @keyframes barcodeOverlayClose {
 
-    from {
-        opacity: 1;
-    }
+  from {
+    opacity:
+      1;
+  }
 
-    to {
-        opacity: 0;
-    }
+  to {
+    opacity:
+      0;
+  }
 
 }
 
 
+@keyframes barcodeModalOpen {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      translateY(
+        12px
+      )
+      scale(
+        0.978
+      );
+  }
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      translateY(
+        0
+      )
+      scale(
+        1
+      );
+  }
+
+}
+
+
+@keyframes barcodeModalClose {
+
+  from {
+    opacity:
+      1;
+
+    transform:
+      translateY(
+        0
+      )
+      scale(
+        1
+      );
+  }
+
+  to {
+    opacity:
+      0;
+
+    transform:
+      translateY(
+        12px
+      )
+      scale(
+        0.978
+      );
+  }
+
+}
+
+
+@keyframes barcodeModalMobileOpen {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      translateY(
+        20px
+      )
+      scale(
+        0.99
+      );
+  }
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      translateY(
+        0
+      )
+      scale(
+        1
+      );
+  }
+
+}
+
+
+@keyframes barcodeAddStockEnter {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      translateX(
+        18px
+      );
+  }
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      translateX(
+        0
+      );
+  }
+
+}
+
+
+@keyframes barcodeLocationDropdownEnter {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      translateY(
+        -4px
+      );
+  }
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      translateY(
+        0
+      );
+  }
+
+}
+
+
+@keyframes locationOverlayIn {
+
+  from {
+    opacity:
+      0;
+  }
+
+  to {
+    opacity:
+      1;
+  }
+
+}
+
+
+@keyframes locationModalOpen {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      translateY(
+        10px
+      )
+      scale(
+        0.98
+      );
+  }
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      translateY(
+        0
+      )
+      scale(
+        1
+      );
+  }
+
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+@media (
+  prefers-reduced-motion:
+    reduce
+) {
+
+  .barcode-modal-overlay,
+  .barcode-modal-container,
+  .barcode-add-stock-view,
+  .barcode-add-location-options,
+  .location-detail-overlay,
+  .location-detail-modal {
+    animation:
+      none;
+  }
+
+
+  .barcode-search-dark,
+  .barcode-product-card,
+  .barcode-tab,
+  .barcode-close-btn,
+  .barcode-option,
+  .barcode-submit,
+  .barcode-cancel,
+  .stock-location-card,
+  .stock-location-add-card,
+  .barcode-add-stock-close,
+  .barcode-add-stock-cancel,
+  .barcode-add-stock-save,
+  .barcode-add-qty-button,
+  .location-detail-close-icon,
+  .location-detail-save {
+    transition:
+      none;
+  }
+
+}
+
+
+
+/* =========================================================
+   MOBILE / PDA
+   BARCODE MODAL — FULL SCREEN
+   PEGAR AL FINAL DEL CSS
+========================================================= */
+
+@media (max-width: 700px) {
+
+  /* OVERLAY */
+  .barcode-modal-overlay {
+    position: fixed !important;
+
+    inset: 0 !important;
+
+    width: 100vw !important;
+    height: 100dvh !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    display: flex !important;
+
+    align-items: stretch !important;
+    justify-content: stretch !important;
+
+    box-sizing: border-box !important;
+  }
+
+
+  /* MODAL PRINCIPAL */
+  .barcode-modal-container {
+    width: 100vw !important;
+    max-width: none !important;
+
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    flex: 1 1 auto !important;
+
+    border: none !important;
+    border-radius: 0 !important;
+
+    box-shadow: none !important;
+
+    overflow: hidden !important;
+
+    box-sizing: border-box !important;
+  }
+
+
+  /* =====================================================
+     VISTA NORMAL
+  ===================================================== */
+
+  .barcode-container-header {
+    flex: 0 0 auto !important;
+  }
+
+
+  .barcode-container-center {
+    flex: 1 1 auto !important;
+
+    min-height: 0 !important;
+
+    overflow: hidden !important;
+  }
+
+
+  .barcode-print-view {
+    width: 100% !important;
+    height: 100% !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    -webkit-overflow-scrolling: touch;
+  }
+
+
+  .barcode-container-footer {
+    flex: 0 0 auto !important;
+
+    width: 100% !important;
+
+    margin: 0 !important;
+
+    box-sizing: border-box !important;
+  }
+
+
+  /* =====================================================
+     VISTA AGREGAR STOCK
+  ===================================================== */
+
+  .barcode-add-stock-view {
+    width: 100% !important;
+    height: 100% !important;
+
+    min-height: 0 !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    overflow: hidden !important;
+
+    box-sizing: border-box !important;
+  }
+
+
+  .barcode-add-stock-header {
+    flex: 0 0 auto !important;
+  }
+
+
+  .barcode-add-stock-body {
+    flex: 1 1 auto !important;
+
+    min-height: 0 !important;
+
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+
+    -webkit-overflow-scrolling: touch;
+  }
+
+
+  .barcode-add-stock-footer {
+    flex: 0 0 auto !important;
+
+    width: 100% !important;
+
+    margin: 0 !important;
+
+    box-sizing: border-box !important;
+  }
+
+}
+
+
+/* =========================================================
+   BARCODE MODALS
+   CAMBIOS INMEDIATOS — SIN ANIMACIONES
+   PEGAR AL FINAL DEL CSS
+========================================================= */
+
+/* Modal principal */
+.barcode-modal-overlay,
+.barcode-modal-container {
+  animation: none !important;
+  transition: none !important;
+}
+
+
+/* Vista normal del producto */
+.barcode-container-header,
+.barcode-container-center,
+.barcode-container-footer,
+.barcode-print-view,
+.barcode-print-content {
+  animation: none !important;
+}
+
+
+/* Vista agregar stock */
+.barcode-add-stock-view,
+.barcode-add-stock-header,
+.barcode-add-stock-body,
+.barcode-add-stock-footer {
+  animation: none !important;
+  transition: none !important;
+
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+
+/* Modal para ajustar inventario existente */
+.location-detail-overlay,
+.location-detail-modal {
+  animation: none !important;
+  transition: none !important;
+
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+
+/* Dropdown de ubicaciones también inmediato */
+.barcode-add-location-options {
+  animation: none !important;
+}

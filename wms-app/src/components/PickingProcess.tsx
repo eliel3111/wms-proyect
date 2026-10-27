@@ -262,6 +262,178 @@ export default function PickingProcess() {
     }
   };
 
+
+  
+  const handleUnassign = async () => {
+
+  console.log(
+    "🚀 [START] Unassign picking desde frontend"
+  );
+
+
+  try {
+
+    // ==========================================
+    // 1. VALIDAR PICKING SELECCIONADO
+    // ==========================================
+
+    if (
+      !selectedItem?.id
+    ) {
+
+      console.log(
+        "⚠️ No picking seleccionado"
+      );
+
+
+      openModal({
+        title:
+          "Picking requerido",
+
+        message:
+          "Debes seleccionar un pedido antes de desasignarlo.",
+      });
+
+
+      return;
+    }
+
+
+    const pickingId =
+      selectedItem.id;
+
+
+    console.log(
+      "📦 Picking a desasignar:",
+      pickingId
+    );
+
+
+    // ==========================================
+    // 2. REQUEST BACKEND
+    // ==========================================
+
+    const response =
+      await apiClient.post(
+        "/picking/unassign",
+        {
+          pickingId
+        }
+      );
+
+
+    console.log(
+      "📥 Response backend:",
+      response.data
+    );
+
+
+    const {
+      success,
+      title,
+      message
+    } = response.data;
+
+
+    // ==========================================
+    // 3. SI FALLÓ
+    // ==========================================
+
+    if (
+      !success
+    ) {
+
+      openModal({
+        title:
+          title ||
+          "No se pudo desasignar",
+
+        message:
+          message ||
+          "No fue posible desasignar el pedido.",
+      });
+
+
+      return;
+    }
+
+
+    // ==========================================
+    // 4. SUCCESS
+    // ==========================================
+
+    console.log(
+      "✅ Picking desasignado correctamente"
+    );
+
+
+    await fetchPickings();
+
+
+    setOpenSidebar(
+      false
+    );
+
+
+    setSelectedItem(
+      null
+    );
+
+
+    setView(
+      "details"
+    );
+
+
+    openModal({
+      title:
+        title ||
+        "Pedido desasignado",
+
+      message:
+        message ||
+        "El pedido fue desasignado correctamente.",
+    });
+
+
+  } catch (
+    error: any
+  ) {
+
+    console.error(
+      "🔥 [CATCH ERROR] Unassign:",
+      error
+    );
+
+
+    const backendTitle =
+      error?.response?.data?.title ||
+      "Error";
+
+
+    const backendMessage =
+      error?.response?.data?.message ||
+      "Error de conexión con el servidor";
+
+
+    openModal({
+      title:
+        backendTitle,
+
+      message:
+        backendMessage,
+    });
+
+
+  } finally {
+
+    console.log(
+      "🔚 [END] Unassign picking frontend"
+    );
+  }
+};
+
+
   return (
     <div className="mainInner">
       <div className="monitor-header">
@@ -545,11 +717,17 @@ export default function PickingProcess() {
 
 
 
-                <button
+                  <button
                   className="modal-pick-save-btn modal-pick-btn-blue"
                   onClick={handleReassign}
                 >
                   Guardar selección
+                </button>
+                <button
+                  className="modal-pick-save-btn modal-pick-btn-unassign"
+                  onClick={handleUnassign}
+                >
+                  Desasignar pedido
                 </button>
               </>
             )}

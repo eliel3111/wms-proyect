@@ -688,10 +688,15 @@ export async function createTransferLine(req, res) {
             FOR UPDATE
             `, [fromLocationId]);
 
-        if (locResult.rowCount === 0 || locResult.rows[0].location_type !== "STORAGE") {
+        if (
+            locResult.rowCount === 0 ||
+            !["STORAGE", "RECEIVING"].includes(
+                locResult.rows[0].location_type
+            )
+        ) {
             throw new AppError(
-                "INVALID_STORAGE_LOCATION",
-                "La ubicación escaneada no es una ubicación válida de almacenamiento."
+                "INVALID_SOURCE_LOCATION",
+                "La ubicación escaneada no es una ubicación válida de origen."
             );
         }
 

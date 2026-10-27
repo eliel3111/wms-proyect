@@ -1,5 +1,5 @@
 import express from "express";
-import { searchProducts, upsertSupplierBarcode } from "../controllers/barcodeController.js";
+import { searchProducts, upsertSupplierBarcode, searchLocationsByCode } from "../controllers/barcodeController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -12,6 +12,16 @@ router.post("/products/search", authMiddleware, searchProducts);
 router.post("/supplierCode", authMiddleware, upsertSupplierBarcode);
 
 
+/* =========================================================
+   BUSCAR UBICACIONES
+========================================================= */
+
+router.get(
+    "/locations/search",
+    authMiddleware,
+    searchLocationsByCode
+);
+               
 
 
 export default router;

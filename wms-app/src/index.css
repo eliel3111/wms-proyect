@@ -1,11 +1,267 @@
-@import url('https://fonts.googleapis.com/css2?family=Work+Sans:ital@0;1&display=swap');
+/* =========================================================
+   GARLAS WMS
+   GLOBAL TYPOGRAPHY SYSTEM
+========================================================= */
+
+
+/* =========================================================
+   DESIGN TOKENS
+========================================================= */
+
+:root {
+
+  /* =====================================================
+     FONT FAMILIES
+  ===================================================== */
+
+  --font-ui:
+    "Geist Variable",
+    sans-serif;
+
+  --font-data:
+    "Geist Mono Variable",
+    monospace;
+
+
+  /* =====================================================
+     FONT WEIGHTS
+  ===================================================== */
+
+  --weight-regular: 430;
+
+  --weight-medium: 510;
+
+  --weight-semibold: 620;
+
+  --weight-bold: 690;
+
+  --weight-heavy: 760;
+
+
+  /* =====================================================
+     TYPE SCALE
+  ===================================================== */
+
+  --text-2xs: 11px;
+
+  --text-xs: 12px;
+
+  --text-sm: 13px;
+
+  --text-md: 14px;
+
+  --text-lg: 16px;
+
+  --text-xl: 18px;
+
+  --text-2xl: 21px;
+
+  --text-3xl: 26px;
+
+
+  /* =====================================================
+     LINE HEIGHT
+  ===================================================== */
+
+  --leading-tight: 1.15;
+
+  --leading-heading: 1.25;
+
+  --leading-ui: 1.4;
+
+  --leading-body: 1.5;
+
+
+  /* =====================================================
+     LETTER SPACING
+  ===================================================== */
+
+  --tracking-display: -0.035em;
+
+  --tracking-heading: -0.022em;
+
+  --tracking-ui: -0.008em;
+
+  --tracking-normal: 0;
+
+  --tracking-label: 0.01em;
+
+
+  /* =====================================================
+     TEXT COLORS
+  ===================================================== */
+
+  --text-primary: #17233c;
+
+  --text-secondary: #52627a;
+
+  --text-muted: #7c899c;
+
+  --text-placeholder: #94a0b1;
+}
+
+
+/* =========================================================
+   RESET
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
 
 html,
+body,
+#root {
+  margin: 0;
+
+  padding: 0;
+
+  width: 100%;
+
+  min-height: 100%;
+
+}
+
+
+/* =========================================================
+   GLOBAL TYPOGRAPHY
+========================================================= */
+
+html {
+  font-family: var(--font-ui);
+
+  font-synthesis: none;
+
+  font-kerning: normal;
+
+  text-rendering: optimizeLegibility;
+
+  -webkit-font-smoothing: antialiased;
+
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
 body {
   margin: 0;
-  padding: 0;
-  font-family: "Work Sans", sans-serif;
-  font-optical-sizing: auto;
-  font-weight: 400;
-  font-style: normal;
+
+  font-family: var(--font-ui);
+
+  font-size: var(--text-md);
+
+  line-height: var(--leading-body);
+
+  font-weight: var(--weight-regular);
+
+  letter-spacing: var(--tracking-ui);
+
+  color: var(--text-primary);
+}
+
+
+/* =========================================================
+   FORM ELEMENTS
+========================================================= */
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+
+  font-size: inherit;
+
+  font-weight: inherit;
+
+  letter-spacing: inherit;
+}
+
+
+/* =========================================================
+   BUTTON RESET
+========================================================= */
+
+button {
+  font-synthesis: none;
+}
+
+
+/* =========================================================
+   INPUT
+========================================================= */
+
+input,
+textarea,
+select {
+  color: var(--text-primary);
+}
+
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-placeholder);
+
+  font-weight: 410;
+
+  opacity: 1;
+}
+
+
+/* =========================================================
+   HEADINGS
+========================================================= */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-top: 0;
+}
+
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-primary);
+
+  font-family: var(--font-ui);
+
+  text-wrap: balance;
+}
+
+
+/* =========================================================
+   NUMERIC / TECHNICAL DATA
+========================================================= */
+
+.wms-data {
+  font-family: var(--font-data);
+
+  font-variant-numeric:
+    tabular-nums;
+
+  letter-spacing: -0.015em;
+}
+
+
+.wms-code {
+  font-family: var(--font-data);
+
+  font-size: 12.5px;
+
+  line-height: 18px;
+
+  font-weight: var(--weight-medium);
+
+  letter-spacing: -0.015em;
+
+  font-variant-numeric:
+    tabular-nums;
 }

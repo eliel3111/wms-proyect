@@ -1,279 +1,1185 @@
+/* =========================================================
+   GARLAS WMS — RECEIVING ORDER
+   MODERN INDUSTRIAL UI
+========================================================= */
+
+
+/* =========================================================
+   PAGE
+========================================================= */
+
 .page-orden-compra {
   width: 100%;
+  min-height: calc(100dvh - 52px);
+
+  box-sizing: border-box;
+
   display: flex;
-  justify-content: center; /* centra el contenido */
   flex-direction: column;
-}
 
-.container-title {
-  width: 100%;
-  max-width: 1000px;   /* controla el ancho en desktop */
-  margin: 0 auto;      /* centra horizontalmente */
-}
-
-.order-container-table {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-
-/* ===== CONTAINER ===== */
-.container-title {
-  width: 80%;
-  display: flex;
-  gap: 12px;
-  padding: 10px;
-  box-sizing: border-box;
-  border-radius: 10px;
-  background-color: #D3D3D3;
-  margin-top: 25px;
-
-  /* ✨ SOMBRA */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-
-
-}
-
-
-/* ===== CHILDREN ===== */
-.order-div-a,
-.order-div-b {
-  flex: 1;
-  display: flex;
   align-items: center;
-  font-weight: 600;
-  font-size: 16px;
-  border-radius: 8px;
-  color: #1f2937;
+
+  padding:
+    26px
+    0
+    110px;
+
+  background:
+    linear-gradient(
+      160deg,
+      #f8fafc 0%,
+      #f3f6fa 45%,
+      #edf2f7 100%
+    );
+
+  font-family: var(--font-ui);
+
+  color: var(--text-primary);
+
+  overflow-x: hidden;
 }
 
 
+/* =========================================================
+   ORDER HEADER CARD
+========================================================= */
 
-/* CONTENEDOR PRINCIPAL */
+.container-title {
+  width:
+    min(
+      1120px,
+      calc(100% - 48px)
+    );
+
+  min-height: 170px;
+
+  margin:
+    0
+    auto
+    24px;
+
+  padding:
+    24px
+    32px;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 32px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.97
+    );
+
+  border:
+    1px solid
+    rgba(
+      218,
+      226,
+      236,
+      0.9
+    );
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 10px 32px
+    rgba(
+      31,
+      45,
+      61,
+      0.075
+    );
+}
+
+
+/* =========================================================
+   HEADER LEFT
+========================================================= */
+
 .order-div-a {
+  min-width: 0;
+
+  flex: 1;
+
   display: flex;
-  align-items: center;       /* centra verticalmente */
-  gap: 16px;                 /* 👈 espacio entre SVG y details */
-  padding: 10px 16px;
-  min-height: 80px;  
-  border-radius: 10px;
+
+  align-items: center;
+
+  gap: 28px;
 }
 
-/* SVG */
+
+/* =========================================================
+   ORDER ICON
+========================================================= */
+
 .order-icon {
+  width: 110px;
+  height: 110px;
+
+  flex:
+    0
+    0
+    110px;
+
+  padding: 0;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
-  background-color: #ffffff;
-  padding: 10px;
-  border-radius: 8px;
+
+  box-sizing: border-box;
+
+  border-radius: 18px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #eef7ff 0%,
+      #dceeff 100%
+    );
+
+  border:
+    1px solid
+    rgba(
+      30,
+      136,
+      229,
+      0.06
+    );
 }
+
 
 .oder-icon-svg {
-    height: 70px;
-    width: 70px;
+  width: 78px;
+  height: 78px;
+
+  display: block;
 }
 
-/* DETAILS (columna vertical) */
+
+/* =========================================================
+   ORDER DETAILS
+========================================================= */
+
 .order-details {
+  min-width: 0;
+
   display: flex;
-  flex-direction: column;    /* 👈 vertical */
-  gap: 4px;
-}
 
-/* NÚMERO DE ORDEN */
-.order-number {
-  font-size: 22px;
-  font-weight: 800;
-  color: #1e3a8a; /* azul fuerte */
-}
+  flex-direction: column;
 
-/* TÍTULO */
-.order-number-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: #57677e; /* gris */
-}
-
-/* CONTENEDOR */
-.order-div-b {
-  display: flex;
-  gap: 14px;
   justify-content: center;
-  align-items: center;
+
+  gap: 6px;
 }
 
-/* BASE PILL BUTTON */
-.pill-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 
-  padding: 14px 22px;
-  border-radius: 999px;
+/* =========================================================
+   PURCHASE ORDER NUMBER
+========================================================= */
+
+.order-number {
+  margin: 0;
+
+  font-family: var(--font-data);
+
+  font-size: clamp(
+    29px,
+    2.4vw,
+    38px
+  );
+
+  line-height: 1.08;
+
+  font-weight: 680;
+
+  letter-spacing: -0.04em;
+
+  color: #102450;
+
+  font-variant-numeric:
+    tabular-nums;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* =========================================================
+   ORDER TYPE
+========================================================= */
+
+.order-number-title {
+  font-family: var(--font-ui);
 
   font-size: 16px;
-  font-weight: 600;
+
+  line-height: 22px;
+
+  font-weight:
+    var(--weight-medium);
+
+  letter-spacing: -0.012em;
+
+  color: #65748b;
+}
+
+
+/* =========================================================
+   HEADER ACTIONS
+========================================================= */
+
+.order-div-b {
+  flex:
+    0
+    0
+    auto;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 14px;
+}
+
+
+/* =========================================================
+   BUTTON BASE
+========================================================= */
+
+.pill-btn {
+  min-width: 150px;
+
+  height: 58px;
+
+  padding:
+    0
+    24px;
+
+  box-sizing: border-box;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
 
   border: none;
+
+  border-radius: 14px;
+
+  font-family: var(--font-ui);
+
+  font-size: 16px;
+
+  line-height: 20px;
+
+  font-weight:
+    var(--weight-semibold);
+
+  letter-spacing: -0.012em;
+
   cursor: pointer;
 
   user-select: none;
-  -webkit-tap-highlight-color: transparent;
+
   touch-action: manipulation;
 
-  transition: transform 0.1s ease,
-              box-shadow 0.15s ease,
-              background-color 0.15s ease;
+  -webkit-tap-highlight-color:
+    transparent;
+
+  transition:
+    transform 130ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease,
+    background-color 160ms ease;
 }
 
-/* ICONO */
+
+/* =========================================================
+   BUTTON ICON
+========================================================= */
+
 .pill-btn .icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+
+  flex:
+    0
+    0
+    22px;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
 }
+
 
 .pill-btn svg {
   width: 100%;
   height: 100%;
+
   fill: currentColor;
 }
 
-/* TEXTO */
+
 .pill-btn .label {
   white-space: nowrap;
 }
 
-/* ⏸️ PAUSAR */
+
+/* =========================================================
+   PAUSE BUTTON
+========================================================= */
+
 .pause-btn {
-  background: #FFD54F;
-  color: #212121;
+  color: #302600;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffd84d 0%,
+      #ffc928 100%
+    );
+
+  border:
+    1px solid
+    rgba(
+      203,
+      151,
+      0,
+      0.18
+    );
+
+  box-shadow:
+    0 4px 10px
+    rgba(
+      214,
+      162,
+      0,
+      0.16
+    );
 }
 
-/* ✅ FINALIZAR */
+
+/* =========================================================
+   FINISH BUTTON
+========================================================= */
+
 .finish-btn {
-  background: #4CAF50;
-  color: #FFFFFF;
+  color: #ffffff;
+
+  background:
+    linear-gradient(
+      180deg,
+      #2fbd5f 0%,
+      #16a34a 100%
+    );
+
+  border:
+    1px solid
+    rgba(
+      14,
+      132,
+      58,
+      0.2
+    );
+
+  box-shadow:
+    0 4px 11px
+    rgba(
+      22,
+      163,
+      74,
+      0.18
+    );
 }
 
-/* TOUCH / ACTIVE FEEDBACK */
+
+/* =========================================================
+   BUTTON INTERACTIONS
+========================================================= */
+
+@media (hover: hover) {
+
+  .pause-btn:hover {
+    filter:
+      brightness(0.98);
+
+    transform:
+      translateY(-1px);
+
+    box-shadow:
+      0 6px 15px
+      rgba(
+        214,
+        162,
+        0,
+        0.2
+      );
+  }
+
+
+  .finish-btn:hover {
+    filter:
+      brightness(0.96);
+
+    transform:
+      translateY(-1px);
+
+    box-shadow:
+      0 7px 16px
+      rgba(
+        22,
+        163,
+        74,
+        0.22
+      );
+  }
+
+}
+
+
 .pill-btn:active {
-  transform: scale(0.96);
-  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.2);
+  transform:
+    scale(0.975);
+
+  box-shadow:
+    0 2px 5px
+    rgba(
+      31,
+      45,
+      61,
+      0.12
+    );
 }
 
+
+.pill-btn:focus-visible {
+  outline:
+    3px solid
+    rgba(
+      30,
+      136,
+      229,
+      0.26
+    );
+
+  outline-offset: 3px;
+}
+
+
+/* =========================================================
+   TABLE AREA
+========================================================= */
+
+.order-container-table {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+
+  padding:
+    0
+    32px;
+}
+
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
+
+.order-lines-header {
+  width: 100%;
+
+  min-height: 55px;
+
+  padding:
+    0
+    34px;
+
+  box-sizing: border-box;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(220px, 20%)
+    minmax(380px, 1fr)
+    minmax(150px, 14%)
+    minmax(140px, 12%);
+
+  align-items: center;
+
+  column-gap: 24px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f4f7fb 0%,
+      #eaf0f6 100%
+    );
+
+  border:
+    1px solid
+    #e0e7ef;
+
+  border-radius: 12px;
+
+  color: #354861;
+
+  font-family:
+    var(--font-ui);
+
+  font-size: 13px;
+
+  line-height: 18px;
+
+  font-weight:
+    var(--weight-semibold);
+
+  letter-spacing: -0.005em;
+}
+
+
+/* RIGHT COLUMNS */
+
+.order-lines-header
+> div:nth-child(3),
+
+.order-lines-header
+> div:nth-child(4) {
+  text-align: center;
+}
+
+
+/* =========================================================
+   PRODUCT LIST
+========================================================= */
+
+.lines-list {
+  width: 100%;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 12px;
+
+  box-sizing: border-box;
+}
+
+
+/*
+  Esto estiliza el root de cada OrderLineCard
+  sin necesitar cambiar tu JSX.
+*/
+
+.lines-list > * {
+  position: relative;
+
+  width: 100%;
+
+  box-sizing: border-box;
+
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  border:
+    1px solid
+    #e1e8f0;
+
+  box-shadow:
+    0 4px 13px
+    rgba(
+      31,
+      45,
+      61,
+      0.055
+    );
+
+  overflow: hidden;
+
+  transition:
+    transform 130ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+
+/* Línea visual izquierda */
+
+
+
+@media (hover: hover) {
+
+  .lines-list > *:hover {
+    transform:
+      translateY(-1px);
+
+    border-color:
+      #d1dce8;
+
+    box-shadow:
+      0 7px 18px
+      rgba(
+        31,
+        45,
+        61,
+        0.075
+      );
+  }
+
+}
+
+
+/* =========================================================
+   FILTER BAR
+========================================================= */
 
 .filter-bar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
+
+  bottom:
+    max(
+      14px,
+      env(safe-area-inset-bottom)
+    );
+
+  left: 50%;
+
+  width: auto;
+
+  transform:
+    translateX(-50%);
+
+  z-index: 1000;
 
   display: flex;
-  justify-content: center; /* 👈 centra horizontalmente */
+
   align-items: center;
+  justify-content: center;
 
+  padding: 5px;
 
-  gap: 12px;
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.94
+    );
 
-  background-color: transparent;
- 
+  border:
+    1px solid
+    rgba(
+      211,
+      220,
+      231,
+      0.95
+    );
 
-  z-index: 1000; /* 👈 siempre encima */
+  border-radius: 15px;
+
+  box-shadow:
+    0 8px 24px
+    rgba(
+      31,
+      45,
+      61,
+      0.13
+    );
+
+  backdrop-filter:
+    blur(14px);
+
+  -webkit-backdrop-filter:
+    blur(14px);
 }
+
+
+/* =========================================================
+   FILTER INNER
+========================================================= */
 
 .filter-bar-inner {
-  width: 100%;
-  max-width: 1000px; /* ajusta a tu layout */
+  width: auto;
+
   display: flex;
+
+  align-items: center;
   justify-content: center;
-  gap: 12px;
+
+  gap: 3px;
 }
+
+
+/* =========================================================
+   FILTER BUTTON
+========================================================= */
 
 .filter-bar-inner button {
-    padding: 8px 25px;
-    height: 48px;
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    cursor: pointer;
-  background-color: #D3D3D3;   
+  min-width: 145px;
+
+  height: 48px;
+
+  padding:
+    0
+    24px;
+
+  border: none;
+
+  border-radius: 11px;
+
+  background:
+    transparent;
+
+  color: #33445d;
+
+  font-family:
+    var(--font-ui);
+
+  font-size: 14px;
+
+  line-height: 20px;
+
+  font-weight:
+    var(--weight-medium);
+
+  letter-spacing:
+    -0.008em;
+
+  cursor: pointer;
+
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 120ms ease,
+    box-shadow 160ms ease;
 }
+
+
+.filter-bar-inner button:hover {
+  background:
+    #f1f5f9;
+}
+
+
+.filter-bar-inner button:active {
+  transform:
+    scale(0.97);
+}
+
+
+/* =========================================================
+   ACTIVE FILTER
+========================================================= */
 
 .filter-bar button.active {
-    border-color: rgba(59, 130, 246, .6);
-    font-weight: 700;
-    font-size: 16px;
-    color: #FFFFFF;
-    background-color: #1E88E5;
+  color: #ffffff;
+
+  font-weight:
+    var(--weight-semibold);
+
+  background:
+    linear-gradient(
+      180deg,
+      #3096fa 0%,
+      #1683ee 100%
+    );
+
+  box-shadow:
+    0 4px 10px
+    rgba(
+      30,
+      136,
+      229,
+      0.2
+    );
 }
 
 
+/* =========================================================
+   TABLET
+========================================================= */
 
+@media (max-width: 1024px) {
 
-/* HOVER (desktop) */
-@media (hover: hover) {
-  .pill-btn:hover {
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-  }
-}
-
-/* 📱 PDA / MÓVIL */
-@media (max-width: 768px) {
-  .pill-btn {
-    padding: 16px 24px;
-    font-size: 17px;
-  }
-
-  .pill-btn .icon {
-    width: 22px;
-    height: 22px;
-  }
-}
-
-
-
-/* ===== DESKTOP ===== */
-@media (min-width: 769px) {
   .container-title {
-    flex-direction: row;      /* horizontal */
-    padding: 25px;            /* 🖥️ Desktop */
-    width: 100%;
-  }
-}
+    width:
+      calc(
+        100% - 32px
+      );
 
-/* ===== MOBILE ===== */
-@media (max-width: 768px) {
-  .container-title {
-    flex-direction: column;   /* vertical */
-    width: 93%;
-    gap: 0;
-    min-width: 300px;
+    min-height: 150px;
+
+    padding:
+      22px
+      24px;
+
+    gap: 20px;
   }
+
+
+  .order-icon {
+    width: 90px;
+    height: 90px;
+
+    flex-basis: 90px;
+  }
+
 
   .oder-icon-svg {
-    height: 50px;
+    width: 64px;
+    height: 64px;
+  }
+
+
+  .order-number {
+    font-size: 28px;
+  }
+
+
+  .pill-btn {
+    min-width: 130px;
+
+    height: 54px;
+
+    padding:
+      0
+      18px;
+  }
+
+
+  .order-container-table {
+    padding:
+      0
+      18px;
+  }
+
+
+  .order-lines-header {
+    grid-template-columns:
+      minmax(180px, 23%)
+      minmax(280px, 1fr)
+      minmax(120px, 16%)
+      minmax(110px, 14%);
+
+    padding:
+      0
+      24px;
+
+    column-gap: 14px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE / PDA
+========================================================= */
+
+@media (max-width: 768px) {
+
+  .page-orden-compra {
+    min-height:
+      calc(
+        100dvh - 52px
+      );
+
+    padding:
+      12px
+      0
+      100px;
+  }
+
+
+  /* =====================================
+     HEADER
+  ===================================== */
+
+  .container-title {
+    width:
+      calc(
+        100% - 20px
+      );
+
+    min-width: 0;
+    min-height: 0;
+
+    margin-bottom: 14px;
+
+    padding:
+      16px;
+
+    flex-direction: column;
+
+    align-items: stretch;
+
+    gap: 16px;
+
+    border-radius: 15px;
+  }
+
+
+  .order-div-a {
+    width: 100%;
+
+    gap: 15px;
+  }
+
+
+  .order-icon {
+    width: 70px;
+    height: 70px;
+
+    flex:
+      0
+      0
+      70px;
+
+    border-radius: 13px;
+  }
+
+
+  .oder-icon-svg {
     width: 50px;
+    height: 50px;
+  }
+
+
+  .order-details {
+    gap: 4px;
+  }
+
+
+  .order-number {
+    font-size: 24px;
+
+    line-height: 29px;
+
+    font-weight: 670;
+
+    letter-spacing: -0.03em;
+  }
+
+
+  .order-number-title {
+    font-size: 14px;
+
+    line-height: 19px;
+  }
+
+
+  /* =====================================
+     ACTIONS
+  ===================================== */
+
+  .order-div-b {
+    width: 100%;
+
+    display: grid;
+
+    grid-template-columns:
+      1fr
+      1fr;
+
+    gap: 10px;
+  }
+
+
+  .pill-btn {
+    width: 100%;
+
+    min-width: 0;
+
+    height: 52px;
+
+    padding:
+      0
+      14px;
+
+    font-size: 16px;
+
+    border-radius: 11px;
+  }
+
+
+  .pill-btn .icon {
+    width: 21px;
+    height: 21px;
+
+    flex-basis: 21px;
+  }
+
+
+  /* =====================================
+     TABLE
+  ===================================== */
+
+  .order-container-table {
+    padding:
+      0
+      10px;
+  }
+
+
+  /*
+   * En PDA no recomiendo mantener
+   * un header de tabla desktop tan pequeño.
+   * Lo ocultamos y las cards contienen
+   * la información visual.
+   */
+
+  .order-lines-header {
+    display: none;
+  }
+
+
+  .lines-list {
+    gap: 10px;
+  }
+
+
+  .lines-list > * {
+    border-radius: 12px;
+  }
+
+
+  .lines-list > *::before {
+    width: 5px;
+
+    border-radius:
+      12px
+      0
+      0
+      12px;
+  }
+
+
+  /* =====================================
+     FILTER
+  ===================================== */
+
+  .filter-bar {
+    width:
+      calc(
+        100% - 20px
+      );
+
+    bottom:
+      max(
+        8px,
+        env(safe-area-inset-bottom)
+      );
+
+    box-sizing: border-box;
+  }
+
+
+  .filter-bar-inner {
+    width: 100%;
+  }
+
+
+  .filter-bar-inner button {
+    min-width: 0;
+
+    flex: 1;
+
+    height: 48px;
+
+    padding:
+      0
+      10px;
+
+    font-size: 14px;
+  }
+
 }
 
-/* NÚMERO DE ORDEN */
-.order-number {
-  font-size: 22px;
-  font-weight: 800;
+
+/* =========================================================
+   VERY SMALL PDA
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .container-title {
+    padding: 14px;
+  }
+
+
+  .order-icon {
+    width: 62px;
+    height: 62px;
+
+    flex-basis: 62px;
+  }
+
+
+  .oder-icon-svg {
+    width: 44px;
+    height: 44px;
+  }
+
+
+  .order-number {
+    font-size: 21px;
+
+    line-height: 26px;
+  }
+
+
+  .order-number-title {
+    font-size: 13px;
+  }
+
+
+  .pill-btn {
+    height: 50px;
+
+    font-size: 15px;
+  }
+
+
+  .filter-bar-inner button {
+    font-size: 13px;
+  }
 
 }
 
-/* TÍTULO */
-.order-number-title {
-  font-size: 14px;
-}
 
-.order-container-table {
-  padding: 0;
-}
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
 
+@media (prefers-reduced-motion: reduce) {
+
+  .pill-btn,
+  .filter-bar-inner button,
+  .lines-list > * {
+    transition: none;
+  }
 
 }
 
@@ -812,4 +1718,22 @@
         border-left: 1px solid #e5e7eb;
         border-right: 1px solid #e5e7eb;
     }
+}
+
+
+.finish-btn {
+  color: #ffffff !important;
+}
+
+.finish-btn .label {
+  color: #ffffff !important;
+}
+
+.finish-btn .icon {
+  color: #ffffff !important;
+}
+
+.finish-btn svg {
+  color: #ffffff !important;
+  fill: currentColor;
 }

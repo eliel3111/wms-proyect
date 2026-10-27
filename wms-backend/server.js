@@ -78,7 +78,12 @@ import {
 import {
   getAdmCloudSalesOrderByIdController,
 } from "./integrations/admcloud/admcloud.salesOrders.js";
-
+import {
+  getPendingDispatchByPickingController,
+} from "./integrations/admcloud/admcloud.pendingDispatch.js";
+import {
+  getAdmCloudProductByIdController,
+} from "./integrations/admcloud/admcloud.items.js";
 
 
 
@@ -116,6 +121,25 @@ app.use(express.json());
 startAdmCloudCron();
 
 
+
+// =====================================================
+// ADM CLOUD - BUSCAR PRODUCTO POR GUID
+// =====================================================
+
+app.get(
+  "/api/admcloud/products/:productId",
+  getAdmCloudProductByIdController
+);
+
+
+// =====================================================
+// CONSULTAR PENDIENTES DE DESPACHO EN ADM CLOUD
+// =====================================================
+
+app.get(
+  "/api/admcloud/pending-dispatch/picking/:pickingId",
+  getPendingDispatchByPickingController
+);
 
 // ============================================================
 // TEST - Search an unique sale order
