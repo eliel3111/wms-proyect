@@ -1967,57 +1967,74 @@ export async function reserveInventoryForMove(
 }*/
 
 
-//Servicio para ordenar los move lines
-export async function getMoveLinesOrderedByLocation(client, pickingId) {
-  try {
-    const query = `
-      SELECT 
-        sml.id,
-        sml.move_id,
-        sml.product_id,
-        sml.product_uom_qty,
-        sml.qty_done,
-        sml.location_id,
-        sml.warehouse_id,
+// =====================================================
+// OBTENER STOCK MOVE LINES ORDENADAS POR UBICACIÓN
+// =====================================================
 
-        l.tramo,
-        l.nivel,
-        l.code,
+export async function getMoveLinesOrderedByLocation(
+  client,
+  pickingId
+) {
+  const result = await client.query(
+    `
+    SELECT
+      sml.id,
+      sml.move_id,
+      sml.picking_id,
+      sml.product_id,
+      sml.product_uom_id,
 
-        p.sku,
-        p.description,
-        p.erp_name,
-        p.erp_sku,
-        P.erp_id
+      sml.product_uom_qty,
+      sml.qty_done,
 
-      FROM stock_move_line sml
+      sml.location_id,
+      sml.warehouse_id,
 
-      INNER JOIN locations l 
-        ON l.id = sml.location_id
-       AND l.warehouse_id = sml.warehouse_id
+      sml.is_general,
+      sml.source_move_line_id,
+      sml.available_locations,
+      sml.max_product_qty,
 
-      INNER JOIN products p
-        ON p.id = sml.product_id
+      l.tramo,
+      l.nivel,
+      l.code,
 
-      WHERE sml.picking_id = $1
-  AND sml.state NOT IN ('done', 'cancel')
+      p.sku,
+      p.description,
+      p.erp_name,
+      p.erp_sku,
+      p.erp_id
 
-      ORDER BY 
-        l.tramo DESC,
-        l.nivel DESC
-    `;
+    FROM stock_move_line AS sml
 
-    const { rows } = await client.query(query, [pickingId]);
+    INNER JOIN locations AS l
+      ON l.id = sml.location_id
+     AND l.warehouse_id = sml.warehouse_id
 
-    //console.log("📦 Líneas ordenadas por ubicación:", rows);
+    INNER JOIN products AS p
+      ON p.id = sml.product_id
 
-    return rows;
+    WHERE sml.picking_id = $1
+      AND sml.state NOT IN ('done', 'cancel')
+      AND (
+        sml.product_uom_qty > 0
+        OR sml.qty_done > 0
+      )
 
-  } catch (error) {
-    console.error("❌ Error obteniendo líneas de picking:", error);
-    throw error;
-  }
+    ORDER BY
+      sml.is_general ASC,
+      l.tramo DESC,
+      l.nivel DESC,
+      sml.id ASC
+    `,
+    [pickingId]
+  );
+
+  return result.rows;
 }
+
+
+
 
 //Servicio para obtener congifuracion de picking inicial
 export async function getPickingConfig(client) {

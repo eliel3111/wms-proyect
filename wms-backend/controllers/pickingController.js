@@ -24,7 +24,16 @@ import {
 import {
   prepareAdmCloudDispatchService,
   sendAdmCloudDispatchService,
+  syncAdmCloudDispatchService
 } from "../integrations/admcloud/admcloud.conduce.js";
+import {
+  confirmPickingWithAlternateLocation,
+  refreshPickingLocationSnapshots,
+} from "../services/pickingAlternativeLocations.service.js";
+import {
+  getAdmCloudDispatchService
+} from "../integrations/admcloud/admcloud.conduce.js";
+
 
 
 export async function updateOriginWarehouse(req, res) {
@@ -183,10 +192,10 @@ export async function closePicking(req, res) {
   const userId = req.user?.id;
 
   let client;
-let transactionStarted = false;
-let releaseError;
-let preparedAdmCloudDispatch = null;
-let admCloudDispatchResult = null;
+  let transactionStarted = false;
+  let releaseError;
+  let preparedAdmCloudDispatch = null;
+  let admCloudDispatchResult = null;
 
   console.log("================================");
   console.log("🚀 INICIANDO CIERRE DE PICKING");
@@ -246,7 +255,7 @@ let admCloudDispatchResult = null;
     // ========================================================
 
     const pickingResult = await client.query(
-  `
+      `
     SELECT
       id,
       name,
@@ -263,8 +272,8 @@ let admCloudDispatchResult = null;
     WHERE id = $1
     FOR UPDATE
   `,
-  [pickingId]
-);
+      [pickingId]
+    );
 
     // ========================================================
     // 7. VALIDAR QUE EL PICKING EXISTA
@@ -316,7 +325,7 @@ let admCloudDispatchResult = null;
     // ========================================================
 
     const linesResult = await client.query(
-  `
+      `
     SELECT
       sml.*,
       p.sku,
@@ -330,106 +339,106 @@ let admCloudDispatchResult = null;
           NOT IN ('cancel', 'done')
     ORDER BY sml.id ASC
   `,
-  [pickingId]
-);
+      [pickingId]
+    );
 
-   const lines = linesResult.rows;
+    const lines = linesResult.rows;
 
-console.log(
-  "📋 Líneas activas del picking:",
-  lines
-);
+    console.log(
+      "📋 Líneas activas del picking:",
+      lines
+    );
 
-// ========================================================
-// VALIDAR QUE EXISTAN LÍNEAS
-// ========================================================
+    // ========================================================
+    // VALIDAR QUE EXISTAN LÍNEAS
+    // ========================================================
 
-if (lines.length === 0) {
-  await client.query("ROLLBACK");
-  transactionStarted = false;
+    if (lines.length === 0) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
 
-  return res.status(422).json({
-    success: false,
-    title: "NO EXISTEN LÍNEAS",
-    message:
-      "Este pedido no tiene líneas disponibles",
-  });
-}
+      return res.status(422).json({
+        success: false,
+        title: "NO EXISTEN LÍNEAS",
+        message:
+          "Este pedido no tiene líneas disponibles",
+      });
+    }
 
-// ========================================================
-// VALIDAR QUE SE HAYA RECOGIDO ALGUNA CANTIDAD
-// ========================================================
+    // ========================================================
+    // VALIDAR QUE SE HAYA RECOGIDO ALGUNA CANTIDAD
+    // ========================================================
 
-const totalQtyDone = lines.reduce(
-  (total, line) =>
-    total + Number(line.qty_done || 0),
-  0
-);
+    const totalQtyDone = lines.reduce(
+      (total, line) =>
+        total + Number(line.qty_done || 0),
+      0
+    );
 
-console.log(
-  "📦 Cantidad total recogida:",
-  totalQtyDone
-);
+    console.log(
+      "📦 Cantidad total recogida:",
+      totalQtyDone
+    );
 
 
 
-if (totalQtyDone <= 0) {
-  await client.query("ROLLBACK");
-  transactionStarted = false;
+    if (totalQtyDone <= 0) {
+      await client.query("ROLLBACK");
+      transactionStarted = false;
 
-  return res.status(422).json({
-    success: false,
-    title: "NO HAY PRODUCTOS RECOGIDOS",
-    message:
-      "No se puede cerrar el picking porque todas las líneas tienen qty_done en 0.",
-    data: {
-      pickingId: picking.id,
-      pickingName: picking.name,
-      totalQtyDone: 0,
-    },
-  });
-}
+      return res.status(422).json({
+        success: false,
+        title: "NO HAY PRODUCTOS RECOGIDOS",
+        message:
+          "No se puede cerrar el picking porque todas las líneas tienen qty_done en 0.",
+        data: {
+          pickingId: picking.id,
+          pickingName: picking.name,
+          totalQtyDone: 0,
+        },
+      });
+    }
 
-// ========================================================
-// 10. PREPARAR CONDUCE EN ADM CLOUD
-// ========================================================
+    // ========================================================
+    // 10. PREPARAR CONDUCE EN ADM CLOUD
+    // ========================================================
 
-preparedAdmCloudDispatch =
-  await prepareAdmCloudDispatchService(
-    client,
-    pickingId
-  );
+    preparedAdmCloudDispatch =
+      await prepareAdmCloudDispatchService(
+        client,
+        pickingId
+      );
 
-if (!preparedAdmCloudDispatch?.success) {
-  throw new Error(
-    preparedAdmCloudDispatch?.message ||
-    "No se pudo preparar el conduce."
-  );
-}
+    if (!preparedAdmCloudDispatch?.success) {
+      throw new Error(
+        preparedAdmCloudDispatch?.message ||
+        "No se pudo preparar el conduce."
+      );
+    }
 
-console.log("✅ Conduce preparado:", {
-  pickingId:
-    preparedAdmCloudDispatch.data.pickingId,
+    console.log("✅ Conduce preparado:", {
+      pickingId:
+        preparedAdmCloudDispatch.data.pickingId,
 
-  itemsCount:
-    preparedAdmCloudDispatch.data.itemsCount,
+      itemsCount:
+        preparedAdmCloudDispatch.data.itemsCount,
 
-  moveLineIds:
-    preparedAdmCloudDispatch.data.moveLineIds,
-});
+      moveLineIds:
+        preparedAdmCloudDispatch.data.moveLineIds,
+    });
 
-// ========================================================
-// 11. CONTINUAR CIERRE DEL PICKING
-// ========================================================
+    // ========================================================
+    // 11. CONTINUAR CIERRE DEL PICKING
+    // ========================================================
 
-// Aquí continúa:
-// UPDATE stock_move_line SET state = 'done'
-// movimientos de inventario
-// actualización del picking
+    // Aquí continúa:
+    // UPDATE stock_move_line SET state = 'done'
+    // movimientos de inventario
+    // actualización del picking
 
-   
 
- 
+
+
 
     // ========================================================
     // 13. PROCESAR CADA LÍNEA
@@ -570,7 +579,7 @@ console.log("✅ Conduce preparado:", {
       // ======================================================
 
       if (qtyDone === qtyPlanned) {
-     
+
 
         console.log("✅ Línea completada:", {
           lineId: line.id,
@@ -687,48 +696,48 @@ console.log("✅ Conduce preparado:", {
     // 14. ACTUALIZAR ESTADO DE LOS STOCK_MOVE
     // ========================================================
 
-   /* const completedMovesResult =
-  await client.query(
-    `
-      UPDATE public.despacho_stock_move AS dsm
-      SET
-        state = 'done',
-        write_date = NOW()
-      WHERE dsm.picking_id = $1
-
-        AND COALESCE(
-          dsm.state,
-          ''
-        ) <> 'cancel'
-
-        AND NOT EXISTS (
-          SELECT 1
-          FROM public.stock_move_line AS sml
-          WHERE sml.move_id = dsm.id
-            AND COALESCE(
-              sml.state,
-              ''
-            ) NOT IN (
-              'done',
-              'cancel'
-            )
-        )
-
-      RETURNING
-        dsm.id,
-        dsm.erp_move_id,
-        dsm.erp_product_id,
-        dsm.product_qty,
-        dsm.pending_qty,
-        dsm.state
-    `,
-    [pickingId]
-  );
-
-console.log(
-  "✅ DESPACHO_STOCK_MOVE COMPLETADOS:",
-  completedMovesResult.rows
-);*/
+    /* const completedMovesResult =
+   await client.query(
+     `
+       UPDATE public.despacho_stock_move AS dsm
+       SET
+         state = 'done',
+         write_date = NOW()
+       WHERE dsm.picking_id = $1
+ 
+         AND COALESCE(
+           dsm.state,
+           ''
+         ) <> 'cancel'
+ 
+         AND NOT EXISTS (
+           SELECT 1
+           FROM public.stock_move_line AS sml
+           WHERE sml.move_id = dsm.id
+             AND COALESCE(
+               sml.state,
+               ''
+             ) NOT IN (
+               'done',
+               'cancel'
+             )
+         )
+ 
+       RETURNING
+         dsm.id,
+         dsm.erp_move_id,
+         dsm.erp_product_id,
+         dsm.product_qty,
+         dsm.pending_qty,
+         dsm.state
+     `,
+     [pickingId]
+   );
+ 
+ console.log(
+   "✅ DESPACHO_STOCK_MOVE COMPLETADOS:",
+   completedMovesResult.rows
+ );*/
 
 
     // ========================================================
@@ -796,51 +805,51 @@ console.log(
     // 18. FUTURA RELACIÓN ADM CLOUD
     // ========================================================
     // ==========================================================
-// CREAR CONDUCE EN ADM CLOUD AL FINAL
-// ==========================================================
+    // CREAR CONDUCE EN ADM CLOUD AL FINAL
+    // ==========================================================
 
-admCloudDispatchResult =
-  await sendAdmCloudDispatchService(
-    preparedAdmCloudDispatch
-  );
+    admCloudDispatchResult =
+      await sendAdmCloudDispatchService(
+        preparedAdmCloudDispatch
+      );
 
-if (!admCloudDispatchResult?.success) {
-  throw new Error(
-    admCloudDispatchResult?.message ||
-    "ADM Cloud no pudo crear el conduce."
-  );
-}
+    if (!admCloudDispatchResult?.success) {
+      throw new Error(
+        admCloudDispatchResult?.message ||
+        "ADM Cloud no pudo crear el conduce."
+      );
+    }
 
-const dispatchGuid = String(
-  admCloudDispatchResult?.data?.dispatchGuid ?? ""
-)
-  .trim()
-  .toLowerCase();
+    const dispatchGuid = String(
+      admCloudDispatchResult?.data?.dispatchGuid ?? ""
+    )
+      .trim()
+      .toLowerCase();
 
-const guidRegex =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const guidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-if (!guidRegex.test(dispatchGuid)) {
-  throw new Error(
-    "ADM Cloud creó el conduce, pero no devolvió un dispatchGuid válido."
-  );
-}
+    if (!guidRegex.test(dispatchGuid)) {
+      throw new Error(
+        "ADM Cloud creó el conduce, pero no devolvió un dispatchGuid válido."
+      );
+    }
 
-const GREEN_BACKGROUND = "\x1b[42m";
-const BLACK_TEXT = "\x1b[30m";
-const BOLD_TEXT = "\x1b[1m";
-const RESET_COLOR = "\x1b[0m";
+    const GREEN_BACKGROUND = "\x1b[42m";
+    const BLACK_TEXT = "\x1b[30m";
+    const BOLD_TEXT = "\x1b[1m";
+    const RESET_COLOR = "\x1b[0m";
 
-const greenStyle =
-  `${GREEN_BACKGROUND}${BLACK_TEXT}${BOLD_TEXT}`;
+    const greenStyle =
+      `${GREEN_BACKGROUND}${BLACK_TEXT}${BOLD_TEXT}`;
 
-console.log(
-  `${greenStyle} ✅ Conduce creado en ADM Cloud: ${JSON.stringify({
-    dispatchGuid,
-    itemsCount:
-      admCloudDispatchResult.data.itemsCount,
-  })} ${RESET_COLOR}`
-);
+    console.log(
+      `${greenStyle} ✅ Conduce creado en ADM Cloud: ${JSON.stringify({
+        dispatchGuid,
+        itemsCount:
+          admCloudDispatchResult.data.itemsCount,
+      })} ${RESET_COLOR}`
+    );
 
     /*
      * TODO: Guardar aquí la relación entre:
@@ -871,45 +880,45 @@ console.log(
 
 
     // ========================================================
-// MARCAR COMO DONE LAS LÍNEAS INCLUIDAS EN EL CONDUCE
-// ========================================================
+    // MARCAR COMO DONE LAS LÍNEAS INCLUIDAS EN EL CONDUCE
+    // ========================================================
 
-const dispatchedMoveLineIds = [
-  ...new Set(
-    (
-      preparedAdmCloudDispatch
-        ?.data
-        ?.moveLineIds || []
-    )
-      .map((id) =>
-        Number(id)
-      )
-      .filter(
-        (id) =>
-          Number.isSafeInteger(id) &&
-          id > 0
-      )
-  ),
-];
+    const dispatchedMoveLineIds = [
+      ...new Set(
+        (
+          preparedAdmCloudDispatch
+            ?.data
+            ?.moveLineIds || []
+        )
+          .map((id) =>
+            Number(id)
+          )
+          .filter(
+            (id) =>
+              Number.isSafeInteger(id) &&
+              id > 0
+          )
+      ),
+    ];
 
-if (
-  dispatchedMoveLineIds.length === 0
-) {
-  throw {
-    code:
-      "EMPTY_DISPATCH_MOVE_LINES",
+    if (
+      dispatchedMoveLineIds.length === 0
+    ) {
+      throw {
+        code:
+          "EMPTY_DISPATCH_MOVE_LINES",
 
-    title:
-      "Conduce sin líneas locales",
+        title:
+          "Conduce sin líneas locales",
 
-    message:
-      "El conduce fue preparado sin identificadores de stock_move_line.",
-  };
-}
+        message:
+          "El conduce fue preparado sin identificadores de stock_move_line.",
+      };
+    }
 
-const completedLinesResult =
-  await client.query(
-    `
+    const completedLinesResult =
+      await client.query(
+        `
       UPDATE public.stock_move_line
       SET
         state = 'done',
@@ -944,18 +953,18 @@ const completedLinesResult =
         user_id,
         erp_dispatch_id
     `,
-    [
-      userId,
-      pickingId,
-      dispatchedMoveLineIds,
-      dispatchGuid,
-    ]
-  );
+        [
+          userId,
+          pickingId,
+          dispatchedMoveLineIds,
+          dispatchGuid,
+        ]
+      );
 
-console.log(
-  "✅ Líneas finalizadas y vinculadas al conduce:",
-  completedLinesResult.rows
-);
+    console.log(
+      "✅ Líneas finalizadas y vinculadas al conduce:",
+      completedLinesResult.rows
+    );
 
     console.log(
       "☁️ Registro de despacho ADM Cloud pendiente"
@@ -973,21 +982,80 @@ console.log(
     );
 
     const completedMoveIds = [
-  ...new Set(
-    completedLinesResult.rows
-      .map((line) => Number(line.move_id))
-      .filter(
-        (moveId) =>
-          Number.isSafeInteger(moveId) &&
-          moveId > 0
-      )
-  ),
-];
+      ...new Set(
+        completedLinesResult.rows
+          .map((line) => Number(line.move_id))
+          .filter(
+            (moveId) =>
+              Number.isSafeInteger(moveId) &&
+              moveId > 0
+          )
+      ),
+    ];
 
-console.log(
-  "✅ Move IDs incluidos en el conduce:",
-  completedMoveIds
-);
+    console.log(
+      "✅ Move IDs incluidos en el conduce:",
+      completedMoveIds
+    );
+
+
+
+
+
+
+
+
+
+
+    // ========================================================
+    // 20. SINCRONIZAR CONDUCE DESPUÉS DE RESPONDER
+    // ========================================================
+
+    const syncPayload = {
+      db,
+      pickingId: picking.id,
+      saleId: picking.sale_id,
+      dispatchGuid
+    };
+
+    res.once("finish", () => {
+
+      console.log(
+        "📨 Respuesta enviada. Iniciando sincronización ADM Cloud..."
+      );
+
+      setImmediate(() => {
+
+        syncAdmCloudDispatchService(syncPayload)
+          .then((result) => {
+
+            console.log(
+              "✅ SINCRONIZACIÓN COMPLETADA:",
+              result.data
+            );
+
+          })
+          .catch((error) => {
+
+            console.error(
+              "❌ ERROR EN SINCRONIZACIÓN BACKGROUND:",
+              {
+                pickingId: syncPayload.pickingId,
+                dispatchGuid: syncPayload.dispatchGuid,
+                message: error.message
+              }
+            );
+
+          });
+
+      });
+
+    });
+
+
+
+
+
 
     // ========================================================
     // 20. RESPUESTA EXITOSA
@@ -1021,137 +1089,137 @@ console.log(
          * puedes reemplazarlo por los despachos creados.
          */
         conduces:
-  admCloudDispatchResult
-    ? [
-        {
-          id:
-            admCloudDispatchResult
-              .data
-              .dispatchGuid,
+          admCloudDispatchResult
+            ? [
+              {
+                id:
+                  admCloudDispatchResult
+                    .data
+                    .dispatchGuid,
 
-          dispatchGuid:
-            admCloudDispatchResult
-              .data
-              .dispatchGuid,
+                dispatchGuid:
+                  admCloudDispatchResult
+                    .data
+                    .dispatchGuid,
 
-          itemsCount:
-            admCloudDispatchResult
-              .data
-              .itemsCount,
-        },
-      ]
-    : [],
+                itemsCount:
+                  admCloudDispatchResult
+                    .data
+                    .itemsCount,
+              },
+            ]
+            : [],
       },
     });
   } catch (error) {
-  // ========================================================
-  // 21. REVERTIR TRANSACCIÓN
-  // ========================================================
+    // ========================================================
+    // 21. REVERTIR TRANSACCIÓN
+    // ========================================================
 
-  if (
-    client &&
-    transactionStarted
-  ) {
-    try {
-      await client.query(
-        "ROLLBACK"
+    if (
+      client &&
+      transactionStarted
+    ) {
+      try {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        transactionStarted = false;
+
+        console.log(
+          "🟠 ROLLBACK ejecutado"
+        );
+      } catch (rollbackError) {
+        releaseError =
+          rollbackError;
+
+        console.error(
+          "❌ Error realizando ROLLBACK:",
+          rollbackError.message
+        );
+      }
+    }
+
+    console.error(
+      "================================"
+    );
+
+    console.error(
+      "❌ ERROR closePicking:",
+      {
+        code:
+          error.code,
+
+        title:
+          error.title,
+
+        message:
+          error.message,
+
+        statusCode:
+          error.statusCode,
+
+        admCloudStatus:
+          error.admCloudStatus,
+
+        admCloudData:
+          error.admCloudData,
+      }
+    );
+
+    console.error(
+      "================================"
+    );
+
+    const candidateStatus =
+      Number(error.statusCode);
+
+    const responseStatus =
+      Number.isInteger(
+        candidateStatus
+      ) &&
+        candidateStatus >= 400 &&
+        candidateStatus <= 599
+        ? candidateStatus
+        : 500;
+
+    return res
+      .status(responseStatus)
+      .json({
+        success: false,
+
+        code:
+          error.code ||
+          "CLOSE_PICKING_ERROR",
+
+        title:
+          error.title ||
+          "Error cerrando picking",
+
+        message:
+          error.message ||
+          "No se pudo cerrar el picking.",
+
+        admCloudStatus:
+          error.admCloudStatus ||
+          null,
+
+        admCloudError:
+          error.admCloudData ||
+          null,
+      });
+  } finally {
+    if (client) {
+      client.release(
+        releaseError
       );
-
-      transactionStarted = false;
 
       console.log(
-        "🟠 ROLLBACK ejecutado"
-      );
-    } catch (rollbackError) {
-      releaseError =
-        rollbackError;
-
-      console.error(
-        "❌ Error realizando ROLLBACK:",
-        rollbackError.message
+        "🔚 Cliente PostgreSQL liberado"
       );
     }
   }
-
-  console.error(
-    "================================"
-  );
-
-  console.error(
-    "❌ ERROR closePicking:",
-    {
-      code:
-        error.code,
-
-      title:
-        error.title,
-
-      message:
-        error.message,
-
-      statusCode:
-        error.statusCode,
-
-      admCloudStatus:
-        error.admCloudStatus,
-
-      admCloudData:
-        error.admCloudData,
-    }
-  );
-
-  console.error(
-    "================================"
-  );
-
-  const candidateStatus =
-    Number(error.statusCode);
-
-  const responseStatus =
-    Number.isInteger(
-      candidateStatus
-    ) &&
-    candidateStatus >= 400 &&
-    candidateStatus <= 599
-      ? candidateStatus
-      : 500;
-
-  return res
-    .status(responseStatus)
-    .json({
-      success: false,
-
-      code:
-        error.code ||
-        "CLOSE_PICKING_ERROR",
-
-      title:
-        error.title ||
-        "Error cerrando picking",
-
-      message:
-        error.message ||
-        "No se pudo cerrar el picking.",
-
-      admCloudStatus:
-        error.admCloudStatus ||
-        null,
-
-      admCloudError:
-        error.admCloudData ||
-        null,
-    });
-} finally {
-  if (client) {
-    client.release(
-      releaseError
-    );
-
-    console.log(
-      "🔚 Cliente PostgreSQL liberado"
-    );
-  }
-}
 }
 
 
@@ -1506,13 +1574,13 @@ export async function getBestShippingLocation(req, res) {
 
     const candidateStatus = Number(
       error.statusCode ??
-        error.response?.status
+      error.response?.status
     );
 
     const status =
       Number.isInteger(candidateStatus) &&
-      candidateStatus >= 400 &&
-      candidateStatus <= 599
+        candidateStatus >= 400 &&
+        candidateStatus <= 599
         ? candidateStatus
         : error.isAxiosError
           ? 502
@@ -1635,7 +1703,7 @@ export async function getPickingDifferences(req, res) {
 
     // 3️⃣ BUSCAR LÍNEAS CON DIFERENCIA
     const linesResult = await db.query(
-  `
+      `
     SELECT
       sml.id,
       sml.product_id,
@@ -1656,8 +1724,8 @@ export async function getPickingDifferences(req, res) {
           <> COALESCE(sml.qty_done, 0)
     ORDER BY sml.id ASC
   `,
-  [id]
-);
+      [id]
+    );
 
     console.log(
       "📋 LÍNEAS CON DIFERENCIA:",
@@ -1703,336 +1771,106 @@ export async function getPickingDifferences(req, res) {
 
 
 
+// =====================================================
+// CONFIRMAR PICKING - RUTA NORMAL O ALTERNATIVA
+// =====================================================
 
 export async function confirmPickingLine(req, res) {
   let client;
+  let transactionStarted = false;
 
-  console.log("\n");
-  console.log("🟨🟨🟨 ========================================");
-  console.log("📦 INICIANDO confirmPickingLine");
-  console.log("🕒 Fecha:", new Date().toISOString());
-  console.log("🟨🟨🟨 ========================================");
+  console.log("======================================");
+  console.log("📦 CONFIRM PICKING LINE");
+  console.log("📥 INPUT:", req.body);
+  console.log("======================================");
 
   try {
-    console.log("🔌 Conectando con PostgreSQL...");
-
-    client = await db.connect();
-
-    console.log("✅ Conexión obtenida correctamente");
-
-    const { id, locationId, productId, qty } = req.body;
-
-    console.log("📨 BODY RECIBIDO:");
-    console.log({
+    const {
       id,
-      locationId,
+      pickingId,
       productId,
-      qty
-    });
-
-    console.log("🔎 TIPOS DE DATOS RECIBIDOS:");
-    console.log({
-      idType: typeof id,
-      locationIdType: typeof locationId,
-      productIdType: typeof productId,
-      qtyType: typeof qty
-    });
-
-    /*
-     * VALIDACIÓN DE DATOS REQUERIDOS
-     */
-    console.log("🛡️ Validando datos requeridos...");
+      locationId,
+      qty,
+    } = req.body;
 
     if (
-      id === undefined ||
-      id === null ||
-      locationId === undefined ||
-      locationId === null ||
-      productId === undefined ||
-      productId === null ||
+      !productId ||
+      !locationId ||
       qty === undefined ||
       qty === null ||
       qty === ""
     ) {
-      console.log("❌ VALIDACIÓN FALLIDA: datos incompletos");
-
-      return res.json({
+      return res.status(400).json({
         success: false,
         title: "Datos incompletos",
-        message: "Debe enviar id, locationId, productId y qty"
-      });
-    }
-
-    console.log("✅ Datos requeridos recibidos");
-
-    /*
-     * CONVERTIR CANTIDAD
-     */
-    const qtyNumber = Number(qty);
-
-    console.log("🔢 Cantidad convertida a número:", qtyNumber);
-
-    if (Number.isNaN(qtyNumber)) {
-      console.log("❌ VALIDACIÓN FALLIDA: qty no es un número");
-
-      return res.json({
-        success: false,
-        title: "Cantidad inválida",
-        message: "La cantidad debe ser numérica"
-      });
-    }
-
-    /*
- * OBTENER CONFIGURACIÓN
- */
-    const pickingConfig = await getPickingConfig(client);
-
-    console.log("⚙️ PICKING CONFIG:", pickingConfig);
-
-    /*
-     * Guardaremos aquí la ubicación escaneada
-     */
-    let scannedLocation = null;
-
-    /*
-     * SI SE PERMITE PICKING SIN UBICACIÓN FIJA,
-     * CONFIRMAR QUE LA UBICACIÓN RECIBIDA EXISTA
-     */
-    if (pickingConfig.allow_picking_without_locations === true) {
-
-      console.log("🔎 Validando que locationId exista:", locationId);
-
-      const locationResult = await client.query(
-        `
-    SELECT
-      id,
-      code,
-      warehouse_id
-    FROM locations
-    WHERE id = $1
-    LIMIT 1
-    `,
-        [locationId]
-      );
-
-      if (locationResult.rowCount === 0) {
-
-        console.log("❌ La ubicación no existe:", locationId);
-
-        return res.json({
-          success: false,
-          title: "Ubicación inválida",
-          message: "La ubicación seleccionada no existe"
-        });
-      }
-
-      scannedLocation = locationResult.rows[0];
-
-      console.log(
-        "✅ Ubicación válida:",
-        scannedLocation
-      );
-    }
-
-    /*
-     * BUSCAR LA LÍNEA
-     */
-    console.log("🔎 Buscando línea en stock_move_line...");
-
-    let result;
-
-    if (pickingConfig.allow_picking_without_locations === true) {
-      /*
-       * No exigimos que location_id coincida,
-       * porque el usuario puede recoger desde otra ubicación válida.
-       */
-      result = await client.query(
-        `
-        SELECT *
-        FROM stock_move_line
-        WHERE id = $1
-          AND product_id = $2
-        `,
-        [id, productId]
-      );
-    } else {
-      /*
-       * Picking normal:
-       * producto y ubicación deben coincidir con la línea.
-       */
-      result = await client.query(
-        `
-        SELECT *
-        FROM stock_move_line
-        WHERE id = $1
-          AND product_id = $2
-          AND location_id = $3
-        `,
-        [id, productId, locationId]
-      );
-    }
-
-    console.log("📊 Resultado de la búsqueda:");
-    console.log({
-      rowCount: result.rowCount,
-      rows: result.rows
-    });
-
-    if (result.rows.length === 0) {
-      console.log("❌ LÍNEA NO ENCONTRADA");
-
-      return res.json({
-        success: false,
-        title: "Línea no encontrada",
         message:
-          pickingConfig.allow_picking_without_locations === true
-            ? "No coincide el producto con la línea"
-            : "No coincide el producto o la ubicación"
+          "Debe enviar productId, locationId y qty.",
       });
     }
 
-    const line = result.rows[0];
-
-    console.log("✅ LÍNEA ENCONTRADA:");
-    console.log(line);
-
-    /*
-     * VALIDAR LA CANTIDAD
-     */
-    console.log("🛡️ Validando cantidad...");
-
-    const requestedQty = Number(line.product_uom_qty);
-    const currentQtyDone = Number(line.qty_done || 0);
-
-    console.log("📦 Comparación de cantidades:");
-    console.log({
-      qtyReceived: qtyNumber,
-      productUomQty: requestedQty,
-      currentQtyDone,
-      remainingQty: requestedQty - currentQtyDone
-    });
-
-    if (qtyNumber < 0) {
-      console.log("❌ VALIDACIÓN FALLIDA: cantidad menor a cero");
-
-      return res.json({
+    // id puede ser NULL para una línea nueva.
+    // En ese caso pickingId es obligatorio.
+    if (!id && !pickingId) {
+      return res.status(400).json({
         success: false,
-        title: "Cantidad inválida",
-        message: "Debe ser mayor o igual a 0"
+        title: "Picking requerido",
+        message:
+          "Debe enviar pickingId cuando id sea null.",
       });
     }
 
-    if (qtyNumber > requestedQty) {
-      console.log(
-        "❌ VALIDACIÓN FALLIDA: cantidad mayor a la solicitada"
+    client = await db.connect();
+
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    const result =
+      await confirmPickingWithAlternateLocation(
+        client,
+        {
+          id: id || null,
+          pickingId,
+          productId,
+          locationId,
+          qty,
+        }
       );
 
-      return res.json({
-        success: false,
-        title: "Cantidad excedida",
-        message: "No puede recoger más de lo solicitado"
-      });
-    }
+    await client.query("COMMIT");
+    transactionStarted = false;
 
-    console.log("✅ Cantidad válida");
+    console.log("✅ PICKING CONFIRMADO:", result);
 
-    /*
-     * ACTUALIZAR STOCK_MOVE_LINE
-     */
-    let updateResult;
-
-    if (pickingConfig.allow_picking_without_locations === true) {
-      console.log("📍 Picking sin ubicación fija");
-      console.log("✏️ Actualizando qty_done y location_id");
-
-
-      updateResult = await client.query(
-        `
-  UPDATE stock_move_line
-  SET
-    qty_done = $1,
-    location_id = $2,
-    warehouse_id = $3
-  WHERE id = $4
-  RETURNING *
-  `,
-        [
-          qtyNumber,
-          scannedLocation.id,
-          scannedLocation.warehouse_id,
-          id
-        ]
-      );
-
-
-    } else {
-      console.log("📍 Picking con ubicación fija");
-      console.log("✏️ Actualizando solamente qty_done");
-
-      updateResult = await client.query(
-        `
-        UPDATE stock_move_line
-        SET
-          qty_done = $1
-        WHERE id = $2
-        RETURNING *
-        `,
-        [
-          qtyNumber,
-          id
-        ]
-      );
-    }
-
-    console.log("✅ UPDATE COMPLETADO");
-
-    console.log("📊 Resultado del UPDATE:");
-    console.log({
-      rowCount: updateResult.rowCount,
-      updatedLine: updateResult.rows[0]
-    });
-
-    console.log("🟩🟩🟩 ========================================");
-    console.log("✅ CONFIRMACIÓN FINALIZADA CORRECTAMENTE");
-    console.log("📌 Línea:", id);
-    console.log("📌 Cantidad registrada:", qtyNumber);
-    console.log("📌 Ubicación usada:", locationId);
-    console.log("🟩🟩🟩 ========================================");
-
-    return res.json({
-      success: true,
-      title: "OK",
-      message: "Cantidad registrada",
-      line: updateResult.rows[0]
-    });
+    return res.status(200).json(result);
 
   } catch (error) {
-    console.error("🔥🔥🔥 ========================================");
-    console.error("❌ ERROR EN confirmPickingLine");
-    console.error("🔥🔥🔥 ========================================");
+    if (client && transactionStarted) {
+      await client.query("ROLLBACK");
+    }
 
-    console.error("📌 Nombre:", error.name);
-    console.error("📌 Mensaje:", error.message);
-    console.error("📌 Código PostgreSQL:", error.code);
-    console.error("📌 Detalle:", error.detail);
-    console.error("📌 Constraint:", error.constraint);
-    console.error("📌 Tabla:", error.table);
-    console.error("📌 Stack:", error.stack);
+    console.error(
+      "❌ ERROR confirmPickingLine:",
+      error
+    );
 
-    return res.status(500).json({
+    return res.status(
+      error.statusCode || 500
+    ).json({
       success: false,
-      title: "Error interno",
-      message: "Algo salió mal"
+      title:
+        error.title ||
+        "Error confirmando recogida",
+      message:
+        error.statusCode
+          ? error.message
+          : "Ocurrió un error al guardar la recogida.",
+      code:
+        error.code ||
+        "PICKING_CONFIRM_ERROR",
     });
 
   } finally {
-    if (client) {
-      client.release();
-      console.log("🔌 Conexión PostgreSQL liberada");
-    }
-
-    console.log("🏁 FIN confirmPickingLine");
-    console.log("\n");
+    client?.release();
   }
 }
 
@@ -2040,245 +1878,288 @@ export async function confirmPickingLine(req, res) {
 
 
 
-
-
+// =====================================================
+// SCAN PICKING - UBICACIÓN O PRODUCTO
+// =====================================================
 
 export async function scanPickingCode(req, res) {
-  console.log("🟦🟨🟨🟨🟨 [START] scanPickingCode");
-
-
-  const client = await db.connect();
-
-  const dbInfo = await client.query(`
-  SELECT current_database()
-`);
-
-  console.log(
-    "🗄️ DATABASE:",
-    dbInfo.rows[0].current_database
-  );
+  let client;
 
   try {
-    const { code, pickingId } = req.body;
+    const {
+      code,
+      pickingId,
+      lineId,
+      productId,
+    } = req.body;
 
-    console.log("📥 INPUT:", req.body);
-
-    // ==============================
-    // 1️⃣ VALIDACIÓN
-    // ==============================
     if (!code || !pickingId) {
       return res.status(400).json({
         success: false,
-        message: "code y pickingId son requeridos",
+        code: "INVALID_REQUEST",
+        title: "Datos incompletos",
+        message:
+          "Debe enviar code y pickingId.",
       });
     }
 
-    const normalized = code.trim().toUpperCase();
+    client = await db.connect();
 
-    console.log("🔎 Código normalizado:", JSON.stringify(normalized));
+    const normalized = String(code)
+      .trim()
+      .toUpperCase();
 
-    let detectedType = null;
-    let detectedData = null;
+    // =================================================
+    // 1. VERIFICAR SI ES UNA UBICACIÓN
+    // =================================================
 
-    // ==============================
-    // 2️⃣ VALIDAR UBICACIÓN
-    // ==============================
-    const locationResult = await getActiveStorageLocationByCode(
-      client,
-      normalized
-    );
-
-    console.log("🟥 location response  db", locationResult.rows[0]);
+    const locationResult =
+      await getActiveStorageLocationByCode(
+        client,
+        normalized
+      );
 
     if (locationResult.rowCount > 0) {
-      detectedType = "location";
-      detectedData = locationResult.rows[0];
+      const location =
+        locationResult.rows[0];
 
-      console.log("📍 UBICACIÓN DETECTADA:", detectedData);
-    }
+      if (!lineId && !productId) {
+        return res.json({
+          success: false,
+          code: "PRODUCT_CONTEXT_REQUIRED",
+          title: "Seleccione una línea",
+          message:
+            "Primero debe existir una línea de recogida activa para validar la ubicación.",
+        });
+      }
 
-    // ==============================
-    // 3️⃣ VALIDAR PRODUCTO
-    // ==============================
-    let productId = null;
-
-    if (!detectedType) {
-      // ==============================
-      // 🔎 BUSCAR PRODUCTO POR BARCODE
-      // ==============================
-      let productResult = await client.query(
-        `
-  SELECT p.id, p.sku
-  FROM product_barcodes pb
-  JOIN products p ON p.sku = pb.product_sku
-  WHERE UPPER(pb.barcode) = $1
-  LIMIT 1
-`,
-        [normalized]
+      // Refrescar el listado almacenado.
+      await refreshPickingLocationSnapshots(
+        client,
+        pickingId
       );
 
-      // ==============================
-      // 🔎 SI NO EXISTE → BUSCAR SKU
-      // ==============================
-      if (productResult.rowCount === 0) {
-
-        console.log("⚠️ Barcode no encontrado, buscando SKU...");
-
-        productResult = await client.query(
+      const lineResult = lineId
+        ? await client.query(
           `
-    SELECT id, sku
-    FROM products
-    WHERE UPPER(sku) = $1
-    LIMIT 1
-  `,
-          [normalized]
+            SELECT
+              sml.id,
+              sml.product_id,
+              sml.location_id,
+              sml.is_general,
+              sml.available_locations,
+              p.sku
+            FROM stock_move_line AS sml
+            JOIN products AS p
+              ON p.id = sml.product_id
+            WHERE sml.id = $1
+              AND sml.picking_id = $2
+              AND sml.state NOT IN ('done', 'cancel')
+            `,
+          [lineId, pickingId]
+        )
+        : await client.query(
+          `
+            SELECT
+              NULL::bigint AS id,
+              dsm.product_id,
+              NULL::bigint AS location_id,
+              FALSE AS is_general,
+              '[]'::jsonb AS available_locations,
+              p.sku
+            FROM despacho_stock_move AS dsm
+            JOIN products AS p
+              ON p.id = dsm.product_id
+            WHERE dsm.picking_id = $1
+              AND dsm.product_id = $2
+              AND dsm.state NOT IN ('done', 'cancel')
+            LIMIT 1
+            `,
+          [pickingId, productId]
         );
-      }
-      if (productResult.rowCount === 0) {
-        console.log("❌ Código inválido");
 
+      if (!lineResult.rowCount) {
         return res.json({
           success: false,
-          code: "INVALID_CODE",
-          message: "El código no corresponde a una ubicación ni a un producto",
+          code: "LINE_NOT_FOUND",
+          title: "Línea no encontrada",
+          message:
+            "No se encontró la línea del producto dentro de este picking.",
         });
       }
 
-      detectedType = "product";
-      detectedData = productResult.rows[0];
-      productId = detectedData.id;
+      const line = lineResult.rows[0];
 
-      console.log("📦 PRODUCTO DETECTADO:", detectedData);
-    }
+      const isOriginalLocation =
+        Number(line.location_id) ===
+        Number(location.id);
 
-    // 🔹 Obtener configuración
-    const pickingConfig = await getPickingConfig(client);
+      // Una ubicación alternativa debe aparecer
+      // en la lista actualizada de inventario.
+      const listedLocations =
+        Array.isArray(line.available_locations)
+          ? line.available_locations
+          : [];
 
-    console.log("⚙️ PICKING CONFIG:", pickingConfig);
+      let inventoryLocation =
+        listedLocations.find(
+          (item) =>
+            Number(item.location_id) ===
+            Number(location.id)
+        );
 
-    // 🔥 PERMITIR CUALQUIER LOCATION EXISTENTE
-    // ==============================
-    if (
-      detectedType === "location" &&
-      pickingConfig.allow_picking_without_locations === true
-    ) {
-      console.log("🔎 Confirmando que location existe:", normalized);
+      // Para un producto todavía sin línea, consultar
+      // su inventario directamente.
+      if (!lineId) {
+        const direct = await client.query(
+          `
+          SELECT
+            ibl.location_id,
+            ibl.warehouse_id,
+            ibl.qty_on_hand,
+            ibl.qty_available
+          FROM inventory_by_location AS ibl
+          JOIN products AS p
+            ON p.sku = ibl.product_sku
+          WHERE p.id = $1
+            AND ibl.location_id = $2
+            AND ibl.qty_on_hand > 0
+          `,
+          [line.product_id, location.id]
+        );
 
-      const locationCheck = await client.query(
-        `
-    SELECT id, code, warehouse_id, location_type
-    FROM locations
-    WHERE UPPER(TRIM(code)) = UPPER(TRIM($1))
-    LIMIT 1
-    `,
-        [normalized]
-      );
-
-      if (locationCheck.rowCount === 0) {
-        console.log("❌ Location no existe:", normalized);
-
-        return res.json({
-          success: false,
-          code: "LOCATION_NOT_FOUND",
-          title: "Ubicación no encontrada",
-          message: "La ubicación escaneada no existe"
-        });
+        inventoryLocation =
+          direct.rows[0] || null;
       }
 
-      const scannedLocation = locationCheck.rows[0];
+      // Mantener compatibilidad con el flujo
+      // existente de una ubicación GENERAL virtual.
+      const config =
+        await getPickingConfig(client);
 
-      console.log(
-        "✅ Location existe y se permite sin validar contra picking:",
-        scannedLocation
-      );
+      const isVirtualOriginal =
+        isOriginalLocation &&
+        config.allow_picking_without_locations &&
+        normalized.startsWith("GENERAL-");
+
+      if (
+        !inventoryLocation &&
+        !isVirtualOriginal
+      ) {
+        return res.json({
+          success: false,
+          code: "LOCATION_WITHOUT_INVENTORY",
+          title: "Ubicación sin inventario",
+          message:
+            `La ubicación ${location.code} no tiene inventario disponible del producto ${line.sku}.`,
+        });
+      }
 
       return res.json({
         success: true,
         type: "location",
         data: {
-          id: scannedLocation.id,
-          code: scannedLocation.code
+          id: location.id,
+          code: location.code,
+          product_id: line.product_id,
+          sku: line.sku,
+          is_alternative: !isOriginalLocation,
+          qty_on_hand: Number(
+            inventoryLocation?.qty_on_hand || 0
+          ),
         },
-        skipPickingValidation: true
       });
     }
 
+    // =================================================
+    // 2. BUSCAR PRODUCTO POR BARCODE O SKU
+    // =================================================
 
-
-    // ==============================
-    // 4️⃣ VALIDAR QUE PERTENECE AL PICKING
-    // ==============================
-    const moveLinesResult = await client.query(
+    let productResult = await client.query(
       `
-      SELECT product_id, location_id
-      FROM stock_move_line
-      WHERE picking_id = $1
-    `,
-      [pickingId]
+      SELECT p.id, p.sku
+      FROM product_barcodes AS pb
+      JOIN products AS p
+        ON p.sku = pb.product_sku
+      WHERE UPPER(pb.barcode) = $1
+      LIMIT 1
+      `,
+      [normalized]
     );
 
-    if (!moveLinesResult.rows.length) {
-      console.log("⚠️ No hay líneas en el picking");
+    if (!productResult.rowCount) {
+      productResult = await client.query(
+        `
+        SELECT id, sku
+        FROM products
+        WHERE UPPER(sku) = $1
+        LIMIT 1
+        `,
+        [normalized]
+      );
+    }
 
+    if (!productResult.rowCount) {
       return res.json({
         success: false,
-        message: "El picking no tiene líneas",
+        code: "INVALID_CODE",
+        title: "Código inválido",
+        message:
+          "El código no corresponde a una ubicación ni a un producto.",
       });
     }
 
-    let isValid = false;
+    const product =
+      productResult.rows[0];
 
-    for (const row of moveLinesResult.rows) {
-      // 🔹 Validar producto
-      if (detectedType === "product" && row.product_id == productId) {
-        isValid = true;
-        break;
-      }
+    // =================================================
+    // 3. VERIFICAR QUE EL PRODUCTO PERTENECE AL PICKING
+    // =================================================
 
-      // 🔹 Validar ubicación
-      if (
-        detectedType === "location" &&
-        row.location_id == detectedData.id
-      ) {
-        isValid = true;
-        break;
-      }
-    }
+    const membershipResult = await client.query(
+      `
+      SELECT id
+      FROM despacho_stock_move
+      WHERE picking_id = $1
+        AND product_id = $2
+        AND state NOT IN ('done', 'cancel')
+      LIMIT 1
+      `,
+      [pickingId, product.id]
+    );
 
-    if (!isValid) {
-      console.log("❌ No pertenece al picking");
-
+    if (!membershipResult.rowCount) {
       return res.json({
         success: false,
         code: "NOT_IN_PICKING",
-        title: "Código no válido",
-        message: "El código escaneado no pertenece a este pedido",
+        title: "Producto no válido",
+        message:
+          "Este producto no pertenece al despacho.",
       });
     }
 
-    // ==============================
-    // 5️⃣ RESPUESTA FINAL
-    // ==============================
-    console.log("✅ VALIDACIÓN EXITOSA");
-
     return res.json({
       success: true,
-      type: detectedType,
-      data: detectedData,
+      type: "product",
+      data: product,
     });
 
   } catch (error) {
-    console.error("🔥 [ERROR scanPickingCode]:", error);
+    console.error(
+      "❌ ERROR scanPickingCode:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Error interno",
-      error: error.message,
+      code: "SCAN_ERROR",
+      title: "Error de escaneo",
+      message:
+        "No se pudo validar el código escaneado.",
     });
 
   } finally {
-    client.release();
-    console.log("🔚 [END] scanPickingCode");
+    client?.release();
   }
 }
 
@@ -2287,10 +2168,459 @@ export async function scanPickingCode(req, res) {
 
 
 
+export async function getAdmCloudDispatchMonitorController(
+  req,
+  res
+) {
+
+  const client =
+    await db.connect();
 
 
-//Busca la orden unica y se inicia la logica del picking
+  try {
+
+    // =========================================================
+    // 1. PARAMS
+    // =========================================================
+
+    const pageRaw =
+      Number(
+        req.query.page
+      );
+
+
+    const limitRaw =
+      Number(
+        req.query.limit
+      );
+
+
+    const page =
+      Number.isInteger(pageRaw) &&
+        pageRaw > 0
+        ? pageRaw
+        : 1;
+
+
+    const limit =
+      Number.isInteger(limitRaw) &&
+        limitRaw > 0
+        ? Math.min(
+          limitRaw,
+          100
+        )
+        : 10;
+
+
+    const offset =
+      (page - 1) * limit;
+
+
+    // =========================================================
+    // 2. SEARCH
+    //
+    // Frontend manda algo como:
+    //
+    // search=CDD-00019501,CDD-00019502
+    //
+    // =========================================================
+
+    const searchRaw =
+      String(
+        req.query.search || ""
+      )
+        .trim();
+
+
+    const searchValues =
+      searchRaw
+        .split(",")
+        .map(
+          value =>
+            value.trim()
+        )
+        .filter(Boolean)
+        .slice(
+          0,
+          50
+        );
+
+
+    console.log(
+      "🚚 [DISPATCH MONITOR]",
+      {
+        page,
+        limit,
+        offset,
+        searchValues
+      }
+    );
+
+
+    // =========================================================
+    // 3. TOTAL
+    // =========================================================
+
+    const countResult =
+      await client.query(
+        `
+                SELECT
+                    COUNT(*)::int
+                    AS total
+
+                FROM admcloud_dispatches d
+
+                WHERE
+
+                    (
+                        cardinality(
+                            $1::text[]
+                        ) = 0
+
+                        OR
+
+                        EXISTS (
+
+                            SELECT
+                                1
+
+                            FROM unnest(
+                                $1::text[]
+                            ) AS search_value
+
+                            WHERE
+
+                                COALESCE(
+                                    d.erp_doc_id::text,
+                                    ''
+                                )
+                                ILIKE
+                                '%' || search_value || '%'
+
+                                OR
+
+                                COALESCE(
+                                    d.erp_reference::text,
+                                    ''
+                                )
+                                ILIKE
+                                '%' || search_value || '%'
+
+                                OR
+
+                                COALESCE(
+                                    d.erp_relationship_name::text,
+                                    ''
+                                )
+                                ILIKE
+                                '%' || search_value || '%'
+
+                        )
+
+                    )
+                `,
+        [
+          searchValues
+        ]
+      );
+
+
+    const total =
+      Number(
+        countResult.rows[0]
+          ?.total || 0
+      );
+
+
+    // =========================================================
+    // 4. OBTENER CONDUCES
+    // =========================================================
+
+    const dispatchResult =
+      await client.query(
+        `
+                SELECT
+
+                    /* =============================================
+                       ADM CLOUD DISPATCH
+                    ============================================= */
+
+                    d.id,
+
+                    d.picking_id,
+
+                    d.sale_id,
+
+                    d.erp_conduce_id,
+
+                    d.erp_doc_id,
+
+                    d.erp_reference,
+
+                    d.erp_relationship_id,
+
+                    d.erp_relationship_name,
+
+                    d.erp_location_id,
+
+                    d.erp_ship_to_address_id,
+
+                    d.erp_ship_to_address1,
+
+                    d.erp_ship_to_address2,
+
+                    d.erp_billing_status_desc,
+
+d.erp_status,
+
+-- Estado local del conduce en SIDIAL
+d.state AS state,
+
+d.erp_doc_type,
+
+                    d.erp_creation_date,
+
+                    d.erp_doc_date,
+
+                    d.erp_calculated_total_cost,
+
+                    d.created_at,
+
+                    d.updated_at,
+
+
+                    /* =============================================
+                       WAREHOUSE
+                    ============================================= */
+
+                    w.id
+                        AS warehouse_id,
+
+                    w.code
+                        AS warehouse_code,
+
+                    w.name
+                        AS warehouse_name,
+
+                    w.description
+                        AS warehouse_description,
+
+                    w.status
+                        AS warehouse_status,
+
+                    w.erp_warehouse_id
+                        AS warehouse_erp_id
+
+
+                FROM admcloud_dispatches d
+
+
+                /* =============================================
+                   JOIN WAREHOUSE
+
+                   Usamos ::text porque tienes valores como:
+
+                   UUID
+                   "1"
+                   "2"
+
+                   dentro de erp_warehouse_id.
+                ============================================= */
+
+                LEFT JOIN LATERAL (
+
+                    SELECT
+
+                        wh.id,
+
+                        wh.code,
+
+                        wh.name,
+
+                        wh.description,
+
+                        wh.status,
+
+                        wh.erp_warehouse_id
+
+                    FROM warehouses wh
+
+                    WHERE
+
+                        wh.erp_warehouse_id::text =
+                        d.erp_location_id::text
+
+                    ORDER BY
+
+                        CASE
+
+                            WHEN
+                                wh.status = 'ACTIVE'
+                            THEN 0
+
+                            ELSE 1
+
+                        END,
+
+                        wh.id ASC
+
+                    LIMIT 1
+
+                ) w ON TRUE
+
+
+                /* =============================================
+                   MULTI SEARCH
+                ============================================= */
+
+                WHERE
+
+                    (
+                        cardinality(
+                            $1::text[]
+                        ) = 0
+
+                        OR
+
+                        EXISTS (
+
+                            SELECT
+                                1
+
+                            FROM unnest(
+                                $1::text[]
+                            ) AS search_value
+
+                            WHERE
+
+                                COALESCE(
+                                    d.erp_doc_id::text,
+                                    ''
+                                )
+                                ILIKE
+                                '%' || search_value || '%'
+
+                                OR
+
+                                COALESCE(
+                                    d.erp_reference::text,
+                                    ''
+                                )
+                                ILIKE
+                                '%' || search_value || '%'
+
+                                OR
+
+                                COALESCE(
+                                    d.erp_relationship_name::text,
+                                    ''
+                                )
+                                ILIKE
+                                '%' || search_value || '%'
+
+                        )
+
+                    )
+
+
+                /* =============================================
+                   ÚLTIMOS CONDUCES PRIMERO
+                ============================================= */
+
+                ORDER BY
+
+                    d.erp_doc_date
+                        DESC
+                        NULLS LAST,
+
+                    d.id
+                        DESC
+
+
+                LIMIT $2
+
+                OFFSET $3
+                `,
+        [
+          searchValues,
+          limit,
+          offset
+        ]
+      );
+
+
+    // =========================================================
+    // 5. TOTAL PAGES
+    // =========================================================
+
+    const totalPages =
+      Math.ceil(
+        total / limit
+      );
+
+
+    // =========================================================
+    // 6. RESPONSE
+    // =========================================================
+
+    return res.status(200).json({
+
+      success: true,
+
+      page,
+
+      limit,
+
+      total,
+
+      totalPages,
+
+      data:
+        dispatchResult.rows
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "❌ Error cargando monitor de conduces:",
+      error
+    );
+
+
+    return res.status(500).json({
+
+      success: false,
+
+      title:
+        "Error cargando conduces",
+
+      message:
+        "No se pudieron obtener los conduces de despacho.",
+
+      data: [],
+
+      total: 0
+
+    });
+
+
+  } finally {
+
+    client.release();
+
+  }
+
+}
+
+
+// ==========================================================
+// 📦 GET PICKING PRODUCTS WITH LOCATIONS - ADM CLOUD
+// ==========================================================
+
 export async function getPickingProductsWithLocations(req, res) {
+
   console.log("🟦 ----[START] Controller----");
 
   let client;
@@ -2298,6 +2628,11 @@ export async function getPickingProductsWithLocations(req, res) {
   let releaseError;
 
   try {
+
+    // ==========================================================
+    // 1. VALIDAR PICKING ID
+    // ==========================================================
+
     const pickingId = String(
       req.params.pickingId ?? ""
     ).trim();
@@ -2309,21 +2644,27 @@ export async function getPickingProductsWithLocations(req, res) {
       return res.status(400).json({
         success: false,
         title: "Picking inválido",
-        message: "Debes enviar un pickingId entero positivo válido.",
+        message:
+          "Debes enviar un pickingId entero positivo válido.",
       });
     }
 
     client = await db.connect();
 
     // ==========================================================
-    // 1. BUSCAR EL PICKING Y OBTENER sale_id
+    // 2. BUSCAR PICKING Y SALE ID
     // ==========================================================
 
     const pickingResult = await client.query(
       `
-        SELECT id, sale_id
-        FROM public.stock_picking
-        WHERE id = $1
+      SELECT
+        id,
+        sale_id,
+        state
+
+      FROM public.stock_picking
+
+      WHERE id = $1
       `,
       [pickingId]
     );
@@ -2334,7 +2675,21 @@ export async function getPickingProductsWithLocations(req, res) {
       return res.status(404).json({
         success: false,
         title: "Picking no encontrado",
-        message: `No existe un picking con el ID ${pickingId}.`,
+        message:
+          `No existe un picking con el ID ${pickingId}.`,
+      });
+    }
+
+    if (
+      ["done", "cancel"].includes(
+        localPicking.state
+      )
+    ) {
+      return res.status(409).json({
+        success: false,
+        title: "Picking cerrado",
+        message:
+          "No se puede preparar un picking finalizado o cancelado.",
       });
     }
 
@@ -2346,7 +2701,8 @@ export async function getPickingProductsWithLocations(req, res) {
       return res.status(422).json({
         success: false,
         title: "Picking sin pedido de venta",
-        message: `El picking ${pickingId} no tiene un valor en sale_id.`,
+        message:
+          `El picking ${pickingId} no tiene sale_id.`,
       });
     }
 
@@ -2357,456 +2713,627 @@ export async function getPickingProductsWithLocations(req, res) {
       return res.status(422).json({
         success: false,
         title: "GUID del pedido inválido",
-        message: `El sale_id del picking ${pickingId} no es un GUID válido.`,
+        message:
+          `El sale_id del picking ${pickingId} no es un GUID válido.`,
       });
     }
 
-    console.log("🔗 Pedido asociado al picking:", {
+    console.log("🔗 PEDIDO ASOCIADO:", {
       pickingId,
       saleId,
     });
 
     // ==========================================================
-    // 2. INICIAR TRANSACCIÓN
+    // 3. INICIAR TRANSACCIÓN
     // ==========================================================
 
     await client.query("BEGIN");
+
     transactionStarted = true;
 
     // ==========================================================
-// 3. ACTUALIZAR EL PEDIDO DESDE ADM CLOUD
-// ==========================================================
+    // 4. CONSULTAR PENDIENTES EN ADM CLOUD
+    // ==========================================================
 
-/*const syncedOrder =
-  await syncAdmCloudSalesOrderByGuidService(
-    client,
-    saleId,
-    pickingId
-  );
-
-if (!syncedOrder?.picking?.id) {
-  const error = new Error(
-    "La sincronización no devolvió un picking válido."
-  );
-
-  error.statusCode = 502;
-  error.code = "INVALID_SALES_ORDER_SYNC";
-  error.title = "Respuesta inválida de ADM Cloud";
-
-  throw error;
-}
-
-console.log(
-  "✅ Pedido actualizado desde ADM Cloud:",
-  {
-    pickingId: syncedOrder.picking.id,
-    saleId,
-    lines: syncedOrder.lines,
-  }
-);*/
-
-// ==========================================================
-// 4. BUSCAR PENDIENTES DE DESPACHO EN ADM CLOUD
-// ==========================================================
-
-console.log(
-  "🔎 Buscando pendientes de despacho en ADM Cloud:",
-  {
-    pickingId,
-    saleId,
-  }
-);
-
-const pendingDispatchResult =
-  await getPendingDispatchBySalesOrderService(
-    saleId,
-    {
-      /*
-       * Se comienza desde la primera página.
-       * No enviamos filtros porque queremos todas
-       * las líneas pendientes de esta orden.
-       */
-      skip: 0,
-    }
-  );
-
-if (
-  !pendingDispatchResult ||
-  !Array.isArray(
-    pendingDispatchResult.data
-  )
-) {
-  const error = new Error(
-    "ADM Cloud no devolvió una lista válida de pendientes de despacho."
-  );
-
-  error.statusCode = 502;
-  error.code =
-    "INVALID_PENDING_DISPATCH_RESPONSE";
-  error.title =
-    "Respuesta inválida de ADM Cloud";
-  error.admCloudData =
-    pendingDispatchResult ?? null;
-
-  throw error;
-}
-
-const pendingDispatchRows =
-  pendingDispatchResult.data;
-
-console.log(
-  "📦 Pendientes encontrados en ADM Cloud:",
-  {
-    pickingId,
-    saleId,
-    rowsReceived:
-      pendingDispatchRows.length,
-    httpStatus:
-      pendingDispatchResult.httpStatus ??
-      null,
-  }
-);
-
-// ==========================================================
-// 5. SINCRONIZAR despacho_stock_move
-// ==========================================================
-
-const dispatchSyncSummary =
-  await syncAdmCloudPendingDispatchMoves(
-    client,
-
-    /*
-     * Líneas devueltas por PendingDispatchByItem.
-     */
-    pendingDispatchRows,
-
-    /*
-     * stock_picking.id
-     */
-    pickingId,
-
-    /*
-     * stock_picking.sale_id
-     *
-     * Se guardará en:
-     * despacho_stock_move.source_transaction_id
-     */
-    saleId
-  );
-
-console.log(
-  "✅ Despacho sincronizado:",
-  {
-    pickingId,
-    saleId,
-    rowsReceived:
-      pendingDispatchRows.length,
-    sync:
-      dispatchSyncSummary,
-  }
-);
-
-
-
-
-
-    const config =
-  await getPickingConfig(client);
-
-console.log(
-  "⚙️ CONFIGURACIÓN DEL PICKING:",
-  config
-);
-
-let generalCleanup = {
-  changed: false,
-  cancelledLines: 0,
-  affectedMoves: [],
-};
-
-if (
-  !config.allow_picking_without_locations
-) {
-  generalCleanup =
-    await cancelOpenGeneralMoveLinesForPicking(
-      client,
-      pickingId
+    console.log(
+      "🔎 BUSCANDO PENDIENTES ADM CLOUD:",
+      {
+        pickingId,
+        saleId,
+      }
     );
 
-  console.log(
-    "🧹 Resultado limpieza GENERAL:",
-    generalCleanup
-  );
-}
-
-
-    // ==========================================================
-    // 4. OBTENER PRODUCTOS Y UBICACIONES: Esto dara como resultado el id del producto, el sku, los moves de ese producto y las ubicaciones con cantidad.
-    // ==========================================================
-
-    const result = await getPickingProductsWithLocationsService(
-      client,
-      pickingId
-    );
-
-    if (!result.data || result.data.length === 0) {
-      // Conservar la sincronización aunque no haya ubicaciones.
-      await client.query("COMMIT");
-      transactionStarted = false;
-
-      return res.status(200).json({
-        success: false,
-        title: "Sin ubicaciones disponibles",
-        message:
-          result.message ||
-          "El producto no tiene cantidad en ninguna ubicación",
-        data: [],
-      });
-    }
-
-    //----------------------------------------------
-    //Se agrega a la respuesta de arriba, selected_location que son de todas las ubicaciones las elegidas.
-
-    const enrichedData = result.data.map((product) => ({
-      ...product,
-      selected_location: selectBestLocation(product),
-    }));
-
-    //Cambiame este console para ver esa informacion de una forma estructurada en el console log.
-    console.log("enrichedData:", enrichedData);
-
-    
-    //La cantidad que los servicios reporten como reservada durante esta ejecución.
-    let totalReserved = 0;
-    //Si el servicio de líneas existentes reportó cambios, creó cantidad o liberó cantidad.
-    let hasPickingChanges = false;
-    //Un resumen de lo que ocurrió con cada movimiento.
-    const results = [];
-
-    // ==========================================================
-    // 5. RESERVAR INVENTARIO
-    // ==========================================================
-
-    //Recorre cada producto y sus movimientos
-    for (const product of enrichedData) {
-      console.log("🟡 Probando producto:", product.product_id);
-
-      const productId = product.product_id;
-
-      //Un producto puede tener varios movimientos: se revisa cada movimiento o stock_move indivialmente.
-      for (const stockMove of product.moves) {
-        const moveId = stockMove.move_id;
-        const requiredQty = Number(stockMove.product_qty || 0);
-
-        console.log("🟦 Procesando stock_move:", {
-          moveId,
-          productId,
-          requiredQty,
-        });
-
-        // Consulta cuánto tiene asignado actualmente
-// este movimiento de despacho.
-//
-// No toma líneas done ni cancel porque
-// despacho_stock_move.pending_qty ya representa
-// la cantidad pendiente actual de ADM Cloud.
-const { rows } = await client.query(
-  `
-    SELECT
-      COALESCE(
-        SUM(sml.product_uom_qty),
-        0
-      ) AS total_qty
-    FROM stock_move_line AS sml
-    WHERE sml.move_id = $1
-      AND sml.picking_id = $2
-      AND COALESCE(
-        sml.state,
-        ''
-      ) NOT IN (
-        'cancel',
-        'done'
-      )
-  `,
-  [
-    moveId,
-    pickingId,
-  ]
-);
-
-const totalQty =
-  Number(rows[0]?.total_qty || 0);
-
-console.log(
-  "📦 Cantidad activa en move_line:",
-  totalQty
-);
-
-console.log(
-  "📦 Cantidad pendiente requerida:",
-  requiredQty
-);
-
-
-
-
-
-
-        // ==========================================================
-// La cantidad solicitada y la cantidad activa son iguales.
-// También hay que verificar que las ubicaciones coincidan.
-// ==========================================================
-
-const quantitiesAreEqual =
-  Math.abs(
-    totalQty -
-    requiredQty
-  ) <= 0.000001;
-
-if (quantitiesAreEqual) {
-  console.log(
-    "✅ El movimiento tiene la cantidad total exacta."
-  );
-
-  /*
-   * Si GENERAL está permitido, primero se conserva
-   * tu lógica actual para mover desde GENERAL hacia
-   * ubicaciones físicas.
-   */
-  if (
-    config.allow_picking_without_locations
-  ) {
-    const generalResult =
-      await redistributeExactMoveFromGeneral(
-        client,
-        product,
-        stockMove
+    const pendingDispatchResult =
+      await getPendingDispatchBySalesOrderService(
+        saleId,
+        {
+          skip: 0,
+        }
       );
 
     if (
-      generalResult.redistributed
+      !pendingDispatchResult ||
+      !Array.isArray(
+        pendingDispatchResult.data
+      )
     ) {
-      const redistributedQty =
-        Number(
-          generalResult.reserved ||
-          0
-        );
+      const error = new Error(
+        "ADM Cloud no devolvió una lista válida de pendientes de despacho."
+      );
 
-      totalReserved +=
-        redistributedQty;
+      error.statusCode = 502;
+      error.code =
+        "INVALID_PENDING_DISPATCH_RESPONSE";
 
-      hasPickingChanges = true;
+      error.title =
+        "Respuesta inválida de ADM Cloud";
 
-      results.push({
-        move_id:
-          moveId,
-        product_id:
-          productId,
-        reserved:
-          redistributedQty,
-        physical_reserved:
-          Number(
-            generalResult
-              .physical_reserved || 0
-          ),
-        general_reserved:
-          Number(
-            generalResult
-              .general_reserved || 0
-          ),
-        changed: true,
-        skipped: false,
-        case:
-          "ORDER_EXACT_REDISTRIBUTED",
-        message:
-          "La reserva fue redistribuida entre ubicaciones físicas y GENERAL.",
-      });
+      throw error;
+    }
 
-      continue;
+    const pendingDispatchRows =
+      pendingDispatchResult.data;
+
+    console.log(
+      "📦 PENDIENTES ADM CLOUD:",
+      {
+        pickingId,
+        saleId,
+        rowsReceived:
+          pendingDispatchRows.length,
+      }
+    );
+
+    // ==========================================================
+    // 5. BLOQUEAR EL PICKING
+    //
+    // NUEVO:
+    // Evita que otra confirmación del mismo picking
+    // modifique las líneas durante esta sincronización.
+    // ==========================================================
+
+    const lockedPicking = await client.query(
+      `
+      SELECT id, state
+
+      FROM stock_picking
+
+      WHERE id = $1
+
+      FOR UPDATE
+      `,
+      [pickingId]
+    );
+
+    if (
+      !lockedPicking.rowCount ||
+      ["done", "cancel"].includes(
+        lockedPicking.rows[0].state
+      )
+    ) {
+      const error = new Error(
+        "El picking ya no está disponible para preparar."
+      );
+
+      error.statusCode = 409;
+      error.title = "Picking no disponible";
+
+      throw error;
     }
 
     console.log(
-      "⏭️ No fue necesario redistribuir GENERAL:",
-      generalResult.reason
+      "🔒 PICKING BLOQUEADO:",
+      pickingId
     );
-  }
 
-  /*
-   * Aunque la cantidad total sea correcta,
-   * comparar las ubicaciones actuales contra
-   * el inventario físico sugerido.
-   */
-  const physicalResult =
-    await reconcileExactMoveLocations(
+    // ==========================================================
+    // 6. SINCRONIZAR DESPACHO_STOCK_MOVE
+    // ==========================================================
+
+    const dispatchSyncSummary =
+      await syncAdmCloudPendingDispatchMoves(
+        client,
+        pendingDispatchRows,
+        pickingId,
+        saleId
+      );
+
+    console.log(
+      "✅ DESPACHO SINCRONIZADO:",
+      {
+        pickingId,
+        saleId,
+        rowsReceived:
+          pendingDispatchRows.length,
+        sync:
+          dispatchSyncSummary,
+      }
+    );
+
+    // ==========================================================
+    // 7. ACTUALIZAR COLUMNAS NUEVAS
+    //
+    // NUEVO:
+    // available_locations
+    // max_product_qty
+    //
+    // Se actualizan las líneas existentes.
+    // ==========================================================
+
+    await refreshPickingLocationSnapshots(
       client,
-      product,
-      stockMove
+      pickingId
     );
 
-  if (
-    physicalResult.redistributed
-  ) {
-    hasPickingChanges = true;
+    console.log(
+      "✅ UBICACIONES Y MÁXIMOS ACTUALIZADOS"
+    );
 
-    results.push({
-      move_id:
-        moveId,
-      product_id:
-        productId,
-      reserved: 0,
-      physical_reserved:
-        requiredQty,
-      createdQty:
-        physicalResult.createdLines,
-      updatedQty:
-        physicalResult.updatedLines,
-      cancelledQty:
-        physicalResult.cancelledLines,
-      changed: true,
-      skipped: false,
-      case:
-        "ORDER_EXACT_LOCATIONS_REDISTRIBUTED",
-      message:
-        "La cantidad era correcta, pero las ubicaciones fueron actualizadas según el inventario físico.",
-      distribution:
-        physicalResult.distribution,
-    });
+    // ==========================================================
+    // 8. OBTENER CONFIGURACIÓN DEL PICKING
+    // ==========================================================
 
-    continue;
-  }
+    const config =
+      await getPickingConfig(client);
 
-  console.log(
-    "⏭️ No fue necesario actualizar ubicaciones:",
-    physicalResult.reason
-  );
+    console.log(
+      "⚙️ CONFIGURACIÓN DEL PICKING:",
+      config
+    );
 
-  results.push({
-    move_id:
-      moveId,
-    product_id:
-      productId,
-    reserved: 0,
-    changed: false,
-    skipped: true,
-    case:
-      "ORDER_EXACT",
-    reason:
-      physicalResult.reason,
-    message:
-      "La cantidad y la distribución por ubicación ya están correctas.",
-  });
+    // ==========================================================
+    // 9. LIMPIEZA DE UBICACIONES GENERAL VIRTUALES
+    //
+    // Se conserva tu lógica existente.
+    // ==========================================================
 
-  continue;
-}
+    let generalCleanup = {
+      changed: false,
+      cancelledLines: 0,
+      affectedMoves: [],
+    };
 
+    if (
+      !config.allow_picking_without_locations
+    ) {
+      generalCleanup =
+        await cancelOpenGeneralMoveLinesForPicking(
+          client,
+          pickingId
+        );
 
+      console.log(
+        "🧹 RESULTADO LIMPIEZA GENERAL:",
+        generalCleanup
+      );
+    }
 
+    // ==========================================================
+    // 10. OBTENER PRODUCTOS, MOVES Y UBICACIONES
+    // ==========================================================
 
+    const result =
+      await getPickingProductsWithLocationsService(
+        client,
+        pickingId
+      );
 
-        //==========================================================
-        // El movimiento tiene líneas existentes.
+    // ==========================================================
+    // 11. SI NO HAY PRODUCTOS CON UBICACIONES
+    //
+    // NUEVO:
+    // Conservar las líneas existentes del picking.
+    // ==========================================================
+
+    if (
+      !result.data ||
+      result.data.length === 0
+    ) {
+
+      const existingLines =
+        await getMoveLinesOrderedByLocation(
+          client,
+          pickingId
+        );
+
+      await client.query("COMMIT");
+
+      transactionStarted = false;
+
+      return res.status(200).json({
+        success:
+          existingLines.length > 0,
+
+        title:
+          existingLines.length > 0
+            ? "Ruta existente"
+            : "Sin ubicaciones disponibles",
+
+        message:
+          existingLines.length > 0
+            ? "Se conservaron las líneas existentes del picking."
+            : result.message ||
+            "No hay ubicaciones disponibles para recoger.",
+
+        data:
+          existingLines,
+      });
+    }
+
+    // ==========================================================
+    // 12. SELECCIONAR MEJORES UBICACIONES
+    // ==========================================================
+
+    const enrichedData = result.data.map(
+      (product) => ({
+        ...product,
+
+        selected_location:
+          selectBestLocation(product),
+      })
+    );
+
+    console.log(
+      "📦 PRODUCTOS CON UBICACIONES:",
+      enrichedData
+    );
+
+    // ==========================================================
+    // 13. VARIABLES DE RESERVA
+    // ==========================================================
+
+    let totalReserved = 0;
+
+    let hasPickingChanges = false;
+
+    const results = [];
+
+    // ==========================================================
+    // 14. PROCESAR PRODUCTOS
+    // ==========================================================
+
+    for (const product of enrichedData) {
+
+      console.log(
+        "🟡 PROCESANDO PRODUCTO:",
+        product.product_id
+      );
+
+      const productId =
+        product.product_id;
+
+      // ========================================================
+      // 15. PROCESAR CADA MOVIMIENTO
+      // ========================================================
+
+      for (const stockMove of product.moves) {
+
+        const moveId =
+          stockMove.move_id;
+
+        const requiredQty = Number(
+          stockMove.product_qty || 0
+        );
+
+        console.log(
+          "🟦 PROCESANDO MOVIMIENTO:",
+          {
+            moveId,
+            productId,
+            requiredQty,
+          }
+        );
+
+        // ======================================================
+        // 16. OBTENER CANTIDAD ASIGNADA ACTUALMENTE
+        // ======================================================
+
+        const { rows } = await client.query(
+          `
+          SELECT
+            COALESCE(
+              SUM(sml.product_uom_qty),
+              0
+            ) AS total_qty
+
+          FROM stock_move_line AS sml
+
+          WHERE sml.move_id = $1
+            AND sml.picking_id = $2
+            AND COALESCE(sml.state, '') NOT IN (
+              'cancel',
+              'done'
+            )
+          `,
+          [
+            moveId,
+            pickingId,
+          ]
+        );
+
+        const totalQty = Number(
+          rows[0]?.total_qty || 0
+        );
+
+        console.log(
+          "📦 CANTIDADES DEL MOVIMIENTO:",
+          {
+            moveId,
+            totalQty,
+            requiredQty,
+          }
+        );
+
+        // ======================================================
+        // 17. PROTEGER LÍNEAS GENERALES
+        //
+        // NUEVO:
+        // Si el usuario recogió desde otra ubicación,
+        // no se debe reorganizar automáticamente.
+        // ======================================================
+
+        const manualResult = await client.query(
+          `
+          SELECT
+            COUNT(*) AS total_lines,
+
+            COALESCE(
+              SUM(product_uom_qty),
+              0
+            ) AS total_qty
+
+          FROM stock_move_line
+
+          WHERE picking_id = $1
+            AND move_id = $2
+            AND is_general = TRUE
+            AND state NOT IN (
+              'done',
+              'cancel'
+            )
+          `,
+          [
+            pickingId,
+            moveId,
+          ]
+        );
+
+        const totalGeneralLines = Number(
+          manualResult.rows[0].total_lines
+        );
+
+        const totalGeneralQty = Number(
+          manualResult.rows[0].total_qty
+        );
+
+        // ======================================================
+        // CASO: EXISTEN LÍNEAS GENERALES
+        // ======================================================
+
+        if (totalGeneralLines > 0) {
+
+          console.log(
+            "🟣 MOVIMIENTO CON LÍNEAS GENERALES:",
+            {
+              moveId,
+              totalGeneralLines,
+              totalGeneralQty,
+              totalQty,
+              requiredQty,
+            }
+          );
+
+          // Si el ERP cambió la cantidad pendiente,
+          // detener antes de alterar el trabajo manual.
+
+          if (
+            Math.abs(
+              totalQty - requiredQty
+            ) > 0.000001
+          ) {
+
+            const error = new Error(
+              `El movimiento ${moveId} contiene líneas generales y su cantidad pendiente cambió de ${totalQty} a ${requiredQty}. Debe revisarse antes de continuar.`
+            );
+
+            error.statusCode = 409;
+
+            error.title =
+              "Despacho modificado en ADM Cloud";
+
+            error.code =
+              "MANUAL_PICKING_REQUIRES_REVIEW";
+
+            throw error;
+          }
+
+          // Mantener las líneas exactamente como están.
+
+          results.push({
+            move_id: moveId,
+            product_id: productId,
+            reserved: 0,
+            changed: false,
+            skipped: true,
+
+            case:
+              "MANUAL_LINES_PROTECTED",
+
+            message:
+              "La distribución manual fue conservada.",
+          });
+
+          console.log(
+            "✅ DISTRIBUCIÓN MANUAL PROTEGIDA:",
+            moveId
+          );
+
+          continue;
+        }
+
+        // ======================================================
+        // 18. COMPARAR CANTIDAD ACTUAL CON REQUERIDA
+        // ======================================================
+
+        const quantitiesAreEqual =
+          Math.abs(
+            totalQty - requiredQty
+          ) <= 0.000001;
+
+        // ======================================================
+        // CASO 1: CANTIDAD EXACTA
+        // ======================================================
+
+        if (quantitiesAreEqual) {
+
+          console.log(
+            "✅ MOVIMIENTO CON CANTIDAD EXACTA"
+          );
+
+          // ====================================================
+          // 19. REDISTRIBUIR GENERAL VIRTUAL SI APLICA
+          // ====================================================
+
+          if (
+            config.allow_picking_without_locations
+          ) {
+
+            const generalResult =
+              await redistributeExactMoveFromGeneral(
+                client,
+                product,
+                stockMove
+              );
+
+            if (
+              generalResult.redistributed
+            ) {
+
+              const redistributedQty = Number(
+                generalResult.reserved || 0
+              );
+
+              totalReserved +=
+                redistributedQty;
+
+              hasPickingChanges = true;
+
+              results.push({
+                move_id: moveId,
+                product_id: productId,
+
+                reserved:
+                  redistributedQty,
+
+                physical_reserved:
+                  Number(
+                    generalResult.physical_reserved || 0
+                  ),
+
+                general_reserved:
+                  Number(
+                    generalResult.general_reserved || 0
+                  ),
+
+                changed: true,
+                skipped: false,
+
+                case:
+                  "ORDER_EXACT_REDISTRIBUTED",
+
+                message:
+                  "La reserva fue redistribuida entre ubicaciones físicas y GENERAL.",
+              });
+
+              continue;
+            }
+
+            console.log(
+              "⏭️ NO FUE NECESARIO REDISTRIBUIR GENERAL:",
+              generalResult.reason
+            );
+          }
+
+          // ====================================================
+          // 20. RECONCILIAR UBICACIONES FÍSICAS
+          // ====================================================
+
+          const physicalResult =
+            await reconcileExactMoveLocations(
+              client,
+              product,
+              stockMove
+            );
+
+          if (
+            physicalResult.redistributed
+          ) {
+
+            hasPickingChanges = true;
+
+            results.push({
+              move_id: moveId,
+              product_id: productId,
+
+              reserved: 0,
+
+              physical_reserved:
+                requiredQty,
+
+              createdQty:
+                physicalResult.createdLines,
+
+              updatedQty:
+                physicalResult.updatedLines,
+
+              cancelledQty:
+                physicalResult.cancelledLines,
+
+              changed: true,
+              skipped: false,
+
+              case:
+                "ORDER_EXACT_LOCATIONS_REDISTRIBUTED",
+
+              message:
+                "La cantidad era correcta, pero las ubicaciones fueron actualizadas según el inventario físico.",
+
+              distribution:
+                physicalResult.distribution,
+            });
+
+            continue;
+          }
+
+          results.push({
+            move_id: moveId,
+            product_id: productId,
+
+            reserved: 0,
+            changed: false,
+            skipped: true,
+
+            case: "ORDER_EXACT",
+
+            reason:
+              physicalResult.reason,
+
+            message:
+              "La cantidad y la distribución ya están correctas.",
+          });
+
+          continue;
+        }
+
+        // ======================================================
+        // CASO 2: EXISTEN LÍNEAS, PERO CAMBIÓ LA CANTIDAD
+        // ======================================================
+
         if (totalQty > 0) {
-          console.log("🟡 Ya existen líneas para este stock_move");
+
+          console.log(
+            "🟡 MOVIMIENTO CON LÍNEAS EXISTENTES"
+          );
 
           const resultExisting =
             await reserveMissingQtyForExistingMoveLines(
@@ -2827,7 +3354,8 @@ if (quantitiesAreEqual) {
             resultExisting?.released || 0
           );
 
-          totalReserved += reservedQty;
+          totalReserved +=
+            reservedQty;
 
           if (
             resultExisting?.changed === true ||
@@ -2840,113 +3368,183 @@ if (quantitiesAreEqual) {
           results.push({
             move_id: moveId,
             product_id: productId,
-            reserved: reservedQty,
+
+            reserved:
+              reservedQty,
+
             createdQty,
-            released: releasedQty,
-            changed: resultExisting?.changed || false,
-            case: resultExisting?.case || null,
-            skipped: resultExisting?.skipped || false,
-            message: resultExisting?.message || "",
+            released:
+              releasedQty,
+
+            changed:
+              resultExisting?.changed || false,
+
+            case:
+              resultExisting?.case || null,
+
+            skipped:
+              resultExisting?.skipped || false,
+
+            message:
+              resultExisting?.message || "",
           });
 
           continue;
         }
 
+        // ======================================================
+        // CASO 3: RESERVA INICIAL
+        // ======================================================
 
-
-
-
-
-
-        //==========================================================
-        // El movimiento todavía no tiene líneas.
-        console.log("🟢 Reserva inicial del stock_move");
-
-        const reservationResult = await reserveInventoryForMove(
-          client,
-          {
-            ...product,
-            moves: [stockMove],
-          }
+        console.log(
+          "🟢 RESERVA INICIAL DEL MOVIMIENTO"
         );
+
+        const reservationResult =
+          await reserveInventoryForMove(
+            client,
+            {
+              ...product,
+
+              moves: [
+                stockMove
+              ],
+            }
+          );
 
         const reservedQty = Number(
           reservationResult?.reserved || 0
         );
 
-
-
-
-
-
-
-        totalReserved += reservedQty;
+        totalReserved +=
+          reservedQty;
 
         results.push({
           move_id: moveId,
           product_id: productId,
           reserved: reservedQty,
         });
-      }
-    }
+
+      } // FIN MOVES
+
+    } // FIN PRODUCTOS
 
     // ==========================================================
-    // 6. OBTENER LÍNEAS FINALES
+    // 21. ACTUALIZAR UBICACIONES DE LAS LÍNEAS NUEVAS
+    //
+    // NUEVO:
+    // Ahora también se actualizan las líneas creadas
+    // durante la reserva inicial o reconciliación.
     // ==========================================================
 
-    const finalResult = await getMoveLinesOrderedByLocation(
+    await refreshPickingLocationSnapshots(
       client,
       pickingId
     );
 
+    console.log(
+      "✅ SNAPSHOTS DE INVENTARIO ACTUALIZADOS"
+    );
 
+    // ==========================================================
+    // 22. OBTENER STOCK MOVE LINES FINALES
+    // ==========================================================
+
+    const finalResult =
+      await getMoveLinesOrderedByLocation(
+        client,
+        pickingId
+      );
+
+    // ==========================================================
+    // 23. VERIFICAR SI HUBO NUEVAS RESERVAS
+    // ==========================================================
 
     const noNewReservations =
       !config.allow_picking_without_locations &&
       totalReserved === 0 &&
       !hasPickingChanges;
 
-    // Conservar también la actualización del pedido
-    // cuando no se agreguen reservas nuevas.
+    // ==========================================================
+    // 24. COMMIT
+    // ==========================================================
+
     await client.query("COMMIT");
+
     transactionStarted = false;
 
-    console.log("📦 Resultado de reservas:", results);
-    console.log("FINAL RESULT:", finalResult);
+    console.log(
+      "📦 RESULTADOS DE RESERVAS:",
+      results
+    );
+
+    console.log(
+      "📦 STOCK MOVE LINES FINALES:",
+      finalResult
+    );
+
+    // ==========================================================
+    // 25. RESPUESTA FINAL
+    // ==========================================================
 
     return res.status(200).json({
       success: true,
-      message: noNewReservations
-        ? finalResult.length > 0
-          ? "El picking ya tiene líneas asignadas."
-          : "Pedido actualizado, pero no se pudo reservar inventario."
-        : result.message || "Picking actualizado correctamente.",
-      data: finalResult,
+
+      title:
+        "Picking preparado",
+
+      message:
+        noNewReservations
+          ? finalResult.length > 0
+            ? "El picking ya tiene líneas asignadas."
+            : "Pedido actualizado, pero no se pudo reservar inventario."
+          : result.message ||
+          "Picking actualizado correctamente.",
+
+      data:
+        finalResult,
     });
 
   } catch (error) {
+
     // ==========================================================
-    // 7. REVERTIR SI OCURRE UN ERROR
+    // 26. ROLLBACK
     // ==========================================================
 
-    if (client && transactionStarted) {
+    if (
+      client &&
+      transactionStarted
+    ) {
       try {
+
         await client.query("ROLLBACK");
+
         transactionStarted = false;
+
+        console.log(
+          "🟠 ROLLBACK EJECUTADO"
+        );
+
       } catch (rollbackError) {
-        releaseError = rollbackError;
+
+        releaseError =
+          rollbackError;
 
         console.error(
-          "❌ Error realizando ROLLBACK:",
+          "❌ ERROR ROLLBACK:",
           rollbackError.message
         );
       }
     }
 
-    console.error("🔥 [ERROR Controller]:", error.message);
+    console.error(
+      "🔥 ERROR PREPARANDO PICKING:",
+      error
+    );
 
     const candidateStatus = Number(
-      error.statusCode ?? error.response?.status
+      error.statusCode ??
+      error.response?.status
     );
 
     const status =
@@ -2960,21 +3558,31 @@ if (quantitiesAreEqual) {
 
     return res.status(status).json({
       success: false,
-      title: error.title || "Error preparando el picking",
+
+      title:
+        error.title ||
+        "Error preparando el picking",
+
       message:
         error.message ||
         "No se pudo actualizar el pedido y preparar el picking.",
+
+      code:
+        error.code ||
+        "PICKING_PREPARATION_ERROR",
     });
 
   } finally {
+
     if (client) {
       client.release(releaseError);
     }
 
-    console.log("🔚 [END Controller]");
+    console.log(
+      "🔚 [END Controller]"
+    );
   }
 }
-
 
 
 
@@ -4877,7 +5485,7 @@ export async function getPickingMoveLinesController(
     if (
       !/^[1-9]\d*$/.test(pickingId) ||
       BigInt(pickingId) >
-        9223372036854775807n
+      9223372036854775807n
     ) {
       return res.status(400).json({
         success: false,
@@ -5074,8 +5682,8 @@ export async function getPickingMoveLinesController(
       Number.isInteger(
         candidateStatus
       ) &&
-      candidateStatus >= 400 &&
-      candidateStatus <= 599
+        candidateStatus >= 400 &&
+        candidateStatus <= 599
         ? candidateStatus
         : 500;
 
@@ -5105,6 +5713,1760 @@ export async function getPickingMoveLinesController(
 
     console.log(
       "🔚 ----[END] Get Picking Move Lines----"
+    );
+  }
+}
+
+
+
+
+
+
+// ============================================================
+// GET ADM CLOUD DISPATCH DETAILS
+// ============================================================
+
+export async function getAdmCloudDispatchDetailsController(req, res) {
+
+    console.log("");
+    console.log("📦 ========================================");
+    console.log("📦 GET ADM CLOUD DISPATCH DETAILS");
+    console.log("📦 ========================================");
+
+    let client;
+
+    try {
+
+        // ====================================================
+        // 1. RECIBIR Y VALIDAR ID
+        // ====================================================
+
+        const { id } = req.params;
+
+        console.log("📥 Dispatch ID recibido:", id);
+
+        const dispatchId = Number(id);
+
+        if (
+            !Number.isSafeInteger(dispatchId) ||
+            dispatchId <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                title: "ID inválido",
+                message: "El ID del conduce no es válido."
+            });
+        }
+
+        client = await db.connect();
+
+
+        // ====================================================
+        // 2. BUSCAR CONDUCE EN ADM CLOUD DISPATCHES
+        // ====================================================
+
+        console.log("");
+        console.log("🔎 Buscando conduce:", dispatchId);
+
+        const dispatchResult = await client.query(
+            `
+            SELECT
+                d.id,
+                d.picking_id,
+                d.sale_id,
+
+                -- ============================================
+                -- IDENTIFICADORES ADM CLOUD
+                -- ============================================
+
+                d.erp_conduce_id,
+                d.erp_doc_id,
+                d.erp_reference,
+
+                -- ============================================
+                -- CLIENTE
+                -- ============================================
+
+                d.erp_relationship_id,
+                d.erp_relationship_name,
+
+                -- ============================================
+                -- UBICACIÓN
+                -- ============================================
+
+                d.erp_location_id,
+
+                d.erp_ship_to_address_id,
+                d.erp_ship_to_address1,
+                d.erp_ship_to_address2,
+
+                -- ============================================
+                -- DATOS ADM CLOUD
+                -- ============================================
+
+                d.erp_billing_status_desc,
+                d.erp_status,
+                d.erp_doc_type,
+
+                -- ============================================
+                -- ESTADO LOCAL DEL CONDUCE EN SIDIAL
+                -- completed = Completado
+                -- reverted  = Anulado
+                -- ============================================
+
+                d.state,
+
+                -- ============================================
+                -- FECHAS
+                -- ============================================
+
+                d.erp_creation_date,
+                d.erp_doc_date,
+
+                -- ============================================
+                -- COSTO
+                -- ============================================
+
+                d.erp_calculated_total_cost,
+
+                -- ============================================
+                -- AUDITORÍA
+                -- ============================================
+
+                d.created_at,
+                d.updated_at
+
+            FROM public.admcloud_dispatches d
+
+            WHERE d.id = $1
+
+            LIMIT 1
+            `,
+            [dispatchId]
+        );
+
+
+        // ====================================================
+        // 3. VALIDAR QUE EXISTA
+        // ====================================================
+
+        if (dispatchResult.rowCount === 0) {
+
+            console.log(
+                "❌ Conduce no encontrado:",
+                dispatchId
+            );
+
+            return res.status(404).json({
+                success: false,
+                title: "Conduce no encontrado",
+                message: `No existe el conduce con ID ${dispatchId}.`
+            });
+        }
+
+
+        const dispatch = dispatchResult.rows[0];
+
+
+        // ====================================================
+        // 4. INTERPRETAR ESTADO LOCAL
+        // ====================================================
+
+        let stateLabel = "Desconocido";
+
+        let stateColor = "gray";
+
+        switch (dispatch.state) {
+
+            case "completed":
+
+                stateLabel = "Completado";
+                stateColor = "green";
+
+                break;
+
+
+            case "reverted":
+
+                stateLabel = "Anulado";
+                stateColor = "red";
+
+                break;
+
+
+            default:
+
+                stateLabel = "Desconocido";
+                stateColor = "gray";
+
+                break;
+
+        }
+
+
+        console.log("");
+        console.log("✅ CONDUCE ENCONTRADO");
+        console.log("🆔 ID:", dispatch.id);
+        console.log("📄 Documento:", dispatch.erp_doc_id);
+        console.log("📋 Referencia:", dispatch.erp_reference);
+        console.log("👤 Cliente:", dispatch.erp_relationship_name);
+        console.log("📦 Picking ID:", dispatch.picking_id);
+        console.log("🚚 ERP Conduce ID:", dispatch.erp_conduce_id);
+
+        console.log("📊 Estado ADM Cloud:", dispatch.erp_status);
+
+        console.log("📊 Estado SIDIAL:", {
+            state: dispatch.state,
+            label: stateLabel,
+            color: stateColor
+        });
+
+
+        // ====================================================
+        // 5. AGREGAR INFORMACIÓN VISUAL DEL ESTADO
+        // ====================================================
+
+        dispatch.state_label = stateLabel;
+        dispatch.state_color = stateColor;
+
+
+        // ====================================================
+        // 6. VALIDAR ERP CONDUCE ID
+        // ====================================================
+
+        if (!dispatch.erp_conduce_id) {
+
+            console.log(
+                "⚠️ El conduce no tiene ERP Conduce ID."
+            );
+
+            return res.status(200).json({
+
+                success: true,
+
+                title: "Conduce encontrado",
+
+                message:
+                    "Conduce encontrado, sin líneas despachadas.",
+
+                data: {
+
+                    dispatch,
+
+                    lines: [],
+
+                    totals: {
+                        ordered: 0,
+                        completed: 0,
+                        pending: 0
+                    }
+
+                }
+
+            });
+        }
+
+
+        // ====================================================
+        // 7. BUSCAR STOCK MOVE LINE DESPACHADAS
+        // ====================================================
+
+        console.log("");
+        console.log("🔎 Buscando líneas despachadas...");
+
+        console.log(
+            "🔗 erp_dispatch_id:",
+            dispatch.erp_conduce_id
+        );
+
+
+        const linesResult = await client.query(
+            `
+            SELECT
+
+                -- ============================================
+                -- STOCK MOVE LINE
+                -- ============================================
+
+                sml.id,
+                sml.move_id,
+                sml.picking_id,
+                sml.product_id,
+
+                sml.product_uom_id,
+                sml.product_uom_qty,
+
+                sml.qty_done,
+
+                sml.location_id,
+                sml.location_dest_id,
+
+                sml.state,
+                sml.user_id,
+                sml.warehouse_id,
+
+                sml.erp_dispatch_id,
+
+                sml.create_date,
+                sml.write_date,
+
+
+                -- ============================================
+                -- DATOS DEL PRODUCTO
+                -- ============================================
+
+                p.sku AS wms_sku,
+
+                p.sku AS product_sku,
+
+                p.sku AS sku,
+
+                p.erp_id AS erp_item_id,
+
+                p.erp_sku AS erp_item_sku,
+
+                p.erp_name AS erp_item_name,
+
+                p.description AS product_description,
+
+
+                -- ============================================
+                -- DESCRIPCIÓN PARA EL FRONTEND
+                -- ============================================
+
+                COALESCE(
+                    NULLIF(p.erp_name, ''),
+                    NULLIF(p.description, ''),
+                    'Producto sin descripción'
+                ) AS erp_name,
+
+
+                -- ============================================
+                -- CANTIDAD ORDENADA
+                -- ============================================
+
+                COALESCE(
+                    sml.product_uom_qty,
+                    0
+                ) AS erp_quantity,
+
+
+                -- ============================================
+                -- CANTIDAD DESPACHADA
+                -- ============================================
+
+                COALESCE(
+                    sml.qty_done,
+                    0
+                ) AS erp_completed_quantity,
+
+
+                -- ============================================
+                -- CANTIDAD PENDIENTE DE LA LÍNEA
+                -- ============================================
+
+                GREATEST(
+                    COALESCE(sml.product_uom_qty, 0)
+                    -
+                    COALESCE(sml.qty_done, 0),
+                    0
+                ) AS erp_pending_completed_quantity
+
+
+            FROM public.stock_move_line sml
+
+            LEFT JOIN public.products p
+                ON p.id = sml.product_id
+
+
+            WHERE
+                sml.erp_dispatch_id = $1
+
+                AND sml.picking_id = $2
+
+                AND sml.state = 'done'
+
+                AND sml.qty_done > 0
+
+
+            ORDER BY
+                sml.id ASC
+            `,
+            [
+                dispatch.erp_conduce_id,
+                dispatch.picking_id
+            ]
+        );
+
+
+        const lines = linesResult.rows;
+
+
+        // ====================================================
+        // 8. LOG DE LAS LÍNEAS
+        // ====================================================
+
+        console.log("");
+        console.log("✅ LÍNEAS DESPACHADAS ENCONTRADAS");
+
+        console.log("📦 Total:", lines.length);
+
+
+        for (const line of lines) {
+
+            console.log("------------------------------------");
+
+            console.log(
+                "🆔 Stock Move Line:",
+                line.id
+            );
+
+            console.log(
+                "📦 Product ID:",
+                line.product_id
+            );
+
+            console.log(
+                "🏷️ WMS SKU:",
+                line.wms_sku
+            );
+
+            console.log(
+                "🏷️ ADM SKU:",
+                line.erp_item_sku
+            );
+
+            console.log(
+                "📄 Producto:",
+                line.erp_name
+            );
+
+            console.log(
+                "📊 Ordenada:",
+                line.erp_quantity
+            );
+
+            console.log(
+                "✅ Despachada:",
+                line.erp_completed_quantity
+            );
+
+            console.log(
+                "⏳ Pendiente:",
+                line.erp_pending_completed_quantity
+            );
+
+        }
+
+
+        // ====================================================
+        // 9. CALCULAR TOTALES
+        // ====================================================
+
+        const totals = lines.reduce(
+            (acc, line) => {
+
+                acc.ordered +=
+                    Number(line.erp_quantity) || 0;
+
+                acc.completed +=
+                    Number(line.erp_completed_quantity) || 0;
+
+                acc.pending +=
+                    Number(line.erp_pending_completed_quantity) || 0;
+
+                return acc;
+            },
+            {
+                ordered: 0,
+                completed: 0,
+                pending: 0
+            }
+        );
+
+
+        // ====================================================
+        // 10. LOG RESUMEN
+        // ====================================================
+
+        console.log("");
+        console.log("📊 ========================================");
+        console.log("📊 RESUMEN DEL CONDUCE");
+        console.log("📊 ========================================");
+
+        console.log(
+            "📄 Conduce:",
+            dispatch.erp_doc_id
+        );
+
+        console.log(
+            "📦 Total líneas:",
+            lines.length
+        );
+
+        console.log(
+            "📋 Cantidad ordenada:",
+            totals.ordered
+        );
+
+        console.log(
+            "✅ Cantidad despachada:",
+            totals.completed
+        );
+
+        console.log(
+            "⏳ Cantidad pendiente:",
+            totals.pending
+        );
+
+        console.log(
+            "📊 Estado:",
+            dispatch.state
+        );
+
+        console.log(
+            "🏷️ Estado mostrado:",
+            dispatch.state_label
+        );
+
+
+        // ====================================================
+        // 11. RESPUESTA FINAL
+        // ====================================================
+
+        return res.status(200).json({
+
+            success: true,
+
+            title: "Detalles del conduce",
+
+            message:
+                "Detalles del conduce obtenidos correctamente.",
+
+            data: {
+
+                dispatch,
+
+                lines,
+
+                totals
+
+            }
+
+        });
+
+
+    } catch (error) {
+
+        // ====================================================
+        // ERROR
+        // ====================================================
+
+        console.error("");
+        console.error("❌ ERROR GET ADM CLOUD DISPATCH DETAILS");
+        console.error(error);
+
+        return res.status(500).json({
+
+            success: false,
+
+            title: "Error obteniendo conduce",
+
+            message:
+                "Error obteniendo los detalles del conduce.",
+
+            error:
+                process.env.NODE_ENV === "development"
+                    ? error.message
+                    : undefined
+
+        });
+
+    } finally {
+
+        // ====================================================
+        // LIBERAR CONEXIÓN
+        // ====================================================
+
+        if (client) {
+            client.release();
+        }
+
+        console.log("");
+        console.log("📦 FIN GET ADM CLOUD DISPATCH DETAILS");
+        console.log("📦 ========================================");
+
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ============================================================
+// ERROR CONTROLADO
+// ============================================================
+
+class ReverseDispatchError extends Error {
+  constructor(
+    status,
+    title,
+    message,
+    code = "DISPATCH_REVERSE_ERROR"
+  ) {
+    super(message);
+
+    this.name = "ReverseDispatchError";
+    this.status = status;
+    this.title = title;
+    this.code = code;
+  }
+}
+
+
+// ============================================================
+// VALIDAR IDENTIFICADOR
+// ACEPTA ID LOCAL O UUID DE ADM CLOUD
+// ============================================================
+
+function getDispatchIdentifier(value) {
+  const id = String(value ?? "").trim();
+
+  if (/^[1-9]\d*$/.test(id)) {
+    return {
+      type: "local",
+      value: id
+    };
+  }
+
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      .test(id)
+  ) {
+    return {
+      type: "erp",
+      value: id
+    };
+  }
+
+  throw new ReverseDispatchError(
+    400,
+    "Identificador inválido",
+    "Debes proporcionar un ID local o un UUID válido de ADM Cloud.",
+    "INVALID_DISPATCH_ID"
+  );
+}
+
+
+// ============================================================
+// NORMALIZAR RESPUESTA DEL SERVICIO ADM CLOUD
+// ============================================================
+
+function normalizeAdmCloudResponse(response) {
+  // Por si el servicio devuelve directamente el payload
+  // o un objeto Axios con { data: payload }.
+
+  if (
+    response?.data &&
+    typeof response.data.success === "boolean"
+  ) {
+    return response.data;
+  }
+
+  return response;
+}
+
+
+// ============================================================
+// VERIFICAR SI ADM CLOUD PERMITE LA REVERSIÓN
+// ============================================================
+
+async function verifyDispatchInAdmCloud(dispatch) {
+  console.log("");
+  console.log("🌐 ========================================");
+  console.log("🌐 VERIFICANDO CONDUCE EN ADM CLOUD");
+  console.log("🌐 ========================================");
+
+  console.log("📄 Conduce:", dispatch.erp_doc_id);
+  console.log("🆔 ERP GUID:", dispatch.erp_conduce_id);
+
+  let response;
+
+  try {
+    response = await getAdmCloudDispatchService({
+      id: dispatch.erp_conduce_id
+    });
+
+  } catch (error) {
+
+    // Únicamente este error explícito significa
+    // que ADM Cloud confirmó ausencia de información.
+
+    const errorCode =
+      error?.code ||
+      error?.response?.data?.code;
+
+    if (errorCode === "EMPTY_DISPATCH_DATA") {
+      console.log(
+        "✅ ADM Cloud confirmó conduce sin información."
+      );
+
+      return {
+        verified: true,
+        erpStatus: "deleted"
+      };
+    }
+
+    throw new ReverseDispatchError(
+      502,
+      "No fue posible verificar el conduce",
+      "Falló la comunicación con ADM Cloud. No se modificó el inventario.",
+      "ADM_CLOUD_VERIFICATION_FAILED"
+    );
+  }
+
+  const result = normalizeAdmCloudResponse(response);
+
+  console.log("📥 Respuesta ADM Cloud:", {
+    success: result?.success,
+    code: result?.code,
+    ID: result?.data?.ID,
+    DocID: result?.data?.DocID,
+    Void: result?.data?.Void
+  });
+
+
+  // ========================================================
+  // CASO 1: CONDUCE ELIMINADO EN ADM CLOUD
+  // ========================================================
+
+  if (
+    result?.success === false &&
+    result?.code === "EMPTY_DISPATCH_DATA"
+  ) {
+    console.log(
+      "✅ Conduce eliminado en ADM Cloud. Reversión permitida."
+    );
+
+    return {
+      verified: true,
+      erpStatus: "deleted"
+    };
+  }
+
+
+  // ========================================================
+  // CASO 2: RESPUESTA NO VÁLIDA
+  // ========================================================
+
+  if (
+    result?.success !== true ||
+    !result?.data
+  ) {
+    throw new ReverseDispatchError(
+      502,
+      "Verificación incompleta",
+      result?.message ||
+      "ADM Cloud no confirmó el estado del conduce.",
+      "INVALID_ADM_CLOUD_RESPONSE"
+    );
+  }
+
+  const erpDispatch = result.data;
+
+
+  // ========================================================
+  // VALIDAR IDENTIDAD DEL CONDUCE
+  // ========================================================
+
+  if (
+    String(erpDispatch.ID ?? "").toLowerCase() !==
+    String(dispatch.erp_conduce_id).toLowerCase()
+  ) {
+    throw new ReverseDispatchError(
+      409,
+      "Conduce diferente",
+      "ADM Cloud devolvió un conduce con un identificador diferente.",
+      "ERP_DISPATCH_MISMATCH"
+    );
+  }
+
+
+  // ========================================================
+  // CASO 3: CONDUCE ANULADO
+  // ========================================================
+
+  if (erpDispatch.Void === true) {
+    console.log(
+      "✅ Conduce anulado en ADM Cloud."
+    );
+
+    return {
+      verified: true,
+      erpStatus: "voided"
+    };
+  }
+
+
+  // ========================================================
+  // CASO 4: CONDUCE ACTIVO
+  // ========================================================
+
+  if (erpDispatch.Void === false) {
+    throw new ReverseDispatchError(
+      409,
+      "Conduce activo en ADM Cloud",
+      `El conduce ${dispatch.erp_doc_id} continúa activo en ADM Cloud. Debe anularse antes de revertirlo en SIDIAL.`,
+      "DISPATCH_STILL_ACTIVE"
+    );
+  }
+
+
+  // ========================================================
+  // ESTADO DESCONOCIDO
+  // ========================================================
+
+  throw new ReverseDispatchError(
+    502,
+    "Estado desconocido",
+    "ADM Cloud no devolvió un valor booleano para Void.",
+    "UNKNOWN_DISPATCH_STATUS"
+  );
+}
+
+
+// ============================================================
+// REVERSE ADM CLOUD DISPATCH CONTROLLER
+// ============================================================
+
+export async function reverseAdmCloudDispatchController(req, res) {
+
+  console.log("");
+  console.log("🔴 ========================================");
+  console.log("🔴 INICIANDO REVERSIÓN DE CONDUCE");
+  console.log("🔴 ========================================");
+
+  let client = null;
+  let transactionStarted = false;
+
+  try {
+
+    // ====================================================
+    // 1. VALIDAR INPUT
+    // ====================================================
+
+    const identifier = getDispatchIdentifier(
+      req.params.id
+    );
+
+    const reason =
+      typeof req.body?.reason === "string"
+        ? req.body.reason.trim()
+        : "Conduce anulado o eliminado en ADM Cloud";
+
+    if (reason.length > 1000) {
+      throw new ReverseDispatchError(
+        400,
+        "Motivo inválido",
+        "El motivo no puede superar 1000 caracteres."
+      );
+    }
+
+    // El usuario autenticado debe provenir
+    // del middleware de autenticación.
+    const rawUserId =
+      req.user?.id ??
+      req.user?.user_id ??
+      req.auth?.userId ??
+      null;
+
+    const reversedBy =
+      rawUserId !== null &&
+        /^\d+$/.test(String(rawUserId))
+        ? String(rawUserId)
+        : null;
+
+    console.log("📥 INPUT:", {
+      identifier,
+      reason,
+      reversedBy
+    });
+
+
+    // ====================================================
+    // 2. BUSCAR CONDUCE LOCAL
+    // ====================================================
+
+    const lookupQuery =
+      identifier.type === "local"
+        ? `
+                    SELECT
+                        id,
+                        picking_id,
+                        sale_id,
+                        erp_conduce_id,
+                        erp_doc_id,
+                        erp_reference,
+                        state
+                    FROM public.admcloud_dispatches
+                    WHERE id = $1::bigint
+                    LIMIT 1
+                `
+        : `
+                    SELECT
+                        id,
+                        picking_id,
+                        sale_id,
+                        erp_conduce_id,
+                        erp_doc_id,
+                        erp_reference,
+                        state
+                    FROM public.admcloud_dispatches
+                    WHERE erp_conduce_id = $1::uuid
+                    LIMIT 1
+                `;
+
+    const localResult = await db.query(
+      lookupQuery,
+      [identifier.value]
+    );
+
+    if (localResult.rows.length === 0) {
+      throw new ReverseDispatchError(
+        404,
+        "Conduce no encontrado",
+        "El conduce solicitado no existe en SIDIAL.",
+        "DISPATCH_NOT_FOUND"
+      );
+    }
+
+    const localDispatch = localResult.rows[0];
+
+    console.log("📦 CONDUCE LOCAL:", localDispatch);
+
+
+    // ====================================================
+    // 3. COMPROBAR SI YA ESTÁ REVERTIDO
+    // ====================================================
+
+    if (localDispatch.state === "reverted") {
+      throw new ReverseDispatchError(
+        409,
+        "Conduce ya revertido",
+        "Este conduce ya fue revertido anteriormente.",
+        "DISPATCH_ALREADY_REVERTED"
+      );
+    }
+
+    if (localDispatch.state !== "completed") {
+      throw new ReverseDispatchError(
+        409,
+        "Estado no permitido",
+        `No se puede revertir un conduce con estado ${localDispatch.state}.`,
+        "INVALID_LOCAL_DISPATCH_STATE"
+      );
+    }
+
+
+    // ====================================================
+    // 4. VERIFICACIÓN EXTERNA ADM CLOUD
+    // ====================================================
+
+    const erpVerification =
+      await verifyDispatchInAdmCloud(localDispatch);
+
+    console.log(
+      "✅ Verificación ADM Cloud:",
+      erpVerification
+    );
+
+
+    // ====================================================
+    // 5. ABRIR TRANSACCIÓN
+    // ====================================================
+
+    client = await db.connect();
+
+    await client.query("BEGIN");
+
+    transactionStarted = true;
+
+    console.log("🟢 BEGIN");
+
+
+    // ====================================================
+    // 6. BLOQUEAR CONDUCE
+    // ====================================================
+
+    const lockedResult = await client.query(
+      `
+            SELECT
+                id,
+                picking_id,
+                erp_conduce_id,
+                erp_doc_id,
+                state
+            FROM public.admcloud_dispatches
+            WHERE id = $1
+            FOR UPDATE
+            `,
+      [localDispatch.id]
+    );
+
+    if (lockedResult.rows.length === 0) {
+      throw new ReverseDispatchError(
+        404,
+        "Conduce no encontrado",
+        "El conduce desapareció durante la operación."
+      );
+    }
+
+    const dispatch = lockedResult.rows[0];
+
+    if (
+      String(dispatch.erp_conduce_id).toLowerCase() !==
+      String(localDispatch.erp_conduce_id).toLowerCase()
+    ) {
+      throw new ReverseDispatchError(
+        409,
+        "Conduce modificado",
+        "El identificador ERP cambió durante la verificación."
+      );
+    }
+
+    if (dispatch.state !== "completed") {
+      throw new ReverseDispatchError(
+        409,
+        "Conduce ya procesado",
+        "El conduce ya no se encuentra en estado completed.",
+        "DISPATCH_STATE_CHANGED"
+      );
+    }
+
+    console.log(
+      "🔒 CONDUCE BLOQUEADO:",
+      dispatch.id
+    );
+
+
+    // ====================================================
+    // 7. VALIDAR REVERSIÓN ANTERIOR
+    // ====================================================
+
+    const previousReversal = await client.query(
+      `
+            SELECT id
+            FROM public.admcloud_dispatch_reversals
+            WHERE erp_conduce_id = $1
+            LIMIT 1
+            `,
+      [dispatch.erp_conduce_id]
+    );
+
+    if (previousReversal.rows.length > 0) {
+      throw new ReverseDispatchError(
+        409,
+        "Reversión duplicada",
+        "Ya existe una reversión registrada para este conduce.",
+        "DUPLICATE_DISPATCH_REVERSAL"
+      );
+    }
+
+
+    // ====================================================
+    // 8. OBTENER PICKING
+    // SOLO CONSULTAR, NO MODIFICAR SU ESTADO
+    // ====================================================
+
+    const pickingResult = await client.query(
+      `
+            SELECT
+                id,
+                name
+            FROM public.stock_picking
+            WHERE id = $1
+            LIMIT 1
+            `,
+      [dispatch.picking_id]
+    );
+
+    if (pickingResult.rows.length === 0) {
+      throw new ReverseDispatchError(
+        409,
+        "Picking no encontrado",
+        "No existe el picking asociado al conduce."
+      );
+    }
+
+    const picking = pickingResult.rows[0];
+
+    console.log("📦 PICKING:", picking);
+
+
+    // ====================================================
+    // 9. BUSCAR STOCK MOVE LINES COMPLETADAS
+    // ====================================================
+
+    const moveLinesResult = await client.query(
+      `
+            SELECT
+                sml.id,
+                sml.move_id,
+                sml.picking_id,
+                sml.product_id,
+                sml.product_uom_qty,
+                sml.qty_done,
+                sml.location_id,
+                sml.location_dest_id,
+                sml.warehouse_id,
+                sml.user_id,
+                sml.erp_dispatch_id,
+                sml.state,
+
+                p.sku,
+                p.description,
+                p.erp_sku,
+
+                loc.warehouse_id AS location_warehouse_id,
+                loc.code AS location_code
+
+            FROM public.stock_move_line sml
+
+            LEFT JOIN public.products p
+                ON p.id = sml.product_id
+
+            LEFT JOIN public.locations loc
+                ON loc.id = sml.location_id
+
+            WHERE sml.erp_dispatch_id = $1
+              AND sml.picking_id = $2
+              AND sml.state = 'done'
+              AND sml.qty_done > 0
+
+            ORDER BY sml.id ASC
+
+            FOR UPDATE OF sml
+            `,
+      [
+        dispatch.erp_conduce_id,
+        dispatch.picking_id
+      ]
+    );
+
+    const moveLines = moveLinesResult.rows;
+
+    console.log(
+      "📦 STOCK MOVE LINES A REVERTIR:"
+    );
+
+    console.table(
+      moveLines.map((line) => ({
+        id: line.id,
+        sku: line.sku,
+        qty_done: line.qty_done,
+        location_id: line.location_id,
+        warehouse_id: line.warehouse_id,
+        state: line.state
+      }))
+    );
+
+    if (moveLines.length === 0) {
+      throw new ReverseDispatchError(
+        409,
+        "Sin líneas para revertir",
+        "No existen líneas completadas asociadas a este conduce.",
+        "NO_COMPLETED_MOVE_LINES"
+      );
+    }
+
+
+    // ====================================================
+    // 10. CREAR REGISTRO DE REVERSIÓN
+    // EL UNIQUE DEL ERP GUID EVITA DUPLICADOS
+    // ====================================================
+
+    const reversalResult = await client.query(
+      `
+            INSERT INTO public.admcloud_dispatch_reversals (
+                erp_conduce_id,
+                dispatch_id,
+                picking_id,
+                total_qty_returned,
+                reversed_by,
+                reason
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                0,
+                $4,
+                $5
+            )
+            ON CONFLICT (erp_conduce_id)
+            DO NOTHING
+            RETURNING id
+            `,
+      [
+        dispatch.erp_conduce_id,
+        dispatch.id,
+        dispatch.picking_id,
+        reversedBy,
+        reason
+      ]
+    );
+
+    if (reversalResult.rows.length === 0) {
+      throw new ReverseDispatchError(
+        409,
+        "Reversión duplicada",
+        "Otro proceso ya registró la reversión."
+      );
+    }
+
+    const reversalId = reversalResult.rows[0].id;
+
+    console.log(
+      "🧾 REVERSAL ID:",
+      reversalId
+    );
+
+
+    // ====================================================
+    // 11. REVERTIR CADA STOCK MOVE LINE
+    // ====================================================
+
+    let totalQtyReturned = 0;
+
+    const reversedLines = [];
+    const usedShipMovementIds = new Set();
+
+    for (const line of moveLines) {
+
+      console.log("");
+      console.log(
+        "🔄 REVIRTIENDO STOCK MOVE LINE:",
+        line.id
+      );
+
+      const qty = Number(line.qty_done);
+
+      // ================================================
+      // VALIDAR DATOS FÍSICOS
+      // ================================================
+
+      if (
+        !line.sku ||
+        !line.location_id ||
+        !line.location_warehouse_id ||
+        !Number.isFinite(qty) ||
+        qty <= 0
+      ) {
+        throw new ReverseDispatchError(
+          409,
+          "Línea incompleta",
+          `La línea ${line.id} no tiene SKU, ubicación, almacén o cantidad válida.`,
+          "INVALID_MOVE_LINE"
+        );
+      }
+
+      if (
+        line.warehouse_id !== null &&
+        line.warehouse_id !== undefined &&
+        String(line.warehouse_id) !==
+        String(line.location_warehouse_id)
+      ) {
+        throw new ReverseDispatchError(
+          409,
+          "Almacén inconsistente",
+          `La línea ${line.id} pertenece a un almacén diferente al de su ubicación.`,
+          "WAREHOUSE_MISMATCH"
+        );
+      }
+
+      const warehouseId =
+        line.location_warehouse_id;
+
+      const locationId =
+        line.location_id;
+
+      console.log("📦 PRODUCTO:", line.sku);
+      console.log("📍 UBICACIÓN:", locationId);
+      console.log("🏭 WAREHOUSE:", warehouseId);
+      console.log("📊 CANTIDAD:", qty);
+
+
+      // ================================================
+      // BUSCAR MOVIMIENTO SHIP ORIGINAL
+      // ================================================
+
+      const shipResult = await client.query(
+        `
+                SELECT
+                    id,
+                    from_location_id,
+                    to_location_id,
+                    qty,
+                    movement_type
+                FROM public.inventory_movements
+                WHERE movement_type = 'SHIP'
+                  AND reference_type = $1
+                  AND reference_id = $2
+                  AND product_sku = $3
+                  AND from_location_id = $4
+                  AND qty = $5::numeric
+
+                ORDER BY id ASC
+
+                FOR UPDATE
+                `,
+        [
+          picking.name,
+          String(picking.id),
+          line.sku,
+          locationId,
+          line.qty_done
+        ]
+      );
+
+      // No inventamos el destino si no podemos
+      // relacionarlo con una salida registrada.
+
+      if (shipResult.rows.length !== 1) {
+        throw new ReverseDispatchError(
+          409,
+          "Movimiento original ambiguo",
+          `La línea ${line.id} tiene ${shipResult.rows.length} movimientos SHIP coincidentes. Se requiere identificar inequívocamente su salida antes de devolver inventario.`,
+          "SHIP_MOVEMENT_NOT_UNIQUE"
+        );
+      }
+
+      const originalShip = shipResult.rows[0];
+
+      if (!originalShip.to_location_id) {
+        throw new ReverseDispatchError(
+          409,
+          "Destino de salida desconocido",
+          `El movimiento SHIP ${originalShip.id} no tiene ubicación de destino.`,
+          "MISSING_SHIP_DESTINATION"
+        );
+      }
+
+      if (
+        line.location_dest_id !== null &&
+        line.location_dest_id !== undefined &&
+        String(line.location_dest_id) !==
+        String(originalShip.to_location_id)
+      ) {
+        throw new ReverseDispatchError(
+          409,
+          "Ubicaciones inconsistentes",
+          `El destino de la línea ${line.id} no coincide con el movimiento SHIP ${originalShip.id}.`,
+          "SHIP_DESTINATION_MISMATCH"
+        );
+      }
+
+      if (
+        usedShipMovementIds.has(
+          String(originalShip.id)
+        )
+      ) {
+        throw new ReverseDispatchError(
+          409,
+          "Movimiento de salida duplicado",
+          `El movimiento SHIP ${originalShip.id} coincide con más de una línea.`,
+          "SHIP_MOVEMENT_REUSED"
+        );
+      }
+
+      usedShipMovementIds.add(
+        String(originalShip.id)
+      );
+
+
+      // ================================================
+      // EVITAR REVERTIR DOS VECES EL MISMO SHIP
+      // ================================================
+
+      const alreadyReversedShip =
+        await client.query(
+          `
+                    SELECT id
+                    FROM public.inventory_movements
+                    WHERE movement_type = 'MOVE'
+                      AND reference_type = 'DISPATCH_VOID'
+                      AND note LIKE $1
+                    LIMIT 1
+                    `,
+          [
+            `%SHIP_ID=${originalShip.id};%`
+          ]
+        );
+
+      if (alreadyReversedShip.rows.length > 0) {
+        throw new ReverseDispatchError(
+          409,
+          "Salida previamente revertida",
+          `El movimiento SHIP ${originalShip.id} ya tiene registrada una reversión.`,
+          "SHIP_ALREADY_REVERSED"
+        );
+      }
+
+
+      // ================================================
+      // DEVOLVER INVENTARIO
+      // qty_available ES COLUMNA GENERATED
+      // ================================================
+
+      const inventoryResult = await client.query(
+        `
+                INSERT INTO public.inventory_by_location (
+                    warehouse_id,
+                    location_id,
+                    product_sku,
+                    qty_on_hand,
+                    qty_reserved,
+                    updated_at
+                )
+                VALUES (
+                    $1,
+                    $2,
+                    $3,
+                    $4::numeric,
+                    0,
+                    NOW()
+                )
+
+                ON CONFLICT (
+                    warehouse_id,
+                    location_id,
+                    product_sku
+                )
+
+                DO UPDATE SET
+                    qty_on_hand =
+                        inventory_by_location.qty_on_hand
+                        + EXCLUDED.qty_on_hand,
+
+                    updated_at = NOW()
+
+                RETURNING
+                    id,
+                    warehouse_id,
+                    location_id,
+                    product_sku,
+                    qty_on_hand,
+                    qty_reserved,
+                    qty_available
+                `,
+        [
+          warehouseId,
+          locationId,
+          line.sku,
+          line.qty_done
+        ]
+      );
+
+      const inventory = inventoryResult.rows[0];
+
+      console.log(
+        "✅ INVENTARIO RESTAURADO:",
+        inventory
+      );
+
+
+      // ================================================
+      // REGISTRAR MOVIMIENTO INVERSO
+      // NO ELIMINAR EL SHIP ORIGINAL
+      // ================================================
+
+      const movementNote =
+        `Reversión del conduce ${dispatch.erp_doc_id}; ` +
+        `ERP_ID=${dispatch.erp_conduce_id}; ` +
+        `STOCK_MOVE_LINE_ID=${line.id}; ` +
+        `SHIP_ID=${originalShip.id}; ` +
+        `REVERSAL_ID=${reversalId}; ` +
+        `Motivo: ${reason}`;
+
+      const movementResult = await client.query(
+        `
+                INSERT INTO public.inventory_movements (
+                    product_sku,
+                    from_location_id,
+                    to_location_id,
+                    qty,
+                    movement_type,
+                    reference_type,
+                    reference_id,
+                    created_at,
+                    created_by,
+                    note
+                )
+                VALUES (
+                    $1,
+                    $2,
+                    $3,
+                    $4::numeric,
+                    'MOVE',
+                    'DISPATCH_VOID',
+                    $5,
+                    NOW(),
+                    $6,
+                    $7
+                )
+                RETURNING id
+                `,
+        [
+          line.sku,
+          originalShip.to_location_id,
+          locationId,
+          line.qty_done,
+          String(dispatch.id),
+          reversedBy,
+          movementNote
+        ]
+      );
+
+      console.log(
+        "✅ MOVIMIENTO INVERSO:",
+        movementResult.rows[0].id
+      );
+
+
+      // ================================================
+      // CANCELAR STOCK MOVE LINE
+      // CONSERVAR qty_done PARA AUDITORÍA
+      // ================================================
+
+      await client.query(
+        `
+                UPDATE public.stock_move_line
+                SET
+                    state = 'cancel',
+                    write_date = NOW()
+                WHERE id = $1
+                  AND state = 'done'
+                `,
+        [line.id]
+      );
+
+      console.log(
+        "✅ STOCK MOVE LINE CANCELADA:",
+        line.id
+      );
+
+
+      // ================================================
+      // ACUMULAR RESULTADO
+      // ================================================
+
+      totalQtyReturned += qty;
+
+      reversedLines.push({
+        stock_move_line_id: line.id,
+        product_id: line.product_id,
+        sku: line.sku,
+        qty_returned: qty,
+        warehouse_id: warehouseId,
+        location_id: locationId,
+        original_ship_movement_id:
+          originalShip.id,
+        reversal_movement_id:
+          movementResult.rows[0].id,
+        inventory_qty_on_hand:
+          inventory.qty_on_hand,
+        inventory_qty_available:
+          inventory.qty_available
+      });
+
+    }
+
+
+    // ====================================================
+    // 12. ACTUALIZAR REGISTRO DE REVERSIÓN
+    // ====================================================
+
+    await client.query(
+      `
+            UPDATE public.admcloud_dispatch_reversals
+            SET total_qty_returned = $1
+            WHERE id = $2
+            `,
+      [
+        totalQtyReturned,
+        reversalId
+      ]
+    );
+
+
+    // ====================================================
+    // 13. CAMBIAR CONDUCE A REVERTED
+    // ====================================================
+
+    const updatedDispatchResult = await client.query(
+      `
+            UPDATE public.admcloud_dispatches
+            SET
+                state = 'reverted',
+                updated_at = NOW()
+            WHERE id = $1
+              AND state = 'completed'
+            RETURNING
+                id,
+                picking_id,
+                erp_conduce_id,
+                erp_doc_id,
+                state
+            `,
+      [dispatch.id]
+    );
+
+    if (updatedDispatchResult.rows.length !== 1) {
+      throw new ReverseDispatchError(
+        409,
+        "Error actualizando conduce",
+        "No se pudo cambiar el estado del conduce a reverted."
+      );
+    }
+
+
+    // ====================================================
+    // 14. NO MODIFICAR STOCK_PICKING
+    // ====================================================
+
+    console.log(
+      "🔒 Estado de stock_picking conservado."
+    );
+
+
+    // ====================================================
+    // 15. COMMIT
+    // ====================================================
+
+    await client.query("COMMIT");
+
+    transactionStarted = false;
+
+    console.log("");
+    console.log("✅ ========================================");
+    console.log("✅ CONDUCE REVERTIDO CORRECTAMENTE");
+    console.log("✅ ========================================");
+
+    console.log("📄 Conduce:", dispatch.erp_doc_id);
+    console.log("📦 Picking:", dispatch.picking_id);
+    console.log("📊 Total devuelto:", totalQtyReturned);
+    console.log("🧾 Reversal ID:", reversalId);
+
+
+    // ====================================================
+    // 16. RESPONSE
+    // ====================================================
+
+    return res.status(200).json({
+      success: true,
+
+      title: "Conduce revertido",
+
+      message:
+        `El conduce ${dispatch.erp_doc_id} fue revertido correctamente en SIDIAL.`,
+
+      data: {
+        dispatch:
+          updatedDispatchResult.rows[0],
+
+        reversal_id:
+          reversalId,
+
+        erp_status:
+          erpVerification.erpStatus,
+
+        lines_reverted:
+          reversedLines.length,
+
+        total_qty_returned:
+          totalQtyReturned,
+
+        picking_state_modified:
+          false,
+
+        lines:
+          reversedLines
+      }
+    });
+
+  } catch (error) {
+
+    // ====================================================
+    // ROLLBACK
+    // ====================================================
+
+    if (client && transactionStarted) {
+      try {
+        await client.query("ROLLBACK");
+
+        console.log(
+          "🟠 ROLLBACK EJECUTADO"
+        );
+      } catch (rollbackError) {
+        console.error(
+          "❌ ERROR EN ROLLBACK:",
+          rollbackError
+        );
+      }
+    }
+
+    console.error("");
+    console.error(
+      "🔥 ERROR REVIRTIENDO CONDUCE:",
+      error
+    );
+
+    const isControlled =
+      error instanceof ReverseDispatchError;
+
+    return res.status(
+      isControlled ? error.status : 500
+    ).json({
+      success: false,
+
+      title:
+        isControlled
+          ? error.title
+          : "Error interno",
+
+      message:
+        isControlled
+          ? error.message
+          : "Ocurrió un error al revertir el conduce. No se confirmó la transacción.",
+
+      code:
+        isControlled
+          ? error.code
+          : "INTERNAL_DISPATCH_REVERSE_ERROR"
+    });
+
+  } finally {
+
+    // ====================================================
+    // LIBERAR CONEXIÓN
+    // ====================================================
+
+    if (client) {
+      client.release();
+    }
+
+    console.log(
+      "🔚 [END] reverseAdmCloudDispatchController"
     );
   }
 }

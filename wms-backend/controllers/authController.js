@@ -1,6 +1,6 @@
 // controllers/authController.js
 import bcrypt from "bcryptjs";
-import { db } from "../db.js";
+import { authDb } from "../db.js";
 import jwt from "jsonwebtoken";
 
 
@@ -19,7 +19,7 @@ export async function logoutUser(req, res) {
     }
 
     // 2️⃣ Buscar si existe en la base de datos
-    const result = await db.query(
+    const result = await authDb.query(
       `SELECT id FROM users WHERE refresh_token = $1`,
       [refreshToken]
     );
@@ -27,7 +27,7 @@ export async function logoutUser(req, res) {
 
     // 3️⃣ Si existe un usuario con ese refresh token → borrarlo
     if (result.rows.length > 0) {
-      await db.query(
+      await authDb.query(
         `UPDATE users
          SET refresh_token = NULL,
              refresh_token_expires_at = NULL
@@ -63,7 +63,7 @@ export async function refreshToken(req, res) {
     return res.status(401).json({ message: "No refresh token" });
   }
 
-  const userResult = await db.query(
+  const userResult = await authDb.query(
     "SELECT id, email, role, refresh_token FROM users WHERE refresh_token = $1",
     [refreshToken]
   );
@@ -100,19 +100,14 @@ export async function login(req, res) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const dbCheck = await db.query(`
-SELECT current_database(),
-inet_server_addr(),
-inet_server_port()
-`);
-console.log("CONECTADO A:", dbCheck.rows);
+  
 
 
     // 2️⃣ Normalizar email
     const normalizedEmail = email.trim().toLowerCase();
 
     // 3️⃣ Buscar usuario por email
-    const userResult = await db.query(
+    const userResult = await authDb.query(
       `SELECT 
         id,
         email,
@@ -125,13 +120,7 @@ console.log("CONECTADO A:", dbCheck.rows);
       [normalizedEmail]
     );
 
-const perm = await db.query(`
-SELECT current_database() as db, permissions 
-FROM users 
-WHERE email=$1
-`, [email]);
 
-console.log("PERMISOS VIENEN DE:", perm.rows);
 
 
     if (userResult.rows.length === 0) {
@@ -168,7 +157,7 @@ console.log("PERMISOS VIENEN DE:", perm.rows);
     refreshExpiresAt.setDate(refreshExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS);
 
     // 7️⃣ Guardar refresh token en DB
-    await db.query(
+    await authDb.query(
       `UPDATE users
        SET refresh_token = $1,
            refresh_token_expires_at = $2,
@@ -219,7 +208,7 @@ export async function registerUser(req, res) {
     const normalizedEmail = email.trim().toLowerCase();
     
     // 3️⃣ Verificar si el email ya existe
-    const existingUser = await db.query(
+    const existingUser = await authDb.query(
       "SELECT id FROM users WHERE email = $1",
       [normalizedEmail]
     );
@@ -232,7 +221,7 @@ export async function registerUser(req, res) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 5️⃣ Insertar usuario
-    const result = await db.query(
+    const result = await authDb.query(
       `INSERT INTO users (
         email, password_hash, full_name, role, phone, warehouse_id
       ) VALUES ($1, $2, $3, $4, $5, $6)

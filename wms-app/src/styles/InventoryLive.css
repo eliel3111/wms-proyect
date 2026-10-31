@@ -1,216 +1,2038 @@
+/* =========================================================
+   GARLAS CONTROL WMS
+   INVENTORY LIVE MONITOR
+   InventoryLive.css
+========================================================= */
+
+
+/* =========================================================
+   MAIN CONTAINER
+========================================================= */
+
 .inventory-live-container {
   width: 100%;
-  min-height: 100%;
-  padding-bottom: 10px;
+
+  min-height:
+    calc(
+      100dvh - 56px
+    );
+
+  padding:
+    24px
+    28px
+    40px;
+
   display: flex;
+
   flex-direction: column;
-  gap: 24px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+
+  gap: 18px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f5f7fa 0%,
+      #f8fafc 100%
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  box-sizing: border-box;
+
+  -webkit-font-smoothing:
+    antialiased;
+
+  -moz-osx-font-smoothing:
+    grayscale;
 }
 
-/* TITLE */
+
+/* =========================================================
+   PAGE HEADER
+========================================================= */
 
 .inventory-live-title {
   width: 100%;
-  padding: 24px 10px;
+
+  min-height: 118px;
+
+  padding:
+    20px
+    24px;
+
   display: flex;
+
   align-items: center;
-  border-bottom: 1px solid #e5e7eb;
+
+  justify-content: space-between;
+
+  gap: 24px;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+
+  border:
+    1px solid
+    #dce5ef;
+
+  border-radius:
+    15px;
+
+  background:
+    radial-gradient(
+      circle at 82% 50%,
+      rgba(
+        59,
+        130,
+        246,
+        0.11
+      ) 0%,
+      rgba(
+        59,
+        130,
+        246,
+        0
+      ) 36%
+    ),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #f8fbff 62%,
+      #edf5ff 100%
+    );
+
+  box-shadow:
+    0
+    4px
+    14px
+    rgba(
+      15,
+      23,
+      42,
+      0.04
+    );
 }
+
+
+/* =========================================================
+   HEADER LEFT
+========================================================= */
 
 .inventory-live-title-container {
+  min-width: 0;
+
   display: flex;
+
   align-items: center;
-  gap: 18px;
+
+  gap: 17px;
 }
+
+
+/* =========================================================
+   HEADER ICON
+========================================================= */
 
 .inventory-live-title-logo {
-  width: 70px;
-  height: 70px;
-  border-radius: 16px;
-  background: #eaf1ff;
-  color: #2563eb;
+  width: 64px;
+
+  height: 64px;
+
+  flex:
+    0
+    0
+    64px;
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
+
+  border:
+    1px solid
+    #dbe9fb;
+
+  border-radius:
+    14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #edf5ff 0%,
+      #e5efff 100%
+    );
+
+  color:
+    #2878dd;
 }
+
+
+.inventory-live-title-logo svg {
+  width: 30px;
+
+  height: 30px;
+}
+
+
+/* =========================================================
+   HEADER TEXT
+========================================================= */
 
 .inventory-live-title-titles {
-  display: flex;
-  flex-direction: column;
+  min-width: 0;
 
+  display: flex;
+
+  flex-direction: column;
 }
+
+
+/* =========================================================
+   EYEBROW
+========================================================= */
+
+.inventory-live-eyebrow {
+  margin-bottom:
+    3px;
+
+  color:
+    #718099;
+
+  font-size:
+    var(
+      --text-2xs,
+      11px
+    );
+
+  line-height:
+    16px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    0.105em;
+
+  text-transform:
+    uppercase;
+}
+
+
+/* =========================================================
+   MAIN TITLE
+========================================================= */
 
 .inventory-live-main-title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #0f172a;
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    var(
+      --text-3xl,
+      26px
+    );
+
+  line-height:
+    var(
+      --leading-tight,
+      1.15
+    );
+
+  font-weight:
+    var(
+      --weight-bold,
+      690
+    );
+
+  letter-spacing:
+    var(
+      --tracking-display,
+      -0.035em
+    );
 }
+
+
+/* =========================================================
+   HEADER SUBTITLE
+========================================================= */
 
 .inventory-live-subtitle {
-  margin-top: 6px;
-  font-size: 16px;
-  color: #64748b;
+  margin-top:
+    5px;
+
+  color:
+    var(
+      --text-secondary,
+      #52627a
+    );
+
+  font-size:
+    var(
+      --text-md,
+      14px
+    );
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
 }
 
-/* TABLE */
+
+/* =========================================================
+   LIVE STATUS
+========================================================= */
+
+.inventory-live-status {
+  min-width: 238px;
+
+  padding:
+    11px
+    14px;
+
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 10px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #d8e3ee;
+
+  border-radius:
+    10px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.82
+    );
+
+  box-shadow:
+    0
+    2px
+    7px
+    rgba(
+      15,
+      23,
+      42,
+      0.025
+    );
+}
+
+
+/* =========================================================
+   LIVE DOT
+========================================================= */
+
+.inventory-live-status-dot {
+  width: 9px;
+
+  height: 9px;
+
+  flex:
+    0
+    0
+    9px;
+
+  margin-top:
+    5px;
+
+  border-radius:
+    50%;
+
+  background:
+    #18ad5b;
+
+  box-shadow:
+    0
+    0
+    0
+    4px
+    rgba(
+      24,
+      173,
+      91,
+      0.11
+    );
+}
+
+
+/* =========================================================
+   LIVE STATUS TEXT
+========================================================= */
+
+.inventory-live-status-content {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 1px;
+}
+
+
+.inventory-live-status-content strong {
+  color:
+    #3e4f66;
+
+  font-size:
+    var(
+      --text-sm,
+      13px
+    );
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+.inventory-live-status-content span {
+  color:
+    var(
+      --text-muted,
+      #7c899c
+    );
+
+  font-size:
+    var(
+      --text-2xs,
+      11px
+    );
+
+  line-height:
+    16px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+}
+
+
+/* =========================================================
+   TABLE CARD
+========================================================= */
 
 .inventory-live-table-container {
   width: 100%;
-  padding: 15px 32px;
+
+  overflow: hidden;
+
   box-sizing: border-box;
+
+  background:
+    #ffffff;
+
+  border:
+    1px solid
+    #dfe6ee;
+
+  border-radius:
+    15px;
+
+  box-shadow:
+    0
+    5px
+    18px
+    rgba(
+      15,
+      23,
+      42,
+      0.04
+    );
 }
+
+
+/* =========================================================
+   TABLE SECTION HEADER
+========================================================= */
 
 .inventory-live-section-title {
+  width: 100%;
+
+  min-height: 84px;
+
+  padding:
+    17px
+    21px;
+
   display: flex;
+
   align-items: center;
-  gap: 14px;
-  margin-bottom: 26px;
-  font-size: 24px;
-  font-weight: 800;
-  color: #0f172a;
+
+  box-sizing: border-box;
+
+  border-bottom:
+    1px solid
+    #e6ebf1;
+
+  background:
+    #ffffff;
 }
 
-.inventory-live-section-title svg {
-  color: #2563eb;
+
+/* =========================================================
+   SECTION TITLE MAIN
+========================================================= */
+
+.inventory-live-section-title-main {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  color:
+    #2878dd;
 }
+
+
+.inventory-live-section-title-main > svg {
+  width: 22px;
+
+  height: 22px;
+
+  flex:
+    0
+    0
+    22px;
+}
+
+
+.inventory-live-section-title-main > div {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+
+/* =========================================================
+   SECTION TITLE
+========================================================= */
+
+.inventory-live-section-heading {
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-size:
+    var(
+      --text-xl,
+      18px
+    );
+
+  line-height:
+    24px;
+
+  font-weight:
+    var(
+      --weight-bold,
+      690
+    );
+
+  letter-spacing:
+    var(
+      --tracking-heading,
+      -0.022em
+    );
+}
+
+
+/* =========================================================
+   SECTION SUBTITLE
+========================================================= */
+
+.inventory-live-section-subtitle {
+  color:
+    var(
+      --text-muted,
+      #7c899c
+    );
+
+  font-size:
+    var(
+      --text-sm,
+      13px
+    );
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+/* =========================================================
+   TABLE BASE
+========================================================= */
 
 .inventory-live-table-column {
   width: 100%;
+
   display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
+
+  grid-template-columns:
+    minmax(
+      250px,
+      1.12fr
+    )
+    minmax(
+      260px,
+      1fr
+    )
+    minmax(
+      300px,
+      0.92fr
+    );
+
+  align-items: center;
+
+  gap: 24px;
+
+  box-sizing: border-box;
 }
 
-.inventory-live-table-column > div {
-  padding: 18px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
 
 .inventory-live-table-header {
-  background: #2563eb;
-  color: white;
-  font-weight: 800;
-  font-size: 18px;
-  border-radius: 10px 10px 0 0;
-  overflow: hidden;
+  min-height: 48px;
+
+  padding:
+    0
+    22px;
+
+  background:
+    #f4f7fb;
+
+  border-bottom:
+    1px solid
+    #dfe6ee;
+
+  color:
+    #617188;
+
+  font-size:
+    var(
+      --text-2xs,
+      11px
+    );
+
+  line-height:
+    16px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    0.045em;
+
+  text-transform:
+    uppercase;
 }
+
+
+/* =========================================================
+   TABLE HEADER CELLS
+========================================================= */
 
 .inventory-live-table-header > div {
-  gap: 10px;
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
 }
 
-.inventory-live-table-header > div:nth-child(2) {
-  border-left: 2px solid rgba(255, 255, 255, 0.75);
-  border-right: 2px solid rgba(255, 255, 255, 0.75);
+
+.inventory-live-table-header svg {
+  width: 17px;
+
+  height: 17px;
+
+  color:
+    #6f8199;
 }
+
+
+/* =========================================================
+   TABLE ROW
+========================================================= */
 
 .inventory-live-table-row {
-  font-size: 18px;
-  color: #0f172a;
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+  min-height: 58px;
+
+  padding:
+    0
+    22px;
+
+  border-bottom:
+    1px solid
+    #edf1f5;
+
+  background:
+    #ffffff;
+
+  color:
+    #273950;
+
+  font-size:
+    var(
+      --text-md,
+      14px
+    );
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+
+  transition:
+    background-color
+    120ms
+    ease;
 }
 
-.inventory-live-table-row > div:nth-child(2) {
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
+
+.inventory-live-table-row.row-white,
+.inventory-live-table-row.row-gray {
+  background:
+    #ffffff;
 }
 
-.inventory-live-table-row > div:nth-child(3) {
-  font-weight: 800;
-  color: #2563eb;
+
+.inventory-live-table-row:hover {
+  background:
+    #f7faff;
 }
 
-.row-white {
-  background: white;
+
+/* =========================================================
+   USER CELL
+========================================================= */
+
+.inventory-live-user {
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 11px;
 }
 
-.row-gray {
-  background: #f8fafc;
+
+/* =========================================================
+   USER AVATAR
+========================================================= */
+
+.inventory-live-user-avatar {
+  width: 34px;
+
+  height: 34px;
+
+  flex:
+    0
+    0
+    34px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    #dce9f8;
+
+  border-radius:
+    50%;
+
+  background:
+    #eaf3ff;
+
+  color:
+    #2977d6;
 }
+
+
+.inventory-live-user-avatar svg {
+  width: 16px;
+
+  height: 16px;
+}
+
+
+/* =========================================================
+   USER NAME
+========================================================= */
+
+.inventory-live-user > span {
+  min-width: 0;
+
+  overflow: hidden;
+
+  color:
+    #26364d;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/* =========================================================
+   NUMERIC DATA
+========================================================= */
+
+.inventory-live-count-value {
+  color:
+    #21344f;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    13.5px;
+
+  line-height:
+    20px;
+
+  font-weight:
+    560;
+
+  letter-spacing:
+    -0.015em;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   PROGRESS CELL
+========================================================= */
+
+.inventory-live-progress-cell {
+  width: 100%;
+
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+}
+
+
+/* =========================================================
+   PROGRESS TRACK
+========================================================= */
+
+.inventory-live-progress-track {
+  flex:
+    1
+    1
+    auto;
+
+  min-width: 130px;
+
+  height: 8px;
+
+  overflow: hidden;
+
+  border-radius:
+    999px;
+
+  background:
+    #e7edf4;
+}
+
+
+/* =========================================================
+   PROGRESS VALUE
+========================================================= */
+
+.inventory-live-progress-value {
+  height: 100%;
+
+  border-radius:
+    inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      #5596ef 0%,
+      #3478ea 100%
+    );
+
+  transition:
+    width
+    250ms
+    ease;
+}
+
+
+/* =========================================================
+   PERCENT VALUE
+========================================================= */
+
+.inventory-live-percent-value {
+  min-width: 48px;
+
+  color:
+    #2f6ee5;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    13px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    -0.015em;
+
+  text-align:
+    right;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   TOTAL TABLE ROW
+========================================================= */
 
 .inventory-live-table-total-row {
-  background: #eaf3ff;
-  font-size: 18px;
-  font-weight: 800;
-  color: #0f172a;
-  border-radius: 0 0 10px 10px;
-  overflow: hidden;
+  min-height: 57px;
+
+  padding:
+    0
+    22px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #edf5ff 0%,
+      #f3f8ff 100%
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-size:
+    var(
+      --text-md,
+      14px
+    );
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
 }
 
-.inventory-live-table-total-row > div:nth-child(2) {
-  border-left: 1px solid #dbeafe;
-  border-right: 1px solid #dbeafe;
+
+.inventory-live-table-total-row
+.inventory-live-count-value {
+  color:
+    #17233c;
+
+  font-size:
+    14px;
+
+  font-weight:
+    650;
 }
+
+
+/* =========================================================
+   TOTAL PROGRESS TEXT
+========================================================= */
+
+.inventory-live-total-progress {
+  color:
+    #607089;
+
+  font-size:
+    var(
+      --text-sm,
+      13px
+    );
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
 
 .inventory-live-empty {
   width: 100%;
-  padding: 35px 20px;
+
+  min-height: 220px;
+
+  padding:
+    38px
+    20px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 6px;
+
+  box-sizing: border-box;
+
+  background:
+    #ffffff;
+
+  color:
+    var(
+      --text-muted,
+      #7c899c
+    );
+
   text-align: center;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 12px;
-  color: #64748b;
-  font-size: 18px;
-  font-weight: 600;
 }
 
-/* TOTAL */
+
+/* =========================================================
+   EMPTY ICON
+========================================================= */
+
+.inventory-live-empty-icon {
+  width: 56px;
+
+  height: 56px;
+
+  margin-bottom:
+    6px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    #dde8f4;
+
+  border-radius:
+    50%;
+
+  background:
+    #edf4fd;
+
+  color:
+    #4f7fb7;
+}
+
+
+/* =========================================================
+   EMPTY TITLE
+========================================================= */
+
+.inventory-live-empty strong {
+  color:
+    #3a4a60;
+
+  font-size:
+    var(
+      --text-md,
+      14px
+    );
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+/* =========================================================
+   EMPTY DESCRIPTION
+========================================================= */
+
+.inventory-live-empty > span {
+  max-width: 440px;
+
+  color:
+    var(
+      --text-muted,
+      #7c899c
+    );
+
+  font-size:
+    var(
+      --text-sm,
+      13px
+    );
+
+  line-height:
+    19px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+}
+
+
+/* =========================================================
+   SUMMARY CARD
+========================================================= */
 
 .inventory-live-total {
-  margin: 0 32px 28px;
-  padding: 15px;
-  display: flex;
-  gap: 20px;
-  border: 1px solid #bfdbfe;
-  border-radius: 14px;
-  background: #f8fbff;
+  width: 100%;
+
+  min-height: 124px;
+
+  padding:
+    18px
+    26px;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr
+    1px
+    1fr;
+
+  align-items: center;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #cddff4;
+
+  border-radius:
+    14px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #fbfdff 0%,
+      #f3f8ff 100%
+    );
+
+  box-shadow:
+    0
+    3px
+    12px
+    rgba(
+      15,
+      23,
+      42,
+      0.025
+    );
 }
+
+
+/* =========================================================
+   SUMMARY SECTIONS
+========================================================= */
 
 .inventory-live-total-a,
 .inventory-live-total-b {
-  width: 100%;
-  padding-left: 15px;
+  min-width: 0;
+
   display: flex;
+
   align-items: center;
-  gap: 22px;
+
+  gap: 18px;
 }
+
 
 .inventory-live-total-b {
-  border-left: 1px solid #dbeafe;
+  padding-left:
+    34px;
 }
+
+
+/* =========================================================
+   SUMMARY DIVIDER
+========================================================= */
+
+.inventory-live-total-divider {
+  width: 1px;
+
+  height: 72px;
+
+  background:
+    #d7e3f1;
+}
+
+
+/* =========================================================
+   SUMMARY ICON
+========================================================= */
 
 .inventory-live-total-icon {
-  width: 78px;
-  height: 78px;
-  border-radius: 50%;
-  background: #eaf1ff;
-  color: #2563eb;
+  width: 66px;
+
+  height: 66px;
+
+  flex:
+    0
+    0
+    66px;
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
+
+  border:
+    1px solid
+    #dce7f7;
+
+  border-radius:
+    50%;
+
+  background:
+    #e8f0ff;
+
+  color:
+    #356bd5;
 }
 
+
+.inventory-live-total-icon svg {
+  width: 30px;
+
+  height: 30px;
+}
+
+
+/* =========================================================
+   SUMMARY INFO
+========================================================= */
+
 .inventory-live-total-info {
+  min-width: 0;
+
   display: flex;
+
   flex-direction: column;
 }
 
+
+/* =========================================================
+   SUMMARY LABEL
+========================================================= */
+
 .inventory-live-total-label {
-  font-size: 18px;
-  color: #475569;
+  color:
+    #4f6077;
+
+  font-size:
+    var(
+      --text-sm,
+      13px
+    );
+
+  line-height:
+    19px;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
 }
 
+
+/* =========================================================
+   SUMMARY NUMBER
+========================================================= */
+
 .inventory-live-total-number {
-  margin-top: 6px;
-  font-size: 34px;
-  font-weight: 800;
-  color: #2563eb;
+  margin-top:
+    2px;
+
+  color:
+    #2f67dc;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    31px;
+
+  line-height:
+    35px;
+
+  font-weight:
+    680;
+
+  letter-spacing:
+    -0.04em;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   SUMMARY DESCRIPTION
+========================================================= */
+
+.inventory-live-total-description {
+  margin-top:
+    2px;
+
+  color:
+    var(
+      --text-muted,
+      #7c899c
+    );
+
+  font-size:
+    var(
+      --text-xs,
+      12px
+    );
+
+  line-height:
+    17px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 1100px) {
+
+  .inventory-live-container {
+    padding:
+      22px;
+  }
+
+
+  .inventory-live-table-column {
+    grid-template-columns:
+      minmax(
+        210px,
+        1fr
+      )
+      minmax(
+        180px,
+        0.8fr
+      )
+      minmax(
+        230px,
+        1fr
+      );
+
+    gap:
+      18px;
+  }
+
+
+  .inventory-live-title {
+    padding:
+      19px
+      20px;
+  }
+
+
+  .inventory-live-total-b {
+    padding-left:
+      24px;
+  }
+
+}
+
+
+/* =========================================================
+   SMALL TABLET
+========================================================= */
+
+@media (max-width: 850px) {
+
+  .inventory-live-title {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+
+    gap:
+      15px;
+  }
+
+
+  .inventory-live-status {
+    width:
+      100%;
+
+    min-width:
+      0;
+  }
+
+
+  .inventory-live-table-column {
+    grid-template-columns:
+      1fr
+      0.7fr
+      1fr;
+
+    gap:
+      12px;
+  }
+
+
+  .inventory-live-progress-track {
+    min-width:
+      90px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE / PDA
+========================================================= */
+
+@media (max-width: 700px) {
+
+  /* =====================================================
+     PAGE
+  ===================================================== */
+
+  .inventory-live-container {
+    min-height:
+      calc(
+        100dvh - 52px
+      );
+
+    padding:
+      12px;
+
+    gap:
+      12px;
+  }
+
+
+  /* =====================================================
+     HEADER
+  ===================================================== */
+
+  .inventory-live-title {
+    min-height:
+      0;
+
+    padding:
+      15px;
+
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+
+    gap:
+      14px;
+
+    border-radius:
+      12px;
+  }
+
+
+  .inventory-live-title-container {
+    align-items:
+      flex-start;
+
+    gap:
+      12px;
+  }
+
+
+  .inventory-live-title-logo {
+    width:
+      48px;
+
+    height:
+      48px;
+
+    flex:
+      0
+      0
+      48px;
+
+    border-radius:
+      11px;
+  }
+
+
+  .inventory-live-title-logo svg {
+    width:
+      24px;
+
+    height:
+      24px;
+  }
+
+
+  .inventory-live-eyebrow {
+    font-size:
+      10px;
+
+    line-height:
+      14px;
+  }
+
+
+  .inventory-live-main-title {
+    font-size:
+      20px;
+
+    line-height:
+      24px;
+
+    font-weight:
+      680;
+
+    letter-spacing:
+      -0.03em;
+  }
+
+
+  .inventory-live-subtitle {
+    margin-top:
+      3px;
+
+    font-size:
+      12px;
+
+    line-height:
+      17px;
+  }
+
+
+  /* =====================================================
+     LIVE STATUS
+  ===================================================== */
+
+  .inventory-live-status {
+    width:
+      100%;
+
+    min-width:
+      0;
+
+    padding:
+      10px
+      12px;
+  }
+
+
+  /* =====================================================
+     TABLE
+  ===================================================== */
+
+  .inventory-live-table-container {
+    border-radius:
+      12px;
+  }
+
+
+  /* =====================================================
+     SECTION HEADER
+  ===================================================== */
+
+  .inventory-live-section-title {
+    min-height:
+      72px;
+
+    padding:
+      14px;
+  }
+
+
+  .inventory-live-section-title-main {
+    align-items:
+      flex-start;
+  }
+
+
+  .inventory-live-section-heading {
+    font-size:
+      17px;
+
+    line-height:
+      22px;
+  }
+
+
+  .inventory-live-section-subtitle {
+    font-size:
+      12px;
+
+    line-height:
+      17px;
+  }
+
+
+  /* =====================================================
+     HIDE DESKTOP HEADER
+  ===================================================== */
+
+  .inventory-live-table-header {
+    display:
+      none;
+  }
+
+
+  /* =====================================================
+     MOBILE USER ROW
+  ===================================================== */
+
+  .inventory-live-table-row {
+    min-height:
+      0;
+
+    padding:
+      14px;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      1fr
+      auto;
+
+    gap:
+      10px
+      14px;
+  }
+
+
+  .inventory-live-user {
+    grid-column:
+      1 / -1;
+  }
+
+
+  .inventory-live-count-value {
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    font-size:
+      14px;
+  }
+
+
+  /* =====================================================
+     MOBILE PROGRESS
+  ===================================================== */
+
+  .inventory-live-progress-cell {
+    width:
+      min(
+        180px,
+        48vw
+      );
+
+    gap:
+      9px;
+  }
+
+
+  .inventory-live-progress-track {
+    min-width:
+      0;
+
+    height:
+      7px;
+  }
+
+
+  .inventory-live-percent-value {
+    min-width:
+      42px;
+  }
+
+
+  /* =====================================================
+     TOTAL ROW
+  ===================================================== */
+
+  .inventory-live-table-total-row {
+    min-height:
+      58px;
+
+    padding:
+      14px;
+
+    grid-template-columns:
+      1fr
+      auto;
+
+    gap:
+      12px;
+  }
+
+
+  .inventory-live-total-progress {
+    display:
+      none;
+  }
+
+
+  /* =====================================================
+     EMPTY
+  ===================================================== */
+
+  .inventory-live-empty {
+    min-height:
+      190px;
+
+    padding:
+      28px
+      18px;
+  }
+
+
+  /* =====================================================
+     SUMMARY
+  ===================================================== */
+
+  .inventory-live-total {
+    min-height:
+      0;
+
+    padding:
+      17px;
+
+    grid-template-columns:
+      1fr;
+
+    gap:
+      17px;
+
+    border-radius:
+      12px;
+  }
+
+
+  .inventory-live-total-divider {
+    width:
+      100%;
+
+    height:
+      1px;
+  }
+
+
+  .inventory-live-total-b {
+    padding-left:
+      0;
+  }
+
+
+  .inventory-live-total-a,
+  .inventory-live-total-b {
+    gap:
+      14px;
+  }
+
+
+  .inventory-live-total-icon {
+    width:
+      55px;
+
+    height:
+      55px;
+
+    flex:
+      0
+      0
+      55px;
+  }
+
+
+  .inventory-live-total-icon svg {
+    width:
+      26px;
+
+    height:
+      26px;
+  }
+
+
+  .inventory-live-total-number {
+    font-size:
+      27px;
+
+    line-height:
+      31px;
+  }
+
+
+  .inventory-live-total-label {
+    font-size:
+      13px;
+  }
+
+
+  .inventory-live-total-description {
+    font-size:
+      11px;
+  }
+
+}
+
+
+/* =========================================================
+   VERY SMALL PDA
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .inventory-live-container {
+    padding:
+      9px;
+  }
+
+
+  .inventory-live-title {
+    padding:
+      13px;
+  }
+
+
+  .inventory-live-main-title {
+    font-size:
+      18px;
+
+    line-height:
+      22px;
+  }
+
+
+  .inventory-live-title-logo {
+    width:
+      44px;
+
+    height:
+      44px;
+
+    flex:
+      0
+      0
+      44px;
+  }
+
+
+  .inventory-live-table-row {
+    padding:
+      13px
+      12px;
+  }
+
+
+  .inventory-live-progress-cell {
+    width:
+      150px;
+  }
+
+
+  .inventory-live-user-avatar {
+    width:
+      32px;
+
+    height:
+      32px;
+
+    flex:
+      0
+      0
+      32px;
+  }
+
+
+  .inventory-live-total {
+    padding:
+      14px;
+  }
+
 }

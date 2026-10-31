@@ -1,4 +1,4 @@
-// services/admCloudDispatchService.js
+// integrations/admcloud/admcloud.conduce.js
 
 import admcloudClient from "./admcloudClient.js";
 
@@ -907,4 +907,669 @@ export async function sendAdmCloudDispatchService(
                 admCloudResult,
         },
     };
+}
+
+
+
+
+
+
+
+
+// =====================================================
+// 🔍 OBTENER CONDUCE DESDE ADM CLOUD
+// =====================================================
+
+export async function getAdmCloudDispatchService({
+    id,
+    docId,
+    reference
+} = {}) {
+
+    console.log(
+        "======================================"
+    );
+    console.log(
+        "🔍 BUSCANDO CONDUCE EN ADM CLOUD"
+    );
+    console.log(
+        "======================================"
+    );
+
+    // ===============================================
+    // 1. NORMALIZAR PARÁMETROS
+    // ===============================================
+
+    const dispatchId = String(id ?? "").trim();
+    const dispatchDocId = String(docId ?? "").trim();
+    const dispatchReference = String(reference ?? "").trim();
+
+    const providedCount = [
+        dispatchId,
+        dispatchDocId,
+        dispatchReference
+    ].filter(Boolean).length;
+
+    if (providedCount !== 1) {
+        throw createServiceError(
+            400,
+            "Parámetros inválidos",
+            "Debe proporcionar exactamente uno de estos valores: id, docId o reference.",
+            "INVALID_DISPATCH_SEARCH"
+        );
+    }
+
+    // ===============================================
+    // 2. VALIDAR GUID
+    // ===============================================
+
+    if (
+        dispatchId &&
+        !GUID_REGEX.test(dispatchId)
+    ) {
+        throw createServiceError(
+            422,
+            "Identificador inválido",
+            "El identificador del conduce no contiene un GUID válido.",
+            "INVALID_DISPATCH_GUID"
+        );
+    }
+
+    // ===============================================
+    // 3. PREPARAR CONSULTA
+    // ===============================================
+
+    const EMPTY_GUID =
+        "00000000-0000-0000-0000-000000000000";
+
+    /*
+     * IMPORTANTE:
+     *
+     * Buscar por GUID está documentado.
+     *
+     * Para DocID y Reference utilizamos temporalmente
+     * EMPTY_GUID en la ruta porque OpenAPI exige ID.
+     *
+     * Este comportamiento debe validarse contra ADM Cloud.
+     */
+
+    const pathId = dispatchId || EMPTY_GUID;
+
+    const params = {};
+
+    if (dispatchDocId) {
+        params.DocID = dispatchDocId;
+    }
+
+    if (dispatchReference) {
+        params.Reference = dispatchReference;
+    }
+
+    console.log("📦 Búsqueda:", {
+        id: dispatchId || null,
+        docId: dispatchDocId || null,
+        reference: dispatchReference || null
+    });
+
+    // ===============================================
+    // 4. CONSULTAR ADM CLOUD
+    // ===============================================
+
+    let response;
+
+    try {
+
+        response = await admcloudClient.get(
+            `/Dispatchs/${encodeURIComponent(pathId)}`,
+            { params }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ ERROR CONSULTANDO CONDUCE:",
+            error.response?.data || error.message
+        );
+
+        throw createServiceError(
+            error.response?.status === 404 ? 404 : 502,
+            "Error consultando conduce",
+            error.response?.data?.message ||
+                "No se pudo consultar el conduce en ADM Cloud.",
+            "ADMCLOUD_DISPATCH_GET_FAILED",
+            {
+                admCloudStatus:
+                    error.response?.status || null,
+
+                admCloudData:
+                    error.response?.data || null
+            }
+        );
+    }
+
+    // ===============================================
+    // 5. VALIDAR RESPUESTA
+    // ===============================================
+
+    const admCloudResult = response.data;
+
+    if (admCloudResult?.success !== true) {
+
+        throw createServiceError(
+            404,
+            "Conduce no encontrado",
+            admCloudResult?.message ||
+                "ADM Cloud no encontró el conduce solicitado.",
+            "DISPATCH_NOT_FOUND"
+        );
+    }
+
+    const dispatch = admCloudResult.data;
+
+    if (!dispatch) {
+
+        throw createServiceError(
+            404,
+            "Conduce sin información",
+            "ADM Cloud respondió correctamente, pero no devolvió los datos del conduce.",
+            "EMPTY_DISPATCH_DATA"
+        );
+    }
+
+    // ===============================================
+    // 6. VERIFICAR BÚSQUEDAS ALTERNATIVAS
+    // ===============================================
+
+    if (dispatchDocId || dispatchReference) {
+
+        const returnedValue = dispatchDocId
+            ? dispatch.DocID ?? dispatch.DocId
+            : dispatch.Reference ?? dispatch.reference;
+
+        const expectedValue =
+            dispatchDocId || dispatchReference;
+
+        if (
+            !returnedValue ||
+            String(returnedValue).trim().toLowerCase() !==
+            expectedValue.toLowerCase()
+        ) {
+            throw createServiceError(
+                502,
+                "Conduce no verificado",
+                "ADM Cloud no devolvió un documento que coincida con el número o referencia solicitados.",
+                "DISPATCH_LOOKUP_MISMATCH"
+            );
+        }
+    }
+
+    // ===============================================
+    // 7. DEVOLVER CONDUCE
+    // ===============================================
+
+    console.log(
+        "✅ CONDUCE ENCONTRADO:",
+        {
+            id: dispatch.ID,
+            docId: dispatch.DocID,
+            reference: dispatch.Reference,
+            itemsCount:
+                dispatch.Items?.length ?? 0
+        }
+    );
+
+    return {
+        success: true,
+        title: "Conduce encontrado",
+        message:
+            "El conduce fue obtenido correctamente desde ADM Cloud.",
+
+        data: dispatch
+    };
+}
+
+
+
+
+
+// =====================================================
+// 🌐 CONTROLLER - GET ADM CLOUD DISPATCH
+// =====================================================
+
+export async function getAdmCloudDispatchController(
+    req,
+    res
+) {
+    try {
+        const {
+            id,
+            docId,
+            reference
+        } = req.query;
+
+        console.log("🔍 BUSCANDO CONDUCE:", {
+            id,
+            docId,
+            reference
+        });
+
+        const result =
+            await getAdmCloudDispatchService({
+                id,
+                docId,
+                reference
+            });
+
+        return res.status(200).json(result);
+
+    } catch (error) {
+
+        console.error(
+            "❌ ERROR GET ADM CLOUD DISPATCH:",
+            error.message
+        );
+
+        return res.status(
+            error.statusCode || 500
+        ).json({
+            success: false,
+            title:
+                error.title ||
+                "Error consultando conduce",
+            message:
+                error.message ||
+                "Ocurrió un error inesperado.",
+            code:
+                error.code ||
+                "INTERNAL_ERROR"
+        });
+    }
+}
+
+
+
+
+
+
+
+/**
+ * Sincroniza un conduce de ADM Cloud con PostgreSQL.
+ *
+ * - Busca el conduce completo por GUID.
+ * - Inserta o actualiza el encabezado.
+ * - Inserta o actualiza todas sus líneas.
+ * - Utiliza una transacción independiente.
+ *
+ * IMPORTANTE:
+ * Recibe el pool de PostgreSQL (db), no el client
+ * utilizado por closePicking.
+ */
+export async function syncAdmCloudDispatchService({
+    db,
+    pickingId,
+    saleId,
+    dispatchGuid
+}) {
+    console.log("========================================");
+    console.log("🔄 SINCRONIZANDO CONDUCE ADM CLOUD");
+    console.log("📦 Picking:", pickingId);
+    console.log("🛒 Sale ID:", saleId);
+    console.log("🚚 Conduce:", dispatchGuid);
+    console.log("========================================");
+
+    const normalizedPickingId = Number(pickingId);
+    const normalizedGuid = String(dispatchGuid ?? "")
+        .trim()
+        .toLowerCase();
+
+    if (
+        !Number.isSafeInteger(normalizedPickingId) ||
+        normalizedPickingId <= 0 ||
+        !GUID_REGEX.test(normalizedGuid)
+    ) {
+        throw new Error(
+            "Identificadores inválidos para sincronizar el conduce."
+        );
+    }
+
+    // =====================================================
+    // 1. CONSULTAR CONDUCE COMPLETO EN ADM CLOUD
+    // =====================================================
+
+    const result = await getAdmCloudDispatchService({
+        id: normalizedGuid
+    });
+
+    if (!result?.success || !result.data) {
+        throw new Error(
+            "No se pudo obtener el conduce desde ADM Cloud."
+        );
+    }
+
+    const dispatch = result.data;
+
+    if (
+        String(dispatch.ID ?? "").toLowerCase() !==
+        normalizedGuid
+    ) {
+        throw new Error(
+            "El GUID del conduce obtenido no coincide con el solicitado."
+        );
+    }
+
+    if (!Array.isArray(dispatch.Items)) {
+        throw new Error(
+            "ADM Cloud no devolvió un arreglo Items válido."
+        );
+    }
+
+    const items = dispatch.Items;
+
+    // Validamos antes de modificar PostgreSQL.
+    const lineIds = new Set();
+
+    for (const item of items) {
+        const lineId = String(item.ID ?? "").toLowerCase();
+        const transId = String(item.TransID ?? "").toLowerCase();
+
+        if (!GUID_REGEX.test(lineId)) {
+            throw new Error(
+                "ADM Cloud devolvió una línea sin ID válido."
+            );
+        }
+
+        if (transId !== normalizedGuid) {
+            throw new Error(
+                `La línea ${lineId} pertenece a otro conduce.`
+            );
+        }
+
+        if (lineIds.has(lineId)) {
+            throw new Error(
+                `La línea ${lineId} aparece duplicada.`
+            );
+        }
+
+        lineIds.add(lineId);
+    }
+
+    console.log("✅ Conduce obtenido:", {
+        docId: dispatch.DocID,
+        items: items.length
+    });
+
+    const toDate = (value) =>
+        value ? String(value).slice(0, 10) : null;
+
+    // =====================================================
+    // 2. ABRIR UNA NUEVA CONEXIÓN
+    // =====================================================
+
+    const client = await db.connect();
+    let transactionStarted = false;
+
+    try {
+        await client.query("BEGIN");
+        transactionStarted = true;
+
+        // =================================================
+        // 3. INSERTAR O ACTUALIZAR ENCABEZADO
+        // =================================================
+
+        const headerResult = await client.query(
+            `
+            INSERT INTO public.admcloud_dispatches (
+                picking_id,
+                sale_id,
+                erp_conduce_id,
+                erp_doc_id,
+                erp_reference,
+                erp_relationship_id,
+                erp_relationship_name,
+                erp_location_id,
+                erp_ship_to_address_id,
+                erp_ship_to_address1,
+                erp_ship_to_address2,
+                erp_billing_status_desc,
+                erp_status,
+                erp_creation_date,
+                erp_calculated_total_cost,
+                erp_doc_type,
+                erp_doc_date
+            )
+            VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, $8, $9, $10, $11, $12,
+                $13, $14, $15, $16, $17
+            )
+            ON CONFLICT (erp_conduce_id)
+            DO UPDATE SET
+                erp_doc_id = EXCLUDED.erp_doc_id,
+                erp_reference = EXCLUDED.erp_reference,
+                erp_relationship_id = EXCLUDED.erp_relationship_id,
+                erp_relationship_name = EXCLUDED.erp_relationship_name,
+                erp_location_id = EXCLUDED.erp_location_id,
+                erp_ship_to_address_id = EXCLUDED.erp_ship_to_address_id,
+                erp_ship_to_address1 = EXCLUDED.erp_ship_to_address1,
+                erp_ship_to_address2 = EXCLUDED.erp_ship_to_address2,
+                erp_billing_status_desc = EXCLUDED.erp_billing_status_desc,
+                erp_status = EXCLUDED.erp_status,
+                erp_creation_date = EXCLUDED.erp_creation_date,
+                erp_calculated_total_cost =
+                    EXCLUDED.erp_calculated_total_cost,
+                erp_doc_type = EXCLUDED.erp_doc_type,
+                erp_doc_date = EXCLUDED.erp_doc_date,
+                updated_at = NOW()
+
+            -- No permitir que un conduce cambie de picking.
+            WHERE
+                admcloud_dispatches.picking_id =
+                    EXCLUDED.picking_id
+                AND admcloud_dispatches.sale_id
+                    IS NOT DISTINCT FROM EXCLUDED.sale_id
+
+            RETURNING id
+            `,
+            [
+                normalizedPickingId,
+                saleId,
+                dispatch.ID,
+                dispatch.DocID,
+                dispatch.Reference,
+                dispatch.RelationshipID,
+                dispatch.RelationshipName,
+                dispatch.LocationID,
+                dispatch.ShipToAddressID,
+                dispatch.ShipToAddress1,
+                dispatch.ShipToAddress2,
+                dispatch.BillingStatusDesc,
+                dispatch.Status,
+                dispatch.CreationDate,
+                dispatch.CalculatedTotalCost,
+                dispatch.DocType,
+                toDate(dispatch.DocDate)
+            ]
+        );
+
+        if (headerResult.rowCount !== 1) {
+            throw new Error(
+                "El conduce ya está asociado a otro picking u orden de venta."
+            );
+        }
+
+        const admcloudDispatchId = headerResult.rows[0].id;
+
+        console.log(
+            "✅ Encabezado sincronizado:",
+            admcloudDispatchId
+        );
+
+        // =================================================
+        // 4. INSERTAR O ACTUALIZAR CADA LÍNEA
+        // =================================================
+
+        let syncedLines = 0;
+
+        for (const item of items) {
+            await client.query(
+                `
+                INSERT INTO public.admcloud_dispatch_lines (
+                    admcloud_dispatch_id,
+                    erp_line_id,
+                    erp_trans_id,
+                    erp_row_order,
+                    erp_item_id,
+                    erp_name,
+                    erp_item_sku,
+                    erp_quantity,
+                    erp_completed_quantity,
+                    erp_pending_completed_quantity,
+                    erp_uom_name,
+                    erp_uom_factor,
+                    erp_uom_id,
+                    erp_source_transaction_id,
+                    erp_source_row_id,
+                    erp_source_transaction_type,
+                    erp_source_transaction_type_name,
+                    erp_source_transaction_doc_date,
+                    erp_source_transaction_doc_date_string,
+                    erp_source_transaction_reference,
+                    erp_source_transaction_relationship_id,
+                    erp_source_transaction_relationship_name
+                )
+                VALUES (
+                    $1, $2, $3, $4, $5, $6,
+                    $7, $8, $9, $10, $11, $12,
+                    $13, $14, $15, $16, $17, $18,
+                    $19, $20, $21, $22
+                )
+                ON CONFLICT (erp_line_id)
+                DO UPDATE SET
+                    erp_trans_id = EXCLUDED.erp_trans_id,
+                    erp_row_order = EXCLUDED.erp_row_order,
+                    erp_item_id = EXCLUDED.erp_item_id,
+                    erp_name = EXCLUDED.erp_name,
+                    erp_item_sku = EXCLUDED.erp_item_sku,
+                    erp_quantity = EXCLUDED.erp_quantity,
+                    erp_completed_quantity =
+                        EXCLUDED.erp_completed_quantity,
+                    erp_pending_completed_quantity =
+                        EXCLUDED.erp_pending_completed_quantity,
+                    erp_uom_name = EXCLUDED.erp_uom_name,
+                    erp_uom_factor = EXCLUDED.erp_uom_factor,
+                    erp_uom_id = EXCLUDED.erp_uom_id,
+                    erp_source_transaction_id =
+                        EXCLUDED.erp_source_transaction_id,
+                    erp_source_row_id =
+                        EXCLUDED.erp_source_row_id,
+                    erp_source_transaction_type =
+                        EXCLUDED.erp_source_transaction_type,
+                    erp_source_transaction_type_name =
+                        EXCLUDED.erp_source_transaction_type_name,
+                    erp_source_transaction_doc_date =
+                        EXCLUDED.erp_source_transaction_doc_date,
+                    erp_source_transaction_doc_date_string =
+                        EXCLUDED.erp_source_transaction_doc_date_string,
+                    erp_source_transaction_reference =
+                        EXCLUDED.erp_source_transaction_reference,
+                    erp_source_transaction_relationship_id =
+                        EXCLUDED.erp_source_transaction_relationship_id,
+                    erp_source_transaction_relationship_name =
+                        EXCLUDED.erp_source_transaction_relationship_name,
+                    updated_at = NOW()
+
+                -- Evitar reasignar una línea a otro encabezado.
+                WHERE
+                    admcloud_dispatch_lines.admcloud_dispatch_id =
+                        EXCLUDED.admcloud_dispatch_id
+
+                RETURNING id
+                `,
+                [
+                    admcloudDispatchId,
+                    item.ID,
+                    item.TransID,
+                    item.RowOrder,
+                    item.ItemID,
+                    item.Name,
+                    item.ItemSKU,
+                    item.Quantity,
+                    item.CompletedQuantity,
+                    item.PendingCompletedQuantity,
+                    item.UOMName,
+                    item.UOMFactor,
+                    item.UOMID,
+                    item.SourceTransactionID,
+                    item.SourceRowID,
+                    item.SourceTransactionType,
+                    item.SourceTransactionTypeName,
+                    toDate(item.SourceTransactionDocDate),
+                    item.SourceTransactionDocDateString,
+                    item.SourceTransactionReference,
+                    item.SourceTransactionRelationshipID,
+                    item.SourceTransactionRelationshipName
+                ]
+            ).then((lineResult) => {
+                if (lineResult.rowCount !== 1) {
+                    throw new Error(
+                        `La línea ${item.ID} está asociada a otro conduce.`
+                    );
+                }
+            });
+
+            syncedLines++;
+        }
+
+        // =================================================
+        // 5. CONFIRMAR SINCRONIZACIÓN
+        // =================================================
+
+        await client.query("COMMIT");
+        transactionStarted = false;
+
+        console.log("========================================");
+        console.log("✅ CONDUCE SINCRONIZADO CORRECTAMENTE");
+        console.log("📄 Documento:", dispatch.DocID);
+        console.log("📦 Picking:", normalizedPickingId);
+        console.log("📋 Líneas sincronizadas:", syncedLines);
+        console.log("========================================");
+
+        return {
+            success: true,
+            title: "Conduce sincronizado",
+            message:
+                "El encabezado y sus líneas fueron sincronizados correctamente.",
+            data: {
+                pickingId: normalizedPickingId,
+                saleId,
+                dispatchGuid: normalizedGuid,
+                admcloudDispatchId,
+                docId: dispatch.DocID,
+                syncedLines
+            }
+        };
+
+    } catch (error) {
+        if (transactionStarted) {
+            try {
+                await client.query("ROLLBACK");
+                console.log("🔄 ROLLBACK sincronización ADM Cloud");
+            } catch (rollbackError) {
+                console.error(
+                    "❌ Error en ROLLBACK:",
+                    rollbackError.message
+                );
+            }
+        }
+
+        console.error(
+            "❌ ERROR SINCRONIZANDO CONDUCE:",
+            error.message
+        );
+
+        throw error;
+
+    } finally {
+        client.release();
+    }
 }

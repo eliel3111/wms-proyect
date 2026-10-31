@@ -2287,6 +2287,1047 @@ export async function CloseReception(req, res) {
 
 
 
+// ============================================================
+// CANCELAR RECEPCIÓN DE UNA PURCHASE ORDER EN SIDIAL
+//
+// BODY:
+// {
+//   purchaseOrderId: 10817, // o purchaseOrderNumber: "OC-000631"
+//   receiptId: 47
+// }
+//
+// IMPORTANTE:
+// La anulación en ADM Cloud debe confirmarse por separado.
+// Si existe una recepción ADM vinculada, bloqueamos la
+// cancelación local hasta implementar esa integración.
+// ============================================================
+
+export async function CancelPurchaseOrderReception(req, res) {
+
+  let client;
+  let transactionStarted = false;
+
+  const fail = (httpStatus, code, title, message) => {
+    const error = new Error(message);
+    error.httpStatus = httpStatus;
+    error.code = code;
+    error.title = title;
+    throw error;
+  };
+
+  try {
+
+    // ========================================================
+    // 1. RECIBIR Y VALIDAR PARÁMETROS
+    // ========================================================
+
+    const {
+      purchaseOrderId,
+      purchaseOrderNumber,
+      receiptId
+    } = req.body;
+
+    // =========================================
+    // USUARIO QUE CANCELA LA RECEPCIÓN
+    // =========================================
+
+    const userId = Number(req.user?.id);
+
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+      fail(
+        401,
+        "USER_NOT_AUTHENTICATED",
+        "Usuario no identificado",
+        "No se pudo identificar al usuario que está cancelando la recepción."
+      );
+    }
+
+    console.log("👤 USER ID CANCELANDO RECEPCIÓN:", userId);
+
+    const poInput =
+      purchaseOrderId ?? purchaseOrderNumber;
+
+    const normalizedReceiptId = Number(receiptId);
+
+    const poText = String(poInput ?? "").trim();
+
+    const isNumericPo = /^\d+$/.test(poText);
+
+    if (!poText) {
+      fail(
+        400,
+        "PURCHASE_ORDER_REQUIRED",
+        "Orden de compra requerida",
+        "Debe proporcionar el ID o número de la orden de compra."
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(normalizedReceiptId) ||
+      normalizedReceiptId <= 0
+    ) {
+      fail(
+        400,
+        "RECEIPT_ID_REQUIRED",
+        "Recepción inválida",
+        "Debe proporcionar un receiptId válido."
+      );
+    }
+
+    if (
+      isNumericPo &&
+      (!Number.isSafeInteger(Number(poText)) ||
+        Number(poText) <= 0)
+    ) {
+      fail(
+        400,
+        "INVALID_PURCHASE_ORDER_ID",
+        "Orden de compra inválida",
+        "El ID de la orden de compra no es válido."
+      );
+    }
+
+    console.log("========================================");
+    console.log("🗑️ CANCEL PURCHASE ORDER RECEPTION");
+    console.log("📋 PO:", poText);
+    console.log("🧾 RECEIPT:", normalizedReceiptId);
+    console.log("========================================");
+
+    client = await db.connect();
+
+    await client.query("BEGIN");
+    transactionStarted = true;
+
+    // ========================================================
+    // 2. BUSCAR Y BLOQUEAR PURCHASE ORDER
+    // ========================================================
+
+    const poResult = isNumericPo
+      ? await client.query(
+        `
+          SELECT
+            id,
+            purchase_order_number,
+            status
+          FROM purchase_orders
+          WHERE id = $1
+          FOR UPDATE
+          `,
+        [Number(poText)]
+      )
+      : await client.query(
+        `
+          SELECT
+            id,
+            purchase_order_number,
+            status
+          FROM purchase_orders
+          WHERE purchase_order_number = $1
+          FOR UPDATE
+          `,
+        [poText]
+      );
+
+    if (poResult.rowCount === 0) {
+      fail(
+        404,
+        "PURCHASE_ORDER_NOT_FOUND",
+        "Orden de compra no encontrada",
+        `No existe una orden de compra identificada como ${poText}.`
+      );
+    }
+
+    const purchaseOrder = poResult.rows[0];
+    const normalizedPurchaseOrderId = Number(purchaseOrder.id);
+
+    // ========================================================
+    // 3. VALIDAR RELACIÓN RECEIPT ↔ PO
+    // ========================================================
+
+    const relationResult = await client.query(
+      `
+      SELECT
+        receipt_id,
+        purchase_order_id
+      FROM receipt_purchase_orders
+      WHERE
+        purchase_order_id = $1
+        AND receipt_id = $2
+      FOR UPDATE
+      `,
+      [
+        normalizedPurchaseOrderId,
+        normalizedReceiptId
+      ]
+    );
+
+    if (relationResult.rowCount === 0) {
+      fail(
+        404,
+        "RECEIPT_PURCHASE_ORDER_RELATION_NOT_FOUND",
+        "Recepción no relacionada",
+        `La recepción ${normalizedReceiptId} no está vinculada a la orden ${purchaseOrder.purchase_order_number}.`
+      );
+    }
+
+    // ========================================================
+    // 4. BUSCAR Y BLOQUEAR RECEIPT
+    // ========================================================
+
+    const receiptResult = await client.query(
+      `
+      SELECT
+        id,
+        receipt_code,
+        status,
+        finished_at
+      FROM receipts
+      WHERE id = $1
+      FOR UPDATE
+      `,
+      [normalizedReceiptId]
+    );
+
+    if (receiptResult.rowCount === 0) {
+      fail(
+        404,
+        "RECEIPT_NOT_FOUND",
+        "Recepción no encontrada",
+        `No existe la recepción con ID ${normalizedReceiptId}.`
+      );
+    }
+
+    const receipt = receiptResult.rows[0];
+
+    if (
+      String(receipt.status).toLowerCase() !== "completed"
+    ) {
+      fail(
+        409,
+        "RECEIPT_NOT_COMPLETED",
+        "Recepción no disponible",
+        `La recepción ${receipt.receipt_code} tiene estado ${receipt.status}. Solo se pueden cancelar recepciones completadas.`
+      );
+    }
+
+    // ========================================================
+    // 5. SEGURIDAD DE INTEGRACIÓN ADM CLOUD
+    //
+    // TODO: Reemplazar esta protección cuando exista el
+    // servicio que anule y confirme la recepción en ADM.
+    //
+    // IMPORTANTE:
+    // Una misma recepción ADM puede incluir varias POs.
+    // NO cancelar el documento ADM completo al eliminar
+    // solamente una PO sin validar las demás.
+    // ========================================================
+
+    /* const admResult = await client.query(
+       `
+       SELECT
+         adm_reception_id
+       FROM adm_receptions
+       WHERE created_from_receipt_id = $1
+       LIMIT 1
+       `,
+       [normalizedReceiptId]
+     );
+ 
+     if (admResult.rowCount > 0) {
+       fail(
+         409,
+         "ADM_RECEPTION_CANCELLATION_REQUIRED",
+         "Recepción registrada en ADM Cloud",
+         "Esta recepción tiene un documento relacionado en ADM Cloud. Primero debe implementarse y confirmarse su anulación en ADM Cloud para evitar diferencias entre ambos sistemas."
+       );
+     }*/
+
+    // ========================================================
+    // 6. BUSCAR TODAS LAS PO LINES Y BLOQUEARLAS
+    // ========================================================
+
+    const poLinesResult = await client.query(
+      `
+      SELECT
+        id,
+        sku,
+        ordered_qty,
+        received_qty
+      FROM purchase_order_lines
+      WHERE purchase_order_id = $1
+      ORDER BY id ASC
+      FOR UPDATE
+      `,
+      [normalizedPurchaseOrderId]
+    );
+
+    if (poLinesResult.rowCount === 0) {
+      fail(
+        404,
+        "PURCHASE_ORDER_LINES_NOT_FOUND",
+        "Orden sin productos",
+        "La orden de compra no tiene líneas registradas."
+      );
+    }
+
+    // ========================================================
+    // 7. BUSCAR SOLO RECEIPT_LINES DE ESTA PO
+    //
+    // El vínculo correcto es:
+    // receipt_lines.purchase_order_line_id
+    //                  ↓
+    // purchase_order_lines.id
+    //
+    // Nunca filtramos solamente por SKU, porque podría
+    // estar repetido en diferentes órdenes.
+    // ========================================================
+
+    const receiptLinesResult = await client.query(
+      `
+      SELECT
+        rl.id AS receipt_line_id,
+        rl.receipt_id,
+        rl.purchase_order_line_id,
+        rl.sku,
+        rl.received_qty,
+        pol.purchase_order_id,
+        pol.sku AS po_sku
+
+      FROM receipt_lines rl
+
+      INNER JOIN purchase_order_lines pol
+        ON pol.id = rl.purchase_order_line_id
+
+      WHERE
+        rl.receipt_id = $1
+        AND pol.purchase_order_id = $2
+
+      ORDER BY rl.id ASC
+
+      FOR UPDATE OF rl
+      `,
+      [
+        normalizedReceiptId,
+        normalizedPurchaseOrderId
+      ]
+    );
+
+    if (receiptLinesResult.rowCount === 0) {
+      fail(
+        404,
+        "RECEIPT_LINES_NOT_FOUND",
+        "Líneas de recepción no encontradas",
+        `La recepción ${normalizedReceiptId} no contiene líneas de la orden ${purchaseOrder.purchase_order_number}.`
+      );
+    }
+
+    const receiptLines = receiptLinesResult.rows;
+
+    console.log("📦 RECEIPT LINES DE ESTA PO:");
+    console.table(receiptLines);
+
+    // ========================================================
+    // 8. AGRUPAR CANTIDADES A DEVOLVER POR SKU
+    //
+    // Si el mismo SKU aparece dos veces:
+    //
+    // SKU-A = 4
+    // SKU-A = 6
+    //
+    // Solo retiramos un total de 10 del inventario.
+    // ========================================================
+
+    const requiredBySku = new Map();
+
+    for (const line of receiptLines) {
+
+      const sku = String(line.sku ?? "").trim();
+      const poSku = String(line.po_sku ?? "").trim();
+      const qty = Number(line.received_qty);
+
+      if (!sku || sku !== poSku) {
+        fail(
+          409,
+          "RECEIPT_LINE_SKU_MISMATCH",
+          "Producto inconsistente",
+          `La línea de recepción ${line.receipt_line_id} no coincide con el SKU de su orden de compra.`
+        );
+      }
+
+      if (!Number.isFinite(qty) || qty < 0) {
+        fail(
+          409,
+          "INVALID_RECEIVED_QUANTITY",
+          "Cantidad recibida inválida",
+          `La línea ${line.receipt_line_id} tiene una cantidad recibida inválida.`
+        );
+      }
+
+      if (qty === 0) {
+        continue;
+      }
+
+      requiredBySku.set(
+        sku,
+        (requiredBySku.get(sku) ?? 0) + qty
+      );
+    }
+
+    const skus = [...requiredBySku.keys()];
+
+    // ========================================================
+    // 9. BUSCAR Y BLOQUEAR INVENTARIO
+    //
+    // Prioridad:
+    //
+    // 1. RECEIVING
+    // 2. STORAGE
+    //
+    // Dentro de cada tipo:
+    // qty_on_hand DESC
+    //
+    // IMPORTANTE:
+    // FOR UPDATE OF ibl bloquea las filas de inventario.
+    // ========================================================
+
+    let inventoryRows = [];
+
+    if (skus.length > 0) {
+
+      const inventoryResult = await client.query(
+        `
+        SELECT
+          ibl.id,
+          ibl.warehouse_id,
+          ibl.location_id,
+          l.code AS location_code,
+          l.location_type,
+          ibl.product_sku,
+          ibl.qty_on_hand
+
+        FROM inventory_by_location ibl
+
+        INNER JOIN locations l
+          ON l.id = ibl.location_id
+          AND l.warehouse_id = ibl.warehouse_id
+
+        WHERE
+          ibl.product_sku = ANY($1::text[])
+          AND l.location_type IN (
+            'RECEIVING',
+            'STORAGE'
+          )
+
+        ORDER BY
+          ibl.product_sku ASC,
+
+          CASE l.location_type
+            WHEN 'RECEIVING' THEN 0
+            WHEN 'STORAGE' THEN 1
+          END ASC,
+
+          ibl.qty_on_hand DESC,
+          ibl.id ASC
+
+        FOR UPDATE OF ibl
+        `,
+        [skus]
+      );
+
+      inventoryRows = inventoryResult.rows;
+    }
+
+    // ========================================================
+    // 10. ORGANIZAR INVENTARIO POR SKU
+    // ========================================================
+
+    const locationsBySku = new Map();
+
+    for (const row of inventoryRows) {
+
+      const sku = String(row.product_sku);
+
+      if (!locationsBySku.has(sku)) {
+        locationsBySku.set(sku, []);
+      }
+
+      locationsBySku.get(sku).push(row);
+    }
+
+    // ========================================================
+    // 11. VALIDAR EXISTENCIA SUFICIENTE
+    //
+    // Primero verificamos TODOS los productos.
+    // Si falta uno, no se modifica ninguno.
+    // ========================================================
+
+    for (const [sku, requiredQty] of requiredBySku) {
+
+      const locations = locationsBySku.get(sku) ?? [];
+
+      const availableQty = locations.reduce(
+        (total, row) =>
+          total + Math.max(0, Number(row.qty_on_hand)),
+        0
+      );
+
+      if (availableQty + 0.00000001 < requiredQty) {
+        fail(
+          409,
+          "INSUFFICIENT_INVENTORY_TO_CANCEL",
+          "Inventario insuficiente",
+          `No se puede cancelar la recepción. El producto ${sku} necesita devolver ${requiredQty} unidades, pero solo existen ${availableQty} entre RECEIVING y STORAGE.`
+        );
+      }
+    }
+
+    console.log("✅ INVENTARIO SUFICIENTE PARA TODOS LOS SKU");
+
+    // ========================================================
+    // 12. DESCONTAR INVENTARIO
+    //
+    // Primero RECEIVING, luego STORAGE.
+    //
+    // Cada UPDATE exige qty_on_hand >= qty.
+    // Ninguna línea puede quedar negativa.
+    // ========================================================
+
+    const inventoryDeductions = [];
+
+    for (const [sku, requiredQty] of requiredBySku) {
+
+      let remaining = requiredQty;
+
+      const locations = locationsBySku.get(sku) ?? [];
+
+      for (const location of locations) {
+
+        if (remaining <= 0.00000001) {
+          break;
+        }
+
+        const available = Number(location.qty_on_hand);
+
+        if (!Number.isFinite(available) || available <= 0) {
+          continue;
+        }
+
+        const qtyToRemove = Math.min(
+          available,
+          remaining
+        );
+
+        if (qtyToRemove <= 0) {
+          continue;
+        }
+
+        const updateResult = await client.query(
+          `
+          UPDATE inventory_by_location
+
+          SET
+            qty_on_hand = qty_on_hand - $1::numeric
+
+          WHERE
+            id = $2
+            AND qty_on_hand >= $1::numeric
+
+          RETURNING
+            id,
+            qty_on_hand
+          `,
+          [
+            qtyToRemove,
+            location.id
+          ]
+        );
+
+        if (updateResult.rowCount !== 1) {
+          fail(
+            409,
+            "INVENTORY_UPDATE_CONFLICT",
+            "Conflicto de inventario",
+            `No se pudo descontar ${qtyToRemove} del producto ${sku} en la ubicación ${location.location_code}.`
+          );
+        }
+
+        inventoryDeductions.push({
+          sku,
+          warehouse_id: Number(location.warehouse_id),
+          location_id: Number(location.location_id),
+          location_code: location.location_code,
+          location_type: location.location_type,
+          qty: qtyToRemove
+        });
+
+        remaining = Math.max(
+          0,
+          remaining - qtyToRemove
+        );
+      }
+
+      if (remaining > 0.00000001) {
+        fail(
+          409,
+          "INVENTORY_NOT_FULLY_DEDUCTED",
+          "Inventario insuficiente",
+          `No fue posible retirar todas las unidades del producto ${sku}. Faltaron ${remaining}.`
+        );
+      }
+    }
+
+    console.log("📉 INVENTARIO DESCONTADO:");
+    console.table(inventoryDeductions);
+
+  // ========================================================
+// 13. CREAR INVENTORY MOVEMENTS
+//
+// Cada resta genera un movimiento.
+//
+// from_location_id = ubicación descontada
+// to_location_id   = NULL
+// movement_type    = RECEIPT_CANCEL
+// reference_type   = RECEIPT
+// reference_id     = receiptId
+// user_id          = usuario autenticado
+// ========================================================
+
+if (inventoryDeductions.length > 0) {
+
+  const movementValues = [];
+  const movementParams = [];
+
+  inventoryDeductions.forEach((line, index) => {
+
+    // AHORA SON 8 PARÁMETROS POR MOVIMIENTO
+    const base = index * 8;
+
+    movementValues.push(`
+      (
+        $${base + 1},
+        $${base + 2},
+        $${base + 3},
+        $${base + 4},
+        $${base + 5},
+        $${base + 6},
+        $${base + 7},
+        $${base + 8}
+      )
+    `);
+
+    movementParams.push(
+      line.sku,
+      line.location_id,
+      null,
+      line.qty,
+      "RECEIPT_CANCEL",
+      "RECEIPT",
+      String(normalizedReceiptId),
+      userId
+    );
+
+  });
+
+  await client.query(
+    `
+    INSERT INTO inventory_movements
+    (
+      product_sku,
+      from_location_id,
+      to_location_id,
+      qty,
+      movement_type,
+      reference_type,
+      reference_id,
+      user_id
+    )
+
+    VALUES
+
+    ${movementValues.join(",")}
+    `,
+    movementParams
+  );
+}
+
+console.log("✅ INVENTORY_MOVEMENTS CREADOS");
+console.log("👤 USUARIO RESPONSABLE:", userId);
+
+    // ========================================================
+    // 14. BORRAR SOLAMENTE LA RELACIÓN DE ESTA PO
+    //
+    // No eliminamos relaciones de otras órdenes
+    // asociadas con el mismo receipt.
+    // ========================================================
+
+    const deleteRelationResult = await client.query(
+      `
+      DELETE FROM receipt_purchase_orders
+
+      WHERE
+        purchase_order_id = $1
+        AND receipt_id = $2
+
+      RETURNING
+        purchase_order_id,
+        receipt_id
+      `,
+      [
+        normalizedPurchaseOrderId,
+        normalizedReceiptId
+      ]
+    );
+
+    if (deleteRelationResult.rowCount !== 1) {
+      fail(
+        409,
+        "RECEIPT_RELATION_DELETE_FAILED",
+        "No se pudo desvincular la recepción",
+        "No fue posible eliminar la relación entre la orden de compra y la recepción."
+      );
+    }
+
+    // ========================================================
+    // 15. VALIDAR SI EL RECEIPT TIENE OTRAS POs
+    //
+    // Si quedan otras POs:
+    //   mantener receipt.status = completed
+    //
+    // Si no queda ninguna:
+    //   receipt.status = in_progress
+    //
+    // IMPORTANTE:
+    // No poner in_progress a un receipt compartido,
+    // porque afectaría las demás órdenes.
+    // ========================================================
+
+    const remainingRelationsResult = await client.query(
+      `
+      SELECT
+        COUNT(*)::integer AS total
+      FROM receipt_purchase_orders
+      WHERE receipt_id = $1
+      `,
+      [normalizedReceiptId]
+    );
+
+    const remainingRelations =
+      Number(remainingRelationsResult.rows[0].total);
+
+    let finalReceiptStatus = "completed";
+
+    if (remainingRelations === 0) {
+
+      const updateReceiptResult = await client.query(
+        `
+        UPDATE receipts
+
+        SET
+          status = 'in_progress',
+          finished_at = NULL
+
+        WHERE id = $1
+
+        RETURNING
+          id,
+          receipt_code,
+          status
+        `,
+        [normalizedReceiptId]
+      );
+
+      if (updateReceiptResult.rowCount !== 1) {
+        fail(
+          409,
+          "RECEIPT_STATUS_UPDATE_FAILED",
+          "No se pudo actualizar la recepción",
+          "No fue posible cambiar el estado de la recepción."
+        );
+      }
+
+      finalReceiptStatus = "in_progress";
+    }
+
+    // ========================================================
+    // 16. RECEIPT_LINES - PENDIENTE
+    //
+    // TODO:
+    // NO eliminamos receipt_lines temporalmente.
+    //
+    // Se conservan como historial de lo registrado
+    // originalmente durante esta recepción.
+    //
+    // IMPORTANTÍSIMO:
+    // Aunque sigan existiendo, NO deben contarse en
+    // purchase_order_lines.received_qty después de
+    // eliminar la relación receipt_purchase_orders.
+    //
+    // Tampoco debe reutilizarse este receipt para
+    // cerrar nuevamente una recepción sin resolver
+    // previamente estas líneas históricas.
+    // ========================================================
+
+    // NO HACER:
+    //
+    // DELETE FROM receipt_lines
+    // WHERE receipt_id = $1;
+
+    // ========================================================
+    // 17. RECALCULAR TODAS LAS LÍNEAS DE LA PO
+    //
+    // No restamos manualmente un valor histórico.
+    //
+    // Recalculamos el recibido real usando:
+    //
+    // - receipt_lines
+    // - receipts.status = completed
+    // - relación vigente en receipt_purchase_orders
+    //
+    // Así las receipt_lines canceladas NO cuentan,
+    // aunque continúen guardadas.
+    //
+    // difference_qty = ordered_qty - received_qty
+    // state = pending
+    // ========================================================
+
+    const updatedPoLinesResult = await client.query(
+      `
+      WITH totals AS
+      (
+        SELECT
+          pol.id,
+
+          COALESCE(
+            (
+              SELECT
+                SUM(rl.received_qty)
+
+              FROM receipt_lines rl
+
+              INNER JOIN receipts r
+                ON r.id = rl.receipt_id
+
+              WHERE
+                rl.purchase_order_line_id = pol.id
+
+                AND r.status = 'completed'
+
+                AND EXISTS
+                (
+                  SELECT 1
+                  FROM receipt_purchase_orders rpo
+                  WHERE
+                    rpo.receipt_id = rl.receipt_id
+                    AND rpo.purchase_order_id =
+                        pol.purchase_order_id
+                )
+            ),
+            0
+          ) AS new_received_qty
+
+        FROM purchase_order_lines pol
+
+        WHERE pol.purchase_order_id = $1
+      )
+
+      UPDATE purchase_order_lines pol
+
+SET
+    received_qty = totals.new_received_qty,
+
+    state = 'pending',
+
+    updated_at = NOW()
+
+FROM totals
+
+WHERE pol.id = totals.id
+
+      RETURNING
+        pol.id,
+        pol.sku,
+        pol.ordered_qty,
+        pol.received_qty,
+        pol.difference_qty,
+        pol.state
+      `,
+      [normalizedPurchaseOrderId]
+    );
+
+    console.log("📋 PURCHASE ORDER LINES RECALCULADAS:");
+    console.table(updatedPoLinesResult.rows);
+
+    // ========================================================
+    // 18. CALCULAR STATUS FINAL DE PURCHASE ORDER
+    //
+    // closed:
+    //   todas las líneas completas
+    //
+    // partial:
+    //   al menos una línea recibida
+    //   y todavía falta alguna
+    //
+    // open:
+    //   ninguna cantidad recibida
+    // ========================================================
+
+    const poStatusResult = await client.query(
+      `
+      SELECT
+        COUNT(*)::integer AS total_lines,
+
+        COUNT(*) FILTER (
+          WHERE received_qty >= ordered_qty
+        )::integer AS completed_lines,
+
+        COUNT(*) FILTER (
+          WHERE received_qty > 0
+        )::integer AS received_lines
+
+      FROM purchase_order_lines
+
+      WHERE
+        purchase_order_id = $1
+        AND COALESCE(deleted_erp, FALSE) = FALSE
+      `,
+      [normalizedPurchaseOrderId]
+    );
+
+    const totals = poStatusResult.rows[0];
+
+    const totalLines = Number(totals.total_lines);
+    const completedLines = Number(totals.completed_lines);
+    const receivedLines = Number(totals.received_lines);
+
+    let finalPurchaseOrderStatus = "open";
+
+    if (
+      totalLines > 0 &&
+      completedLines === totalLines
+    ) {
+      finalPurchaseOrderStatus = "closed";
+    } else if (receivedLines > 0) {
+      finalPurchaseOrderStatus = "partial";
+    }
+
+    // ========================================================
+    // 19. ACTUALIZAR PURCHASE_ORDER.STATUS
+    // ========================================================
+
+    await client.query(
+      `
+      UPDATE purchase_orders
+
+      SET
+        status = $1,
+        updated_at = NOW()
+
+      WHERE id = $2
+      `,
+      [
+        finalPurchaseOrderStatus,
+        normalizedPurchaseOrderId
+      ]
+    );
+
+    // ========================================================
+    // 20. COMMIT
+    // ========================================================
+
+    await client.query("COMMIT");
+    transactionStarted = false;
+
+    console.log("========================================");
+    console.log("✅ RECEPCIÓN CANCELADA EN SIDIAL");
+    console.log("📋 PO:", purchaseOrder.purchase_order_number);
+    console.log("🧾 RECEIPT:", normalizedReceiptId);
+    console.log("📊 PO STATUS:", finalPurchaseOrderStatus);
+    console.log("📊 RECEIPT STATUS:", finalReceiptStatus);
+    console.log("========================================");
+
+    // ========================================================
+    // 21. RESPUESTA
+    // ========================================================
+
+    return res.status(200).json({
+
+      success: true,
+
+      title: "Recepción cancelada",
+
+      message:
+        `La recepción ${receipt.receipt_code} fue desvinculada correctamente de la orden ${purchaseOrder.purchase_order_number}.`,
+
+      data: {
+
+        purchaseOrderId: normalizedPurchaseOrderId,
+        purchaseOrderNumber:
+          purchaseOrder.purchase_order_number,
+
+        purchaseOrderStatus:
+          finalPurchaseOrderStatus,
+
+        receiptId: normalizedReceiptId,
+        receiptCode: receipt.receipt_code,
+        receiptStatus: finalReceiptStatus,
+
+        remainingPurchaseOrdersInReceipt:
+          remainingRelations,
+
+        receiptLinesProcessed:
+          receiptLines.length,
+
+        inventoryDeductions,
+
+        purchaseOrderLines:
+          updatedPoLinesResult.rows
+      }
+    });
+
+  } catch (error) {
+
+    if (client && transactionStarted) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error(
+          "❌ ERROR DURANTE ROLLBACK:",
+          rollbackError
+        );
+      }
+    }
+
+    console.error(
+      "❌ ERROR CANCELANDO RECEPCIÓN:",
+      error
+    );
+
+    return res.status(
+      error.httpStatus || 500
+    ).json({
+
+      success: false,
+
+      title:
+        error.title || "Error cancelando recepción",
+
+      code:
+        error.code || "CANCEL_RECEPTION_ERROR",
+
+      message:
+        error.httpStatus
+          ? error.message
+          : "No se pudo cancelar la recepción. Se revirtieron los cambios de la transacción."
+    });
+
+  } finally {
+
+    if (client) {
+      client.release();
+    }
+  }
+}
+
 
 //Obtain purchase order receptions details
 export async function getPurchaseOrderFullDetails(

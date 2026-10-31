@@ -1,5 +1,5 @@
 import express from "express";
-import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode, confirmPickingLine, getPickingDifferences, getBestShippingLocation, closePicking, updateOriginWarehouse, unassignPicking, getPickingMoveLinesController } from "../controllers/pickingController.js"
+import { getAvailablePickers, addPickers, removePicker, getAllPickers, updatePickerActiveToday, getPickings, cancelPicking, getActivePickers, reassignPicking, getAssignedPickings, getPickingProductsWithLocations, scanPickingCode, confirmPickingLine, getPickingDifferences, getBestShippingLocation, closePicking, updateOriginWarehouse, unassignPicking, getPickingMoveLinesController, getAdmCloudDispatchMonitorController, getAdmCloudDispatchDetailsController, reverseAdmCloudDispatchController } from "../controllers/pickingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
@@ -51,6 +51,35 @@ router.get("/assigned", authMiddleware, getAssignedPickings);
 router.get(
   "/:pickingId/products-locations", 
   getPickingProductsWithLocations
+);
+
+
+
+
+
+// ============================================================
+// POST ADM CLOUD DISPATCH REVERSE
+// ============================================================
+
+router.post(
+    "/monitor/:id/reverse",
+    reverseAdmCloudDispatchController
+);
+
+
+// ============================================================
+// GET ADM CLOUD DISPATCH DETAILS
+// ============================================================
+
+router.get(
+    "/monitor/:id",
+    getAdmCloudDispatchDetailsController
+);
+
+router.get(
+    "/monitor",
+    authMiddleware,
+    getAdmCloudDispatchMonitorController
 );
 
 //Reasignar un picking

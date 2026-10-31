@@ -1,0 +1,207 @@
+/* SIDIAL / Barcode-main: selector Zebra y Bluetooth NIIMBOT */
+.barcode-printer-choice-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.barcode-printer-choice {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 60px;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid #d6dce5;
+  border-radius: 12px;
+  background: #f9fafb;
+  color: #263342;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.barcode-printer-choice span { flex: 1; }
+.barcode-printer-choice.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #174ea6;
+}
+.barcode-printer-choice:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+.barcode-printer-choice:disabled,
+.barcode-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+.barcode-bluetooth-help {
+  color: #536273;
+  line-height: 1.5;
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+@media (max-width: 600px) {
+  .barcode-printer-choice-group { grid-template-columns: 1fr; }
+  .barcode-printer-choice { min-height: 54px; }
+}
+/* El CSS original esconde la pestaña Imprimir en móviles: mostrarla en PDA. */
+@media (max-width: 480px) {
+  .barcode-tab.barcode-print-tab { display: flex !important; }
+}
+
+
+.barcode-printer-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.barcode-printer-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: #3f4d67;
+    line-height: 1.2;
+}
+
+.barcode-printer-choice-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.barcode-printer-card {
+    width: 100%;
+    min-height: 72px;
+    border: 1.5px solid #d7deea;
+    border-radius: 14px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition:
+        border-color 0.2s ease,
+        background-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+}
+
+.barcode-printer-card:hover:not(:disabled) {
+    border-color: #b8c7e6;
+    background: #f8fbff;
+}
+
+.barcode-printer-card:active:not(:disabled) {
+    transform: scale(0.995);
+}
+
+.barcode-printer-card.selected {
+    border-color: #4c8dff;
+    background: #eef5ff;
+    box-shadow: 0 0 0 3px rgba(76, 141, 255, 0.12);
+}
+
+.barcode-printer-card:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.barcode-printer-card-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.barcode-printer-icon-wrapper {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #f1f5fb;
+    border: 1px solid #dfe7f3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4f6b95;
+    flex-shrink: 0;
+}
+
+.barcode-printer-card.selected .barcode-printer-icon-wrapper {
+    background: #dfeeff;
+    border-color: #c7dcff;
+    color: #2d6cdf;
+}
+
+.barcode-printer-texts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.barcode-printer-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #22304d;
+    line-height: 1.2;
+}
+
+.barcode-printer-subtitle {
+    font-size: 13px;
+    font-weight: 500;
+    color: #7b8aa5;
+    line-height: 1.2;
+    margin-top: 4px;
+}
+
+.barcode-printer-card-right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.barcode-printer-radio {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    border: 2px solid #c9d4e5;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition:
+        border-color 0.2s ease,
+        background-color 0.2s ease;
+}
+
+.barcode-printer-radio.selected {
+    border-color: #4c8dff;
+    background: #4c8dff;
+}
+
+@media (max-width: 640px) {
+    .barcode-printer-card {
+        min-height: 68px;
+        padding: 12px 14px;
+    }
+
+    .barcode-printer-title {
+        font-size: 14px;
+    }
+
+    .barcode-printer-subtitle {
+        font-size: 12px;
+    }
+
+    .barcode-printer-icon-wrapper {
+        width: 40px;
+        height: 40px;
+    }
+}

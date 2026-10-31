@@ -5,6 +5,7 @@ import {
     useEffect
 } from "react";
 import "../styles/Barcode.css"
+import "../styles/Barcode.bluetooth.css";
 import apiClient from "../services/apiClient";
 import { useModal } from "../context/ModalContext";
 import {
@@ -19,7 +20,7 @@ import {
     ChevronUp,
     Package,
 } from "lucide-react";
-import { getPrinter, sendZpl } from "../services/zebra.ts";
+import { getPrinterKind, printLabel, setPrinterKind, type PrinterKind } from "../services/labelPrinter.ts";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
 import { FaCubes } from "react-icons/fa6";
 import { useAuth } from "../context/AuthProvider.tsx";
@@ -479,6 +480,16 @@ DEBOUNCE + CANCEL REQUEST
     const [printType, setPrintType] = useState<PrintType>("internal");
     const [quantity, setQuantity] = useState("");
 
+    // Impresora elegida por este dispositivo (PDA Bluetooth / PC Zebra).
+    const [printerKind, setPrinterKindState] = useState<PrinterKind>(getPrinterKind);
+    const [printing, setPrinting] = useState(false);
+
+    function changePrinterKind(kind: PrinterKind) {
+        if (printing) return;
+        setPrinterKind(kind);
+        setPrinterKindState(kind);
+    }
+
 
     const inputRef = useRef<HTMLInputElement>(null);
     const handleClear = () => {
@@ -784,175 +795,62 @@ DEBOUNCE + CANCEL REQUEST
     };
 
 
-    //Area de impresion
+    // ==========================================================
+    // IMPRESIÓN ZEBRA / NIIMBOT BLUETOOTH
+    //
+    // No hacer ninguna petición HTTP ni setTimeout antes de
+    // printLabel(): Web Bluetooth requiere un gesto del usuario.
+    // La plantilla ZPL original vive en labelPrinter.ts.
+    // ==========================================================
+    async function handlePrint() {
+        if (!selectedProduct || printing) return;
 
-    function getBarcodeX(sku: string) {
-        const labelWidth = 400;
+        const code = printType === "internal"
+            ? selectedProduct.sku
+            : selectedProduct.supplier_barcode;
 
-        console.log(sku.length);
-
-        let x;
-
-        if (sku.length <= 10) {
-            const moduleWidth = 4; // ^BY2
-
-            // 🔥 factor realista (ajustado)
-            const estimatedWidth = sku.length * 7.5 * moduleWidth;
-
-            x = (labelWidth - estimatedWidth) / 2;
-        } else {
-            const moduleWidth = 4; // ^BY2
-
-            // 🔥 factor realista (ajustado)
-            const estimatedWidth = sku.length * 6.5 * moduleWidth;
-
-            x = (labelWidth - estimatedWidth) / 2;
-        }
-
-
-
-        return Math.max(Math.floor(x), 10); // evita pegarse al borde
-    }
-
-    function clean(text: string) {
-        return text
-            .replace(/\^/g, "")
-            .replace(/~/g, "")
-            .replace(/\n/g, " ");
-    }
-
-    function cleanAndFormat(text: string) {
-        let clean = text
-            .normalize("NFD") // separa acentos
-            .replace(/[\u0300-\u036f]/g, "") // elimina acentos
-            .replace(/\^|~/g, "") // limpia ZPL
-            .toUpperCase()
-            .trim();
-
-        // 🔥 1. Limitar a 40 caracteres con ...
-        if (clean.length > 55) {
-            clean = clean.slice(0, 52) + "...";
-        }
-
-        // 🔥 2. Si es <= 20, no dividir
-        if (clean.length <= 20) {
-            return clean;
-        }
-
-        // 🔥 3. Dividir en 2 líneas
-        const line1 = clean.slice(0, 18).trim();
-        const line2 = clean.slice(20).trim();
-
-        return `${line1}\n${line2}`;
-    }
-
-    async function printLabel(
-        description: string,
-        sku: string,
-        erp_name?: string,
-        erp_sku?: string,
-        qty: number = 1
-    ) {
-        try {
-
-
-
-            const printer = await getPrinter();
-            console.log("CAMBIO en 05/26/2026");
-            const d = cleanAndFormat(description);
-            const i = cleanAndFormat(erp_name || "");
-            const p = cleanAndFormat(erp_sku || "");
-
-            const s = clean(sku);
-
-            // Código largo → barras más estrechas
-            const barcodeModuleWidth =
-                s.length >= 15
-                    ? 1
-                    : 2;
-
-            // Para código largo no necesitamos
-            // intentar centrarlo agresivamente
-            const x =
-                s.length >= 15
-                    ? 15
-                    : getBarcodeX(s);
-
-
-            function limitLabelText(
-                i: string,
-                d: string,
-                maxChars: number = 48
-            ): string {
-
-                const text = `${i} / ${d}`.trim();
-
-                if (text.length <= maxChars) {
-                    return text;
-                }
-
-                return text.substring(0, maxChars - 3).trim() + "...";
-            }
-
-            const labelText = limitLabelText(i, d);
-
-            const zpl = `
-^XA
-
-^PW400
-^LL203
-^LH0,0
-
-^CF0,26
-
-^FO0,17
-^FB400,2,0,C,0
-^FD${labelText}^FS
-
-^BY${barcodeModuleWidth},2,50
-^FO${x},72
-^BCN,50,Y,N,N
-^FD${s}^FS
-
-^FO15,167
-^A0N,21,23
-^FDP/N ${p}^FS
-
-^PQ${qty}
-^XZ
-`;
-
-            await sendZpl(printer, zpl);
-
-            console.log(`✅ Impreso ${qty} etiquetas`);
-        } catch (error) {
-            console.error("❌ Error imprimiendo:", error);
-        }
-    }
-
-    function handlePrint() {
-        if (!selectedProduct) return;
-
-        const code =
-            printType === "internal"
-                ? selectedProduct.sku
-                : selectedProduct.supplier_barcode;
-
-        if (!code) {
-            console.warn("❌ No hay código para imprimir");
+        if (!code?.trim()) {
+            openModal({
+                title: "Código de barras requerido",
+                message: "El producto no tiene el código de barras seleccionado.",
+            });
             return;
         }
 
-        printLabel(
-            selectedProduct.description,
-            code,
-            selectedProduct.erp_name || "",  // 👈 este faltaba
-            selectedProduct.erp_sku || "",
-            Number(quantity || 1)            // 👈 ahora sí va en posición correcta
-        );
+        const qty = quantity.trim() === "" ? 1 : Number(quantity);
+        if (!Number.isSafeInteger(qty) || qty < 1 || qty > 100) {
+            openModal({
+                title: "Cantidad inválida",
+                message: "Introduzca una cantidad entera entre 1 y 100 etiquetas.",
+            });
+            return;
+        }
+
+        setPrinting(true);
+
+        try {
+            // Se ejecuta inmediatamente desde onClick, sin await previos.
+            await printLabel(
+                selectedProduct.description,
+                code,
+                selectedProduct.erp_name || "",
+                selectedProduct.erp_sku || "",
+                qty,
+                printerKind
+            );
+            console.log(`✅ Enviadas ${qty} etiquetas a ${printerKind}`);
+        } catch (error: unknown) {
+            console.error("❌ Error imprimiendo:", error);
+            openModal({
+                title: "No se pudo imprimir",
+                message: error instanceof Error
+                    ? error.message
+                    : "Verifique la impresora y vuelva a intentarlo.",
+            });
+        } finally {
+            setPrinting(false);
+        }
     }
-
-
 
 
     const handleSaveInventoryAdjustment = async () => {
@@ -2060,6 +1958,105 @@ DEBOUNCE + CANCEL REQUEST
 
                                                 </div>
 
+                                                {/* =========================================
+                                                    SELECTOR DE IMPRESORA
+                                                    ========================================= */}
+                                                <h3 className="barcode-title barcode-mt">
+                                                    Impresora
+                                                </h3>
+
+                                                <div className="barcode-printer-section">
+  
+    <div
+        className="barcode-printer-choice-group"
+        role="group"
+        aria-label="Seleccionar impresora"
+    >
+        <button
+            type="button"
+            className={`barcode-printer-card ${
+                printerKind === "zebra" ? "selected" : ""
+            }`}
+            onClick={() => changePrinterKind("zebra")}
+            aria-pressed={printerKind === "zebra"}
+            disabled={printing}
+        >
+            <div className="barcode-printer-card-left">
+                <div className="barcode-printer-icon-wrapper">
+                    <Printer size={20} strokeWidth={2} />
+                </div>
+
+                <div className="barcode-printer-texts">
+                    <span className="barcode-printer-title">
+                        Zebra
+                    </span>
+
+                    <span className="barcode-printer-subtitle">
+                        Browser Print
+                    </span>
+                </div>
+            </div>
+
+            <div className="barcode-printer-card-right">
+                <div
+                    className={`barcode-printer-radio ${
+                        printerKind === "zebra" ? "selected" : ""
+                    }`}
+                >
+                    {printerKind === "zebra" && (
+                        <Check size={14} strokeWidth={3} />
+                    )}
+                </div>
+            </div>
+        </button>
+
+        <button
+            type="button"
+            className={`barcode-printer-card ${
+                printerKind === "niimbot" ? "selected" : ""
+            }`}
+            onClick={() => changePrinterKind("niimbot")}
+            aria-pressed={printerKind === "niimbot"}
+            disabled={printing}
+        >
+            <div className="barcode-printer-card-left">
+                <div className="barcode-printer-icon-wrapper">
+                    <Printer size={20} strokeWidth={2} />
+                </div>
+
+                <div className="barcode-printer-texts">
+                    <span className="barcode-printer-title">
+                        Bluetooth
+                    </span>
+
+                    <span className="barcode-printer-subtitle">
+                        NIIMBOT B1
+                    </span>
+                </div>
+            </div>
+
+            <div className="barcode-printer-card-right">
+                <div
+                    className={`barcode-printer-radio ${
+                        printerKind === "niimbot" ? "selected" : ""
+                    }`}
+                >
+                    {printerKind === "niimbot" && (
+                        <Check size={14} strokeWidth={3} />
+                    )}
+                </div>
+            </div>
+        </button>
+    </div>
+</div>
+
+                                                {printerKind === "niimbot" && (
+                                                    <p className="barcode-bluetooth-help">
+                                                        En la PDA, use Chrome con HTTPS y active Bluetooth.
+                                                        La primera impresión pedirá seleccionar la impresora.
+                                                    </p>
+                                                )}
+
                                             </div>
 
                                         </div>
@@ -2370,9 +2367,10 @@ DEBOUNCE + CANCEL REQUEST
                                                 type="button"
                                                 className="barcode-submit"
                                                 onClick={handlePrint}
+                                                disabled={printing}
                                             >
 
-                                                Imprimir
+                                                {printing ? "Imprimiendo..." : "Imprimir"}
 
                                             </button>
 

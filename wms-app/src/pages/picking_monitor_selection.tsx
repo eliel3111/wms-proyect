@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import "../styles/picking.css";
-import { Package, Activity } from "lucide-react";
+import { Package, Activity, Truck } from "lucide-react";
 import PickingProcess from "../components/PickingProcess.tsx"
 import PickingActive from "../components/PickingActive.tsx"
+import ConduceDispatches from "../components/ConduceDispatches.tsx";
+
+
 
 export default function MonitorPicking() {
     const [isMobile, setIsMobile] = useState(false);
@@ -45,47 +48,69 @@ export default function MonitorPicking() {
                     <nav className="nav">
 
                         <button
-    onClick={() =>
-        setView("picking-process")
-    }
-    className={`
+                            onClick={() =>
+                                setView("picking-process")
+                            }
+                            className={`
         sidebar-button
-        ${
-            view === "picking-process"
-                ? "active"
-                : ""
-        }
+        ${view === "picking-process"
+                                    ? "active"
+                                    : ""
+                                }
     `}
->
-    <Activity size={22} />
+                        >
+                            <Activity size={22} />
 
-    <span>
-        Proceso de Picking
-    </span>
-</button>
+                            <span>
+                                Proceso de Picking
+                            </span>
+                        </button>
 
                         <button
-    onClick={() =>
-        setView("pickers-active")
-    }
-    className={`
+                            onClick={() =>
+                                setView("pickers-active")
+                            }
+                            className={`
         sidebar-button
-        ${
-            view === "pickers-active"
-                ? "active"
-                : ""
-        }
+        ${view === "pickers-active"
+                                    ? "active"
+                                    : ""
+                                }
     `}
->
-    <Package size={22} />
+                        >
+                            <Package size={22} />
 
-    <span>
-        Pickers
-    </span>
-</button>
+                            <span>
+                                Pickers
+                            </span>
+                        </button>
 
-                        
-                        
+                        <button
+                            onClick={() =>
+                                setView(
+                                    "dispatches"
+                                )
+                            }
+
+                            className={`
+        sidebar-button
+        ${view === "dispatches"
+                                    ? "active"
+                                    : ""
+                                }
+    `}
+                        >
+
+                            <Truck
+                                size={22}
+                            />
+
+                            <span>
+                                Conduce de Despachos
+                            </span>
+
+                        </button>
+
                     </nav>
                 </div>
             </aside>
@@ -139,9 +164,27 @@ export default function MonitorPicking() {
             </aside>
 
             {/* Main content */}
-            <main className="main" aria-label="Contenido principal">
-                {view === "pickers-active" && <PickingActive />}
-                {view === "picking-process" && <PickingProcess />}
+            <main
+                className="main"
+                aria-label="Contenido principal"
+            >
+
+                {view ===
+                    "pickers-active" && (
+                        <PickingActive />
+                    )}
+
+
+                {view ===
+                    "picking-process" && (
+                        <PickingProcess />
+                    )}
+
+
+                {view ===
+                    "dispatches" && (
+                        <ConduceDispatches />
+                    )}
 
             </main>
         </div>

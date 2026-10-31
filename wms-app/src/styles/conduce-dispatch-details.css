@@ -1,0 +1,789 @@
+/* ==========================================================
+   CONDUCE DE DESPACHO - DISEÑO RESPONSIVE
+   Complementa ReceivingDetailsPage.css sin afectar Recepción.
+========================================================== */
+
+.conduce-details-page {
+    --conduce-ink: #1d2941;
+    --conduce-muted: #68758a;
+    --conduce-border: #e7ecf3;
+    --conduce-soft: #f7f9fc;
+    --conduce-accent: #96235f;
+
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    color: var(--conduce-ink);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    box-sizing: border-box;
+}
+
+.conduce-details-page,
+.conduce-details-page *,
+.conduce-details-page *::before,
+.conduce-details-page *::after {
+    box-sizing: border-box;
+}
+
+/* ==========================================================
+   LAYOUT: CABECERA ARRIBA Y DETALLES DEBAJO
+========================================================== */
+
+.conduce-details-page .receiving-details-layout {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    gap: 16px;
+}
+
+.conduce-details-page .receiving-details-left,
+.conduce-details-page .receiving-details-right {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+}
+
+.conduce-details-page .receiving-details-left {
+    gap: 12px;
+}
+
+.conduce-details-page .receiving-details-right {
+    gap: 0;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid var(--conduce-border);
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgb(22 35 58 / 4%);
+}
+
+/* ==========================================================
+   BARRA DE REGRESO
+========================================================== */
+
+.conduce-details-page .receiving-details-back-section {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    min-height: 64px;
+    margin: 0;
+    padding: 12px 16px;
+    background: #ffffff;
+    border: 1px solid var(--conduce-border);
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgb(22 35 58 / 4%);
+}
+
+.conduce-details-page .receiving-details-back-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: auto;
+    min-width: 142px;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: #2b2d31;
+    color: #ffffff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.25;
+    white-space: normal;
+    cursor: pointer;
+    transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.conduce-details-page .receiving-details-back-button:hover:not(:disabled) {
+    background: #1c1e23;
+    transform: translateY(-1px);
+}
+
+.conduce-details-page .receiving-details-back-button:focus-visible {
+    outline: 3px solid #af82a0;
+    outline-offset: 3px;
+}
+
+/* ==========================================================
+   TARJETA DE INFORMACIÓN: 4 / 2 / 1 COLUMNAS
+========================================================== */
+
+.conduce-details-page .receiving-details-information-card {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1.2fr)
+        minmax(0, 1.55fr)
+        minmax(0, 1.12fr)
+        minmax(0, 0.78fr);
+    align-items: center;
+    gap: 22px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    padding: 20px 24px;
+    background: #ffffff;
+    border: 1px solid var(--conduce-border);
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgb(22 35 58 / 4%);
+}
+
+.conduce-details-page .receiving-details-information-row,
+.conduce-details-page .receiving-details-order-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    align-self: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+/* Iconos equilibrados y consistentes */
+.conduce-details-page .receiving-details-main-icon,
+.conduce-details-page .receiving-details-small-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    border-radius: 11px;
+    background: #f8edf4;
+    color: var(--conduce-accent);
+}
+
+.conduce-details-page .receiving-details-main-icon svg,
+.conduce-details-page .receiving-details-small-icon svg {
+    width: 21px;
+    height: 21px;
+    flex-shrink: 0;
+}
+
+/* Texto del campo sin truncamiento */
+.conduce-details-page .receiving-details-order-content,
+.conduce-details-page .receiving-details-field-content,
+.conduce-details-page .receiving-details-status-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 5px;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+}
+
+.conduce-details-page .receiving-details-order-title,
+.conduce-details-page .receiving-details-field-label {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    color: var(--conduce-muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.conduce-details-page .receiving-details-order-number {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    color: #18243e;
+    font-size: clamp(17px, 1.3vw, 20px);
+    font-weight: 750;
+    line-height: 1.28;
+    letter-spacing: -0.025em;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.conduce-details-page .receiving-details-field-value {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    color: var(--conduce-ink);
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.45;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+/* Estado con tamaño natural */
+.conduce-details-page .receiving-details-active-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    flex: 0 1 auto;
+    width: fit-content;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 28px;
+    height: auto;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: #e1f7e9;
+    color: #187343;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.conduce-details-page .receiving-details-active-dot {
+    flex: 0 0 7px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #259758;
+}
+
+.conduce-details-page .receiving-details-active-pill span:last-child {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* ==========================================================
+   SECCIÓN INFERIOR: TÍTULO, TABLA Y MENSAJES
+========================================================== */
+
+.conduce-details-page .conduce-details-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 66px;
+    margin: 0;
+    padding: 18px 24px;
+    color: var(--conduce-ink);
+    border-bottom: 1px solid #eef1f6;
+    background: #ffffff;
+}
+
+.conduce-details-page .conduce-details-titlebar svg {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    color: #38465c;
+}
+
+.conduce-details-page .conduce-details-titlebar h2 {
+    min-width: 0;
+    margin: 0;
+    color: #1b2740;
+    font-size: clamp(16px, 1.3vw, 19px);
+    font-weight: 730;
+    letter-spacing: -0.015em;
+    line-height: 1.4;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.conduce-details-page .receiving-details-table-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.conduce-details-page .conduce-details-table {
+    width: 100%;
+    min-width: 1050px;
+    border-collapse: collapse;
+    color: var(--conduce-ink);
+}
+
+.conduce-details-page .conduce-details-table th,
+.conduce-details-page .conduce-details-table td {
+    padding: 13px 12px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid #eff2f7;
+}
+
+.conduce-details-page .conduce-details-table thead th {
+    background: var(--conduce-soft);
+    color: #5e6b80;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: 0.015em;
+}
+
+.conduce-details-page .conduce-details-table tbody td {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.conduce-details-page .conduce-details-table tbody tr:hover {
+    background: #fafbfe;
+}
+
+.conduce-details-page .conduce-details-table .receiving-details-product-code {
+    color: #293853;
+    font-size: 12.5px;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.conduce-details-page .conduce-details-table .receiving-details-description {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.conduce-details-page .conduce-details-message {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 14px;
+    width: auto;
+    max-width: 100%;
+    min-height: 116px;
+    height: auto;
+    margin: 18px 24px 24px;
+    padding: 18px 20px;
+    color: var(--conduce-muted);
+    background: var(--conduce-soft);
+    border: 1px solid #edf1f6;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.conduce-details-page .conduce-details-message p {
+    margin: 0;
+}
+
+.conduce-details-page .conduce-details-message .receiving-details-back-button {
+    min-height: 36px;
+    min-width: 0;
+    padding: 9px 15px;
+    font-size: 12px;
+}
+
+.conduce-details-page .conduce-details-empty {
+    padding: 28px 16px !important;
+    color: var(--conduce-muted);
+    text-align: center;
+    font-size: 13px;
+}
+
+/* ==========================================================
+   TABLET / MONITORES MEDIANOS
+========================================================== */
+
+@media (max-width: 1200px) {
+    .conduce-details-page .receiving-details-information-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 24px;
+        row-gap: 20px;
+    }
+}
+
+/* ==========================================================
+   MÓVIL / PDA
+========================================================== */
+
+@media (max-width: 768px) {
+    .conduce-details-page .receiving-details-layout {
+        gap: 12px;
+    }
+
+    .conduce-details-page .receiving-details-back-section {
+        min-height: 58px;
+        padding: 10px 12px;
+    }
+
+    .conduce-details-page .receiving-details-information-card {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+        padding: 18px;
+    }
+
+    .conduce-details-page .receiving-details-information-row {
+        gap: 12px;
+    }
+
+    .conduce-details-page .conduce-details-titlebar {
+        min-height: 60px;
+        padding: 16px 18px;
+    }
+
+    .conduce-details-page .conduce-details-message {
+        min-height: 100px;
+        margin: 14px 16px 18px;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 400px) {
+    .conduce-details-page .receiving-details-information-card {
+        padding: 14px;
+        gap: 14px;
+    }
+
+    .conduce-details-page .receiving-details-main-icon,
+    .conduce-details-page .receiving-details-small-icon {
+        flex-basis: 40px;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    .conduce-details-page .conduce-details-titlebar {
+        padding: 15px 14px;
+    }
+}
+
+
+
+
+/* =====================================================
+   HEADER DETALLES DEL CONDUCE
+===================================================== */
+
+.conduce-details-page .conduce-details-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+
+    gap: 16px;
+
+    width: 100%;
+    padding: 18px 24px;
+    box-sizing: border-box;
+}
+
+.conduce-details-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    min-width: 0;
+    flex: 1;
+}
+
+.conduce-details-heading h2 {
+    margin: 0;
+
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.4;
+
+    color: #252b35;
+}
+
+
+/* =====================================================
+   BOTÓN BORRAR CONDUCE
+===================================================== */
+
+.conduce-details-delete-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 9px;
+
+    min-height: 42px;
+    padding: 10px 18px;
+
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+
+    background-color: #fff1f2;
+    color: #be123c;
+
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 650;
+
+    white-space: nowrap;
+    cursor: pointer;
+
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+.conduce-details-delete-button:hover:not(:disabled) {
+    background-color: #ffe4e6;
+    border-color: #fda4af;
+    color: #9f1239;
+
+    box-shadow: 0 3px 10px rgba(190, 18, 60, 0.08);
+}
+
+.conduce-details-delete-button:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.conduce-details-delete-button:focus-visible {
+    outline: 3px solid rgba(225, 29, 72, 0.2);
+    outline-offset: 3px;
+}
+
+.conduce-details-delete-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+
+/* =====================================================
+   ANIMACIÓN LOADING
+===================================================== */
+
+.conduce-details-spinning {
+    animation: conduce-delete-spin 1s linear infinite;
+}
+
+@keyframes conduce-delete-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* =====================================================
+   RESPONSIVE - TABLET
+===================================================== */
+
+@media (max-width: 1024px) {
+
+    .conduce-details-page .conduce-details-titlebar {
+        padding: 16px 20px;
+    }
+
+    .conduce-details-heading h2 {
+        font-size: 17px;
+    }
+
+}
+
+
+/* =====================================================
+   RESPONSIVE - MOBILE
+===================================================== */
+
+@media (max-width: 600px) {
+
+    .conduce-details-page .conduce-details-titlebar {
+        flex-direction: column;
+        align-items: stretch;
+
+        gap: 16px;
+        padding: 18px;
+    }
+
+    .conduce-details-heading {
+        width: 100%;
+    }
+
+    .conduce-details-heading h2 {
+        font-size: 16px;
+    }
+
+    .conduce-details-delete-button {
+        width: 100%;
+        min-height: 44px;
+        font-size: 14px;
+    }
+
+}
+
+
+
+/* =====================================================
+   CONDUCE DETAILS - STATUS BADGES
+===================================================== */
+
+/* =====================================================
+   ESTADO GENERAL
+===================================================== */
+
+.conduce-details-page .receiving-details-active-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    gap: 8px;
+
+    width: fit-content;
+    max-width: 100%;
+
+    min-height: 32px;
+
+    padding: 7px 13px;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+
+    box-sizing: border-box;
+}
+
+
+/* =====================================================
+   PUNTO INDICADOR
+===================================================== */
+
+.conduce-details-page .receiving-details-active-dot {
+    display: inline-block;
+
+    width: 8px;
+    height: 8px;
+
+    min-width: 8px;
+    min-height: 8px;
+
+    border-radius: 50%;
+
+    flex-shrink: 0;
+}
+
+
+/* =====================================================
+   COMPLETADO - VERDE
+===================================================== */
+
+.conduce-details-page .conduce-details-status-green {
+    background-color: #dcfce7;
+
+    color: #15803d;
+
+    border: 1px solid #bbf7d0;
+}
+
+.conduce-details-page
+.conduce-details-status-green
+.receiving-details-active-dot {
+    background-color: #16a34a;
+}
+
+
+/* =====================================================
+   ANULADO - ROJO
+===================================================== */
+
+.conduce-details-page .conduce-details-status-red {
+    background-color: #fee2e2;
+
+    color: #b91c1c;
+
+    border: 1px solid #fecaca;
+}
+
+.conduce-details-page
+.conduce-details-status-red
+.receiving-details-active-dot {
+    background-color: #dc2626;
+}
+
+
+/* =====================================================
+   DESCONOCIDO - GRIS
+===================================================== */
+
+.conduce-details-page .conduce-details-status-gray {
+    background-color: #f1f5f9;
+
+    color: #64748b;
+
+    border: 1px solid #e2e8f0;
+}
+
+.conduce-details-page
+.conduce-details-status-gray
+.receiving-details-active-dot {
+    background-color: #94a3b8;
+}
+
+
+/* =====================================================
+   ESTADO - RESPONSIVE
+===================================================== */
+
+@media (max-width: 768px) {
+
+    .conduce-details-page .receiving-details-active-pill {
+        min-height: 30px;
+
+        padding: 6px 11px;
+
+        font-size: 11px;
+    }
+
+}

@@ -12,14 +12,15 @@ import {
 import apiClient from "../services/apiClient.ts";
 
 import {
-  ArrowLeft,
-  FileText,
-  UsersRound,
-  Activity,
-  ClipboardList,
-  Package,
-  WifiOff,
-  RefreshCw,
+    ArrowLeft,
+    FileText,
+    UsersRound,
+    Activity,
+    ClipboardList,
+    Package,
+    WifiOff,
+    RefreshCw,
+    Trash2,
 } from "lucide-react";
 
 import "../styles/ReceivingDetailsPage.css";
@@ -120,6 +121,8 @@ export default function ReceivingDetailsPage() {
         }>();
 
 
+    const [isDeletingReceipt, setIsDeletingReceipt] = useState(false);
+
     const [
         purchaseOrder,
         setPurchaseOrder,
@@ -173,8 +176,8 @@ export default function ReceivingDetailsPage() {
             null
         );
 
-        const [isClosing, setIsClosing] =
-    useState(false);
+    const [isClosing, setIsClosing] =
+        useState(false);
 
 
     useEffect(
@@ -401,13 +404,13 @@ export default function ReceivingDetailsPage() {
 
     const handleBack = () => {
 
-    if (isClosing) {
-        return;
-    }
+        if (isClosing) {
+            return;
+        }
 
-    setIsClosing(true);
+        setIsClosing(true);
 
-};
+    };
 
 
     // =========================================
@@ -415,433 +418,563 @@ export default function ReceivingDetailsPage() {
     // POR AHORA SOLO MOCK
     // =========================================
 
-   /* const handleDeleteReceipt = () => {
+    // =========================================
+    // BORRAR RECEPCIÓN
+    // =========================================
 
-        console.log(
-            "Borrar recepción"
+    const handleDeleteReceipt = async () => {
+
+        // =====================================
+        // VALIDAR DOCUMENTO SELECCIONADO
+        // =====================================
+
+        if (
+            !selectedDocument ||
+            selectedDocument.type !== "receipt"
+        ) {
+            return;
+        }
+
+        if (!purchaseOrder?.id) {
+            window.alert(
+                "No se encontró la orden de compra."
+            );
+            return;
+        }
+
+        if (isDeletingReceipt) {
+            return;
+        }
+
+        // =====================================
+        // OBTENER IDS
+        // =====================================
+
+        const purchaseOrderId =
+            Number(purchaseOrder.id);
+
+        const receiptId =
+            Number(selectedDocument.id);
+
+        const receiptCode =
+            selectedDocument.code;
+
+        // =====================================
+        // CONFIRMAR CANCELACIÓN
+        // =====================================
+
+        const confirmed = window.confirm(
+            `¿Estás seguro de que deseas borrar la recepción ${receiptCode}?\n\n` +
+            `Orden de compra: ${purchaseOrder.purchase_order_number}\n\n` +
+            `Esta operación modificará el inventario y recalculará las cantidades recibidas.`
         );
 
-    };*/
+        if (!confirmed) {
+            return;
+        }
+
+        // =====================================
+        // LLAMAR BACKEND
+        // =====================================
+
+        try {
+
+            setIsDeletingReceipt(true);
+
+            console.log(
+                "🗑️ CANCELANDO RECEPCIÓN:",
+                {
+                    purchaseOrderId,
+                    receiptId
+                }
+            );
+
+            const response = await apiClient.post(
+                "/receiving/cancel-purchase-order-reception",
+                {
+                    purchaseOrderId,
+                    receiptId
+                }
+            );
+
+            console.log(
+                "📥 RESPUESTA CANCELACIÓN:",
+                response.data
+            );
+
+            // =================================
+            // VALIDAR RESPUESTA
+            // =================================
+
+            if (!response.data?.success) {
+
+                throw new Error(
+                    response.data?.message ||
+                    "No se pudo cancelar la recepción."
+                );
+
+            }
+
+            // =================================
+            // ÉXITO
+            // =================================
+
+            window.alert(
+                response.data?.message ||
+                "La recepción fue cancelada correctamente."
+            );
+
+            // =================================
+            // ACTUALIZAR PÁGINA
+            // =================================
+
+            window.location.reload();
+
+        } catch (error: any) {
+
+            console.error(
+                "❌ ERROR CANCELANDO RECEPCIÓN:",
+                error
+            );
+
+            const title =
+                error?.response?.data?.title ||
+                "Error cancelando recepción";
+
+            const message =
+                error?.response?.data?.message ||
+                error?.message ||
+                "No fue posible cancelar la recepción.";
+
+            window.alert(
+                `${title}\n\n${message}`
+            );
+
+        } finally {
+
+            setIsDeletingReceipt(false);
+
+        }
+
+    };
 
 
     if (loading) {
 
-  return (
+        return (
 
-    <div className="receiving-details-page receiving-details-loading-page">
+            <div className="receiving-details-page receiving-details-loading-page">
 
-      <div className="receiving-details-loading-layout">
+                <div className="receiving-details-loading-layout">
 
 
-        {/* =========================================
+                    {/* =========================================
             LEFT SIDE
         ========================================= */}
 
-        <aside className="receiving-loading-left">
+                    <aside className="receiving-loading-left">
 
 
-          {/* BACK BUTTON PLACEHOLDER */}
+                        {/* BACK BUTTON PLACEHOLDER */}
 
-          <div className="receiving-loading-back-card">
+                        <div className="receiving-loading-back-card">
 
-            <div className="receiving-loading-back-button skeleton-shimmer">
+                            <div className="receiving-loading-back-button skeleton-shimmer">
 
-              <div className="receiving-loading-back-icon" />
+                                <div className="receiving-loading-back-icon" />
 
-              <div className="receiving-loading-back-text" />
+                                <div className="receiving-loading-back-text" />
 
-            </div>
+                            </div>
 
-          </div>
-
-
-          {/* INFORMATION CARD */}
-
-          <div className="receiving-loading-info-card">
+                        </div>
 
 
-            {/* PURCHASE ORDER */}
+                        {/* INFORMATION CARD */}
 
-            <div className="receiving-loading-info-row receiving-loading-order-row">
-
-              <div className="receiving-loading-main-icon skeleton-shimmer" />
+                        <div className="receiving-loading-info-card">
 
 
-              <div className="receiving-loading-text-group">
+                            {/* PURCHASE ORDER */}
 
-                <div className="receiving-loading-label skeleton-shimmer" />
+                            <div className="receiving-loading-info-row receiving-loading-order-row">
 
-                <div className="receiving-loading-order-number skeleton-shimmer" />
-
-              </div>
-
-            </div>
+                                <div className="receiving-loading-main-icon skeleton-shimmer" />
 
 
-            {/* SUPPLIER */}
+                                <div className="receiving-loading-text-group">
 
-            <div className="receiving-loading-info-row">
+                                    <div className="receiving-loading-label skeleton-shimmer" />
 
-              <div className="receiving-loading-small-icon skeleton-shimmer" />
+                                    <div className="receiving-loading-order-number skeleton-shimmer" />
 
-              <div className="receiving-loading-text-group">
+                                </div>
 
-                <div className="receiving-loading-label skeleton-shimmer" />
-
-                <div className="receiving-loading-value receiving-loading-value-long skeleton-shimmer" />
-
-              </div>
-
-            </div>
+                            </div>
 
 
-            {/* ERP ID */}
+                            {/* SUPPLIER */}
 
-            <div className="receiving-loading-info-row">
+                            <div className="receiving-loading-info-row">
 
-              <div className="receiving-loading-small-icon skeleton-shimmer" />
+                                <div className="receiving-loading-small-icon skeleton-shimmer" />
 
-              <div className="receiving-loading-text-group">
+                                <div className="receiving-loading-text-group">
 
-                <div className="receiving-loading-label skeleton-shimmer" />
+                                    <div className="receiving-loading-label skeleton-shimmer" />
 
-                <div className="receiving-loading-value receiving-loading-value-medium skeleton-shimmer" />
+                                    <div className="receiving-loading-value receiving-loading-value-long skeleton-shimmer" />
 
-              </div>
+                                </div>
 
-            </div>
-
-
-            {/* STATUS */}
-
-            <div className="receiving-loading-info-row">
-
-              <div className="receiving-loading-small-icon skeleton-shimmer" />
-
-              <div className="receiving-loading-text-group">
-
-                <div className="receiving-loading-label skeleton-shimmer" />
-
-                <div className="receiving-loading-status skeleton-shimmer" />
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </aside>
+                            </div>
 
 
-        {/* =========================================
+                            {/* ERP ID */}
+
+                            <div className="receiving-loading-info-row">
+
+                                <div className="receiving-loading-small-icon skeleton-shimmer" />
+
+                                <div className="receiving-loading-text-group">
+
+                                    <div className="receiving-loading-label skeleton-shimmer" />
+
+                                    <div className="receiving-loading-value receiving-loading-value-medium skeleton-shimmer" />
+
+                                </div>
+
+                            </div>
+
+
+                            {/* STATUS */}
+
+                            <div className="receiving-loading-info-row">
+
+                                <div className="receiving-loading-small-icon skeleton-shimmer" />
+
+                                <div className="receiving-loading-text-group">
+
+                                    <div className="receiving-loading-label skeleton-shimmer" />
+
+                                    <div className="receiving-loading-status skeleton-shimmer" />
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </aside>
+
+
+                    {/* =========================================
             RIGHT SIDE
         ========================================= */}
 
-        <main className="receiving-loading-right">
+                    <main className="receiving-loading-right">
 
 
-          {/* TABS */}
+                        {/* TABS */}
 
-          <div className="receiving-loading-tabs">
+                        <div className="receiving-loading-tabs">
 
-            <div className="receiving-loading-tab receiving-loading-tab-main skeleton-shimmer" />
+                            <div className="receiving-loading-tab receiving-loading-tab-main skeleton-shimmer" />
 
-            <div className="receiving-loading-tab skeleton-shimmer" />
+                            <div className="receiving-loading-tab skeleton-shimmer" />
 
-            <div className="receiving-loading-tab skeleton-shimmer" />
+                            <div className="receiving-loading-tab skeleton-shimmer" />
 
-          </div>
+                        </div>
 
 
-          {/* LOADING MESSAGE */}
+                        {/* LOADING MESSAGE */}
 
-          <div className="receiving-loading-message">
+                        <div className="receiving-loading-message">
 
-            <div className="receiving-loading-spinner">
+                            <div className="receiving-loading-spinner">
 
-              <div className="receiving-loading-spinner-ring" />
+                                <div className="receiving-loading-spinner-ring" />
 
-              <div className="receiving-loading-spinner-center" />
+                                <div className="receiving-loading-spinner-center" />
+
+                            </div>
+
+
+                            <div className="receiving-loading-message-content">
+
+                                <div className="receiving-loading-message-title">
+                                    Cargando detalles
+                                </div>
+
+                                <div className="receiving-loading-message-subtitle">
+                                    Estamos preparando la orden de compra y sus recepciones.
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        {/* TABLE */}
+
+                        <div className="receiving-loading-table">
+
+                            {/* HEADER */}
+
+                            <div className="receiving-loading-table-header">
+
+                                <div className="receiving-loading-header-cell receiving-loading-cell-check" />
+                                <div className="receiving-loading-header-cell receiving-loading-cell-number" />
+                                <div className="receiving-loading-header-cell" />
+                                <div className="receiving-loading-header-cell receiving-loading-cell-description" />
+                                <div className="receiving-loading-header-cell" />
+                                <div className="receiving-loading-header-cell" />
+                                <div className="receiving-loading-header-cell" />
+                                <div className="receiving-loading-header-cell" />
+
+                            </div>
+
+
+                            {/* ROWS */}
+
+                            {Array.from({ length: 6 }).map((_, index) => (
+
+                                <div
+                                    className="receiving-loading-table-row"
+                                    key={index}
+                                >
+
+                                    <div className="receiving-loading-checkbox skeleton-shimmer" />
+
+                                    <div className="receiving-loading-number skeleton-shimmer" />
+
+                                    <div className="receiving-loading-table-line receiving-loading-line-code skeleton-shimmer" />
+
+                                    <div className="receiving-loading-table-line receiving-loading-line-description skeleton-shimmer" />
+
+                                    <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
+
+                                    <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
+
+                                    <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
+
+                                    <div className="receiving-loading-pill skeleton-shimmer" />
+
+                                </div>
+
+                            ))}
+
+                        </div>
+
+                    </main>
+
+                </div>
 
             </div>
 
+        );
 
-            <div className="receiving-loading-message-content">
-
-              <div className="receiving-loading-message-title">
-                Cargando detalles
-              </div>
-
-              <div className="receiving-loading-message-subtitle">
-                Estamos preparando la orden de compra y sus recepciones.
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* TABLE */}
-
-          <div className="receiving-loading-table">
-
-            {/* HEADER */}
-
-            <div className="receiving-loading-table-header">
-
-              <div className="receiving-loading-header-cell receiving-loading-cell-check" />
-              <div className="receiving-loading-header-cell receiving-loading-cell-number" />
-              <div className="receiving-loading-header-cell" />
-              <div className="receiving-loading-header-cell receiving-loading-cell-description" />
-              <div className="receiving-loading-header-cell" />
-              <div className="receiving-loading-header-cell" />
-              <div className="receiving-loading-header-cell" />
-              <div className="receiving-loading-header-cell" />
-
-            </div>
-
-
-            {/* ROWS */}
-
-            {Array.from({ length: 6 }).map((_, index) => (
-
-              <div
-                className="receiving-loading-table-row"
-                key={index}
-              >
-
-                <div className="receiving-loading-checkbox skeleton-shimmer" />
-
-                <div className="receiving-loading-number skeleton-shimmer" />
-
-                <div className="receiving-loading-table-line receiving-loading-line-code skeleton-shimmer" />
-
-                <div className="receiving-loading-table-line receiving-loading-line-description skeleton-shimmer" />
-
-                <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
-
-                <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
-
-                <div className="receiving-loading-table-line receiving-loading-line-small skeleton-shimmer" />
-
-                <div className="receiving-loading-pill skeleton-shimmer" />
-
-              </div>
-
-            ))}
-
-          </div>
-
-        </main>
-
-      </div>
-
-    </div>
-
-  );
-
-}
+    }
 
 
     if (error) {
 
-  const isNetworkError =
-    error
-      .toLowerCase()
-      .includes("network");
+        const isNetworkError =
+            error
+                .toLowerCase()
+                .includes("network");
 
 
-  return (
+        return (
 
-    <div
-      className={`
+            <div
+                className={`
         receiving-details-page
         receiving-details-error-page
 
-        ${
-          isClosing
-            ? "receiving-details-page-closing"
-            : ""
-        }
+        ${isClosing
+                        ? "receiving-details-page-closing"
+                        : ""
+                    }
       `}
-      onAnimationEnd={(event) => {
+                onAnimationEnd={(event) => {
 
-        if (
-          isClosing &&
-          event.animationName ===
-            "receivingDetailsExitLeft"
-        ) {
+                    if (
+                        isClosing &&
+                        event.animationName ===
+                        "receivingDetailsExitLeft"
+                    ) {
 
-          navigate(-1);
+                        navigate(-1);
 
-        }
+                    }
 
-      }}
-    >
+                }}
+            >
 
-      <div className="receiving-details-error-container">
+                <div className="receiving-details-error-container">
 
 
-        {/* =====================================
+                    {/* =====================================
             ERROR ICON
         ===================================== */}
 
-        <div className="receiving-details-error-icon">
+                    <div className="receiving-details-error-icon">
 
-          <WifiOff
-            size={32}
-            strokeWidth={1.8}
-          />
+                        <WifiOff
+                            size={32}
+                            strokeWidth={1.8}
+                        />
 
-        </div>
+                    </div>
 
 
-        {/* =====================================
+                    {/* =====================================
             CONTENT
         ===================================== */}
 
-        <div className="receiving-details-error-content">
+                    <div className="receiving-details-error-content">
 
 
-          <span className="receiving-details-error-eyebrow">
+                        <span className="receiving-details-error-eyebrow">
 
-            No pudimos cargar la información
+                            No pudimos cargar la información
 
-          </span>
-
-
-          <h2 className="receiving-details-error-title">
-
-            {
-              isNetworkError
-                ? "No hay conexión con el servidor"
-                : "Ocurrió un problema"
-            }
-
-          </h2>
+                        </span>
 
 
-          <p className="receiving-details-error-description">
+                        <h2 className="receiving-details-error-title">
 
-            {
-              isNetworkError
-                ? "No fue posible conectarse al servidor del WMS. Verifica tu conexión o intenta nuevamente."
-                : "No pudimos obtener los detalles de esta orden de compra. Puedes intentar nuevamente."
-            }
+                            {
+                                isNetworkError
+                                    ? "No hay conexión con el servidor"
+                                    : "Ocurrió un problema"
+                            }
 
-          </p>
+                        </h2>
 
 
-          {/* =====================================
+                        <p className="receiving-details-error-description">
+
+                            {
+                                isNetworkError
+                                    ? "No fue posible conectarse al servidor del WMS. Verifica tu conexión o intenta nuevamente."
+                                    : "No pudimos obtener los detalles de esta orden de compra. Puedes intentar nuevamente."
+                            }
+
+                        </p>
+
+
+                        {/* =====================================
               TECHNICAL MESSAGE
           ===================================== */}
 
-          <div className="receiving-details-error-technical">
+                        <div className="receiving-details-error-technical">
 
-            <span className="receiving-details-error-technical-label">
-              Detalle técnico
-            </span>
+                            <span className="receiving-details-error-technical-label">
+                                Detalle técnico
+                            </span>
 
-            <span className="receiving-details-error-technical-value">
-              {error}
-            </span>
+                            <span className="receiving-details-error-technical-value">
+                                {error}
+                            </span>
 
-          </div>
+                        </div>
 
 
-          {/* =====================================
+                        {/* =====================================
               ACTIONS
           ===================================== */}
 
-          <div className="receiving-details-error-actions">
+                        <div className="receiving-details-error-actions">
 
 
-            <button
-              type="button"
-              className="
+                            <button
+                                type="button"
+                                className="
                 receiving-details-error-button
                 receiving-details-error-button-primary
               "
-              onClick={() => {
+                                onClick={() => {
 
-                window.location.reload();
+                                    window.location.reload();
 
-              }}
-            >
+                                }}
+                            >
 
-              <RefreshCw
-                size={17}
-                strokeWidth={2}
-              />
+                                <RefreshCw
+                                    size={17}
+                                    strokeWidth={2}
+                                />
 
-              <span>
-                Intentar nuevamente
-              </span>
+                                <span>
+                                    Intentar nuevamente
+                                </span>
 
-            </button>
+                            </button>
 
 
-            <button
-              type="button"
-              className="
+                            <button
+                                type="button"
+                                className="
                 receiving-details-error-button
                 receiving-details-error-button-secondary
               "
-              onClick={handleBack}
-            >
+                                onClick={handleBack}
+                            >
 
-              <ArrowLeft
-                size={17}
-                strokeWidth={2}
-              />
+                                <ArrowLeft
+                                    size={17}
+                                    strokeWidth={2}
+                                />
 
-              <span>
-                Volver atrás
-              </span>
+                                <span>
+                                    Volver atrás
+                                </span>
 
-            </button>
+                            </button>
 
-          </div>
+                        </div>
 
-        </div>
+                    </div>
 
-      </div>
+                </div>
 
-    </div>
+            </div>
 
-  );
+        );
 
-}
+    }
 
 
 
     return (
 
-    <div
-        className={`
+        <div
+            className={`
             receiving-details-page
-            ${
-                isClosing
+            ${isClosing
                     ? "receiving-details-page-closing"
                     : ""
-            }
+                }
         `}
-        onAnimationEnd={(event) => {
+            onAnimationEnd={(event) => {
 
-            if (
-                isClosing &&
-                event.animationName ===
+                if (
+                    isClosing &&
+                    event.animationName ===
                     "receivingDetailsExitLeft"
-            ) {
+                ) {
 
-                navigate(-1);
+                    navigate(-1);
 
-            }
+                }
 
-        }}
-    >
+            }}
+        >
 
-        <div className="receiving-details-layout">
+            <div className="receiving-details-layout">
 
 
                 {/* =====================================
@@ -857,23 +990,23 @@ export default function ReceivingDetailsPage() {
 
                     <div className="receiving-details-back-section">
 
-                       <button
-    type="button"
-    className="receiving-details-back-button"
-    onClick={handleBack}
-    disabled={isClosing}
->
+                        <button
+                            type="button"
+                            className="receiving-details-back-button"
+                            onClick={handleBack}
+                            disabled={isClosing}
+                        >
 
-    <ArrowLeft
-        size={20}
-        strokeWidth={2.2}
-    />
+                            <ArrowLeft
+                                size={20}
+                                strokeWidth={2.2}
+                            />
 
-    <span>
-        Volver atrás
-    </span>
+                            <span>
+                                Volver atrás
+                            </span>
 
-</button>
+                        </button>
 
                     </div>
 
@@ -1403,32 +1536,38 @@ export default function ReceivingDetailsPage() {
 
 
                     {/* =================================
-              FOOTER
-          ================================= */}
+    FOOTER
+================================= */}
 
-                    <div className="receiving-details-footer">
+<div className="receiving-details-footer">
 
-                     {/*
-<button
-  type="button"
-  className="receiving-details-delete-button"
-  onClick={handleDeleteReceipt}
->
+    {selectedDocument?.type === "receipt" && (
 
-  <Trash2
-    size={20}
-    strokeWidth={2}
-  />
+        <button
+            type="button"
+            className="receiving-details-delete-button"
+            onClick={handleDeleteReceipt}
+            disabled={isDeletingReceipt}
+        >
 
-  <span>
-    Borrar Recepción
-  </span>
+            <Trash2
+                size={20}
+                strokeWidth={2}
+            />
 
-</button>
-*/}
+            <span>
+                {
+                    isDeletingReceipt
+                        ? "Cancelando recepción..."
+                        : "Borrar Recepción"
+                }
+            </span>
 
-                    </div>
+        </button>
 
+    )}
+
+</div>
                 </main>
 
             </div>

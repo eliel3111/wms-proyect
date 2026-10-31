@@ -25,8 +25,11 @@ function getCurrentMonthDateRange() {
   };
 }
 
-//Controller with the main logic
-export async function syncAdmCloudSalesOrdersController(req, res) {
+// ============================================================
+// SERVICIO - SINCRONIZAR SALES ORDERS ADM CLOUD
+// ============================================================
+
+export async function runAdmCloudSalesOrdersSync() {
   let clientDb;
 
   try {
@@ -205,29 +208,79 @@ export async function syncAdmCloudSalesOrdersController(req, res) {
     };
 
     console.log("✅ SALES ORDERS SYNC TERMINADO");
-    console.log(summary);
+console.log(summary);
 
-    return res.status(200).json(summary);
+return summary;
   } catch (error) {
-    console.error(
-      "❌ ERROR SALES ORDERS SYNC:",
-      error.response?.data || error.message
-    );
 
-    return res
-      .status(error.response?.status || 500)
-      .json({
-        success: false,
-        message: "Error sincronizando Sales Orders desde ADM Cloud",
-        error: error.response?.data || error.message,
-      });
-  } finally {
-    clientDb?.release();
-  }
+  console.error(
+    "❌ ERROR SALES ORDERS SYNC:",
+    error.stack || error.message
+  );
+
+  throw error;
+
+} finally {
+
+  clientDb?.release();
+
+}
 }
 
 
 
+// ============================================================
+// CONTROLLER - SINCRONIZAR SALES ORDERS ADM CLOUD
+// ============================================================
+
+export async function syncAdmCloudSalesOrdersController(req, res) {
+
+  try {
+
+    console.log(
+      "🌐 SOLICITUD HTTP: SYNC SALES ORDERS ADM CLOUD"
+    );
+
+    // ========================================================
+    // EJECUTAR SERVICIO
+    // ========================================================
+
+    const result = await runAdmCloudSalesOrdersSync();
+
+    // ========================================================
+    // RESPONDER AL FRONTEND / POSTMAN
+    // ========================================================
+
+    return res.status(200).json(result);
+
+  } catch (error) {
+
+    console.error(
+      "❌ ERROR CONTROLLER SALES ORDERS:",
+      error.stack || error.message
+    );
+
+    return res.status(
+      error.response?.status || 500
+    ).json({
+
+      success: false,
+
+      title: "Error sincronizando Sales Orders",
+
+      message:
+        error.response?.data?.message ||
+        error.message ||
+        "Ocurrió un error inesperado.",
+
+      code:
+        error.code || "SALES_ORDERS_SYNC_ERROR"
+
+    });
+
+  }
+
+}
 
 //Obtain from the ERP all the sales orders
 export async function getAdmCloudSalesOrders(

@@ -213,132 +213,312 @@ export default function InventoryMonitorOptions({
   }
 
   return (
-    <div className="inventory-monitor-container-options">
-      <div className="inventory-monitor-adjuments">
-        <div className="inventory-monitor-adjuments-arriba">
-          <Settings size={32} />
-          <h3>MODO DE AJSUTE DE INVENTARIO</h3>
+  <div className="inventory-monitor-container-options">
+
+    {/* =====================================================
+        HEADER
+    ===================================================== */}
+
+    <div className="inventory-monitor-adjuments">
+
+      <div className="inventory-monitor-adjuments-arriba">
+
+        <div className="inventory-monitor-header-icon">
+          <Settings
+            size={27}
+            strokeWidth={2}
+          />
         </div>
 
-        <div className="inventory-monitor-adjuments-abajo">
-          Seleccione el método de ajuste que se aplicará al finalizar los conteos.
+        <div className="inventory-monitor-header-content">
+
+          <span className="inventory-monitor-eyebrow">
+            INVENTARIO
+          </span>
+
+          <h3>
+            Modo de Ajuste de Inventario
+          </h3>
+
+          <div className="inventory-monitor-adjuments-abajo">
+            Seleccione el método de ajuste que se aplicará al finalizar los conteos.
+          </div>
+
         </div>
+
       </div>
 
-      <div className="inventory-monitor-options">
-        <div
-          className={`inventory-monitor-option ${adjustmentMode === "final" ? "selected" : ""
-            }`}
-          onClick={() => handleChangeMode("final")}
-        >
-          <div className="option-radio"></div>
+    </div>
+
+
+    {/* =====================================================
+        MODOS DE AJUSTE
+    ===================================================== */}
+
+    <div className="inventory-monitor-options">
+
+      {/* AJUSTE FINAL */}
+
+      <div
+        className={`
+          inventory-monitor-option
+          ${
+            adjustmentMode === "final"
+              ? "selected"
+              : ""
+          }
+        `}
+        onClick={() =>
+          handleChangeMode("final")
+        }
+      >
+
+        <div className="option-radio">
+          <span />
+        </div>
+
+
+        <div className="option-content">
 
           <div className="option-header">
+
             <div className="option-icon calendar">
-              <CalendarDays size={34} />
+
+              <CalendarDays
+                size={31}
+                strokeWidth={2}
+              />
+
             </div>
 
+
             <div className="option-title-row">
-              <h4>Ajuste al Final</h4>
-              <span>Recomendado</span>
+
+              <h4>
+                Ajuste al Final
+              </h4>
+
+              <span className="option-recommended">
+                Recomendado
+              </span>
+
             </div>
+
           </div>
+
 
           <p>
             Los ajustes se aplicarán al finalizar y confirmar toda la sesión de inventario.
           </p>
+
         </div>
 
-        <div
-          className={`inventory-monitor-option ${adjustmentMode === "immediate" ? "selected" : ""
-            }`}
-          onClick={() => handleChangeMode("immediate")}
-        >
-          <div className="option-radio"></div>
+      </div>
+
+
+      {/* AJUSTE INMEDIATO */}
+
+      <div
+        className={`
+          inventory-monitor-option
+          ${
+            adjustmentMode === "immediate"
+              ? "selected"
+              : ""
+          }
+        `}
+        onClick={() =>
+          handleChangeMode(
+            "immediate"
+          )
+        }
+      >
+
+        <div className="option-radio">
+          <span />
+        </div>
+
+
+        <div className="option-content">
 
           <div className="option-header">
+
             <div className="option-icon flash">
-              <Zap size={36} />
+
+              <Zap
+                size={32}
+                strokeWidth={2.1}
+              />
+
             </div>
 
+
             <div className="option-title-row">
-              <h4>Ajuste Inmediato</h4>
+
+              <h4>
+                Ajuste Inmediato
+              </h4>
+
             </div>
+
           </div>
+
 
           <p>
             Los ajustes se aplicarán inmediatamente después de cada conteo.
           </p>
+
         </div>
+
       </div>
 
-      <div className="inventory-monitor-alert">
-        <AlertTriangle size={24} />
-        <p>
-          No puede cambiar el método de ajuste mientras exista una sesión activa
-          <br />
-          <span>(draft o in-progress).</span>
-        </p>
+    </div>
+
+
+    {/* =====================================================
+        ALERTA
+    ===================================================== */}
+
+    <div className="inventory-monitor-alert">
+
+      <div className="inventory-monitor-alert-icon">
+
+        <AlertTriangle
+          size={21}
+          strokeWidth={2}
+        />
+
       </div>
 
 
+      <p>
+
+        <strong>
+          No puede cambiar el método de ajuste mientras exista una sesión activa.
+        </strong>
+
+        <span>
+          Estados bloqueados: draft o in-progress.
+        </span>
+
+      </p>
+
+    </div>
+
+
+    {/* =====================================================
+        WAREHOUSE + ACTION
+    ===================================================== */}
+
+    <div className="inventory-monitor-session-section">
 
       <div className="inventory-warehouse-select-container">
+
         <label htmlFor="warehouse-select">
-          Almacenes disponibles:
+          Almacenes disponibles
         </label>
 
-        <select
-          id="warehouse-select"
-          className="inventory-warehouse-select"
-          value={warehouseSelected?.id ?? ""}
-          disabled={warehouses.length <= 1}
-          onChange={(event) => {
-            const selectedWarehouse =
-              warehouses.find(
-                (warehouse) =>
-                  String(warehouse.id) === event.target.value
-              ) ?? null;
 
-            setWarehouseSelected(selectedWarehouse);
+        <div className="inventory-warehouse-select-wrapper">
 
-            console.log(
-              "🏬 Almacén seleccionado:",
-              selectedWarehouse
-            );
-          }}
-        >
-          {warehouses.length === 0 && (
-            <option value="">
-              No hay almacenes disponibles
-            </option>
-          )}
+          <select
+            id="warehouse-select"
+            className="inventory-warehouse-select"
+            value={
+              warehouseSelected?.id ??
+              ""
+            }
+            disabled={
+              warehouses.length <= 1
+            }
+            onChange={(event) => {
 
-          {warehouses.length > 1 && !warehouseSelected && (
-            <option value="">
-              Seleccione un almacén
-            </option>
-          )}
+              const selectedWarehouse =
+                warehouses.find(
+                  warehouse =>
+                    String(
+                      warehouse.id
+                    ) ===
+                    event.target.value
+                ) ?? null;
 
-          {warehouses.map((warehouse) => (
-            <option
-              key={warehouse.id}
-              value={String(warehouse.id)}
-            >
-              {warehouse.code} - {warehouse.name}
-            </option>
-          ))}
-        </select>
+
+              setWarehouseSelected(
+                selectedWarehouse
+              );
+
+
+              console.log(
+                "🏬 Almacén seleccionado:",
+                selectedWarehouse
+              );
+
+            }}
+          >
+
+            {warehouses.length === 0 && (
+
+              <option value="">
+                No hay almacenes disponibles
+              </option>
+
+            )}
+
+
+            {warehouses.length > 1 &&
+              !warehouseSelected && (
+
+                <option value="">
+                  Seleccione un almacén
+                </option>
+
+              )}
+
+
+            {warehouses.map(
+              warehouse => (
+
+                <option
+                  key={
+                    warehouse.id
+                  }
+                  value={
+                    String(
+                      warehouse.id
+                    )
+                  }
+                >
+
+                  {warehouse.code}
+                  {" - "}
+                  {warehouse.name}
+
+                </option>
+
+              )
+            )}
+
+          </select>
+
+        </div>
+
       </div>
-
 
 
       <button
+        type="button"
         className="inventory-session-action-btn"
-        onClick={handleCreateSession}
+        onClick={
+          handleCreateSession
+        }
       >
+
         Crear Sesión de Inventario
+
       </button>
+
     </div>
-  );
+
+  </div>
+);
 }

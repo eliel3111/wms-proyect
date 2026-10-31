@@ -23,7 +23,9 @@ import {
 import {
   runAdmCloudPurchaseOrdersSync
 } from "./admcloud.purchaseOrders.js";
-
+import {
+  runAdmCloudSalesOrdersSync
+} from "./admcloud.salesOrders.js";
 
 
 // ============================================================
@@ -230,4 +232,91 @@ export function startAdmCloudCron() {
 
     }
   );
+
+
+
+// ============================================================
+// CRON - SALES ORDERS ADM CLOUD
+// CADA 30 SEGUNDOS
+// ============================================================
+
+let salesOrdersSyncRunning = false;
+
+cron.schedule(
+  "*/30 * * * * *",
+  async () => {
+
+    // ========================================================
+    // EVITAR EJECUCIONES SIMULTÁNEAS
+    // ========================================================
+
+    if (salesOrdersSyncRunning) {
+
+      console.log(
+        "⏭️ Sales Orders Sync omitido: sincronización anterior en ejecución."
+      );
+
+      return;
+    }
+
+    salesOrdersSyncRunning = true;
+
+    console.log("");
+    console.log("==============================================");
+    console.log("🚚 CRON ADM CLOUD: SALES ORDERS");
+    console.log("🕒 Fecha:", new Date().toISOString());
+    console.log("==============================================");
+
+    try {
+
+      // ======================================================
+      // EJECUTAR SERVICIO
+      // ======================================================
+
+      const result = await runAdmCloudSalesOrdersSync();
+
+      console.log("");
+      console.log("✅ SALES ORDERS SYNC FINALIZADO");
+
+      console.log("📊 RESUMEN:", {
+        success: result.success,
+        totalReceived: result.totalReceived,
+        totalUnique: result.totalUnique,
+        inserted: result.inserted,
+        updated: result.updated,
+        done: result.done,
+        draft: result.draft,
+        failed: result.failed
+      });
+
+    } catch (error) {
+
+      console.error(
+        "❌ ERROR CRON SALES ORDERS:",
+        {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          data: error.response?.data,
+          stack: error.stack
+        }
+      );
+
+    } finally {
+
+      // ======================================================
+      // LIBERAR LOCK
+      // ======================================================
+
+      salesOrdersSyncRunning = false;
+
+    }
+
+  }
+);
+
+
+
 }
+
+

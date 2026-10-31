@@ -84,7 +84,10 @@ import {
 import {
   getAdmCloudProductByIdController,
 } from "./integrations/admcloud/admcloud.items.js";
-
+//Search a conduce using an guid
+import {
+    getAdmCloudDispatchController
+} from "./integrations/admcloud/admcloud.conduce.js";
 
 
 const app = express();
@@ -118,9 +121,23 @@ console.log(resultado);
 }
 app.use(express.json());
 
-startAdmCloudCron();
+//startAdmCloudCron();
 
 
+
+
+
+
+
+
+// =====================================================
+// 🧪 TEST - OBTENER CONDUCE ADM CLOUD
+// =====================================================
+
+app.get(
+    "/test-admcloud-dispatch",
+    getAdmCloudDispatchController
+);
 
 // =====================================================
 // ADM CLOUD - BUSCAR PRODUCTO POR GUID

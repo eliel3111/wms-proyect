@@ -1,14 +1,25 @@
 import express from "express";
 import {gettingOpenOrders, confirmingIdOrder, getReceivingByPoId, savingReception, getReceivingDifferences, gettingReceptionLocation, CloseReception, getRecentCompletedReceipts,
-  searchPurchaseOrdersWithReceipts, getPurchaseOrderFullDetails } from "../controllers/receivingController.js"
+  searchPurchaseOrdersWithReceipts, getPurchaseOrderFullDetails, CancelPurchaseOrderReception } from "../controllers/receivingController.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { log } from "console";
 
 
 const router = express.Router();
 
+
+// Cancelar recepción relacionada con una PO
+router.post(
+  "/cancel-purchase-order-reception",
+  authMiddleware,
+  CancelPurchaseOrderReception
+);
+
 // Close a reception process
 router.post("/close",authMiddleware, CloseReception);
+
+
+
 
 
 // Search ALL open or patial purchase orders

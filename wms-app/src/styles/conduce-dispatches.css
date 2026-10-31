@@ -1,0 +1,913 @@
+/* =========================================================
+   GARLAS CONTROL
+   CONDUCE DE DESPACHOS
+   DESKTOP ERP
+========================================================= */
+
+.dispatch-monitor-page {
+    width: 100%;
+    min-height: 100%;
+
+    padding:
+        26px
+        34px
+        40px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #f5f7fa 0%,
+            #f8fafc 100%
+        );
+
+    font-family:
+        var(
+            --font-ui,
+            "Geist Variable",
+            sans-serif
+        );
+
+    color:
+        var(
+            --text-primary,
+            #17233c
+        );
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.dispatch-monitor-banner {
+    min-height: 138px;
+
+    padding:
+        24px
+        28px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content:
+        space-between;
+
+    border:
+        1px solid
+        #dce5ef;
+
+    border-radius:
+        16px;
+
+    background:
+        radial-gradient(
+            circle at 82% 50%,
+            rgba(
+                37,
+                134,
+                223,
+                0.13
+            ) 0%,
+            rgba(
+                37,
+                134,
+                223,
+                0
+            ) 34%
+        ),
+        linear-gradient(
+            135deg,
+            #ffffff 0%,
+            #f5f9fe 54%,
+            #e8f3ff 100%
+        );
+
+    box-shadow:
+        0
+        4px
+        15px
+        rgba(
+            15,
+            23,
+            42,
+            0.045
+        );
+}
+
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.dispatch-monitor-title-group {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+}
+
+
+.dispatch-monitor-eyebrow {
+    color:
+        #6f8097;
+
+    font-size:
+        var(
+            --text-xs,
+            12px
+        );
+
+    line-height:
+        17px;
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+
+    letter-spacing:
+        0.13em;
+
+    text-transform:
+        uppercase;
+}
+
+
+.dispatch-monitor-title {
+    margin: 0;
+
+    color:
+        #17233c;
+
+    font-size:
+        32px;
+
+    line-height:
+        1.15;
+
+    font-weight:
+        var(
+            --weight-bold,
+            690
+        );
+
+    letter-spacing:
+        -0.035em;
+}
+
+
+/* =========================================================
+   TRUCK
+========================================================= */
+
+.dispatch-monitor-truck {
+    width: 70px;
+    height: 70px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content:
+        center;
+
+    flex-shrink: 0;
+
+    color:
+        #b88900;
+
+    border:
+        1px solid
+        #e0e8f1;
+
+    border-radius:
+        13px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.82
+        );
+
+    box-shadow:
+        0
+        4px
+        14px
+        rgba(
+            15,
+            23,
+            42,
+            0.06
+        );
+}
+
+
+/* =========================================================
+   CARD
+========================================================= */
+
+.dispatch-monitor-card {
+    width: 100%;
+
+    overflow: hidden;
+
+    border:
+        1px solid
+        #e0e7ef;
+
+    border-radius:
+        15px;
+
+    background:
+        #ffffff;
+
+    box-shadow:
+        0
+        5px
+        18px
+        rgba(
+            15,
+            23,
+            42,
+            0.045
+        );
+}
+
+
+/* =========================================================
+   CARD HEADER
+========================================================= */
+
+.dispatch-monitor-card-header {
+    min-height: 86px;
+
+    padding:
+        15px
+        22px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content:
+        space-between;
+
+    gap: 30px;
+
+    border-bottom:
+        1px solid
+        #e6ebf1;
+}
+
+
+.dispatch-monitor-card-header h2 {
+    margin:
+        0
+        0
+        3px;
+
+    color:
+        #17233c;
+
+    font-size:
+        21px;
+
+    line-height:
+        27px;
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+
+    letter-spacing:
+        -0.022em;
+}
+
+
+.dispatch-monitor-card-header p {
+    margin: 0;
+
+    color:
+        #7c899c;
+
+    font-size:
+        12.5px;
+
+    line-height:
+        18px;
+}
+
+
+.dispatch-monitor-search {
+    flex:
+        0
+        0
+        auto;
+}
+
+
+/* =========================================================
+   TABLE
+========================================================= */
+
+.dispatch-monitor-table {
+    width: 100%;
+
+    background:
+        #ffffff;
+}
+
+
+.dispatch-monitor-row {
+    min-height:
+        58px;
+
+    padding:
+        0
+        22px;
+
+    display: grid;
+
+    grid-template-columns:
+        minmax(
+            160px,
+            0.9fr
+        )
+        minmax(
+            130px,
+            0.8fr
+        )
+        minmax(
+            180px,
+            1fr
+        )
+        minmax(
+            260px,
+            1.8fr
+        )
+        minmax(
+            220px,
+            1.3fr
+        );
+
+    align-items:
+        center;
+
+    gap:
+        20px;
+
+    border-bottom:
+        1px solid
+        #edf1f5;
+
+    color:
+        #344258;
+
+    font-size:
+        13px;
+
+    line-height:
+        18px;
+
+    letter-spacing:
+        var(
+            --tracking-ui,
+            -0.008em
+        );
+
+    transition:
+        background-color
+        120ms
+        ease;
+}
+
+
+.dispatch-monitor-row:not(
+    .dispatch-monitor-row-header
+):hover {
+    background:
+        #f7faff;
+}
+
+
+/* =========================================================
+   HEADER ROW
+========================================================= */
+
+.dispatch-monitor-row-header {
+    min-height:
+        48px;
+
+    color:
+        #68788f;
+
+    background:
+        #f5f8fb;
+
+    font-size:
+        11px;
+
+    line-height:
+        15px;
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+
+    letter-spacing:
+        0.04em;
+
+    text-transform:
+        uppercase;
+}
+
+
+/* =========================================================
+   CONDUCE NUMBER LINK
+========================================================= */
+
+.dispatch-monitor-number {
+    margin: 0;
+
+    padding: 0;
+
+    border: 0;
+
+    background:
+        transparent;
+
+    color:
+        #b88900;
+
+    font-family:
+        var(
+            --font-data,
+            "Geist Mono Variable",
+            monospace
+        );
+
+    font-size:
+        13px;
+
+    line-height:
+        18px;
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+
+    letter-spacing:
+        -0.015em;
+
+    text-decoration:
+        underline;
+
+    text-decoration-thickness:
+        1px;
+
+    text-underline-offset:
+        3px;
+
+    cursor:
+        pointer;
+
+    transition:
+        color
+        120ms
+        ease;
+}
+
+
+.dispatch-monitor-number:hover {
+    color:
+        #876500;
+}
+
+
+/* =========================================================
+   TECHNICAL DATA
+========================================================= */
+
+.dispatch-monitor-date,
+.dispatch-monitor-reference {
+    font-family:
+        var(
+            --font-data,
+            "Geist Mono Variable",
+            monospace
+        );
+
+    font-size:
+        12.5px;
+
+    font-variant-numeric:
+        tabular-nums;
+
+    color:
+        #53647a;
+}
+
+
+.dispatch-monitor-client {
+    min-width: 0;
+
+    overflow: hidden;
+
+    color:
+        #2c3e56;
+
+    font-weight:
+        var(
+            --weight-medium,
+            510
+        );
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+
+/* =========================================================
+   LOCATION
+========================================================= */
+
+.dispatch-monitor-location {
+    min-width: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    color:
+        #53647a;
+}
+
+
+.dispatch-monitor-location-icon {
+    width:
+        27px;
+
+    height:
+        27px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    flex:
+        0 0
+        27px;
+
+    color:
+        #607690;
+
+    border-radius:
+        7px;
+
+    background:
+        #f1f5f9;
+}
+
+
+.dispatch-monitor-location span:last-child {
+    min-width: 0;
+
+    overflow: hidden;
+
+    text-overflow:
+        ellipsis;
+
+    white-space:
+        nowrap;
+}
+
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.dispatch-monitor-footer {
+    min-height:
+        70px;
+
+    padding:
+        12px
+        22px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        space-between;
+
+    gap:
+        20px;
+
+    background:
+        #ffffff;
+}
+
+
+.dispatch-monitor-results {
+    color:
+        #63738a;
+
+    font-size:
+        12.5px;
+
+    line-height:
+        18px;
+}
+
+
+.dispatch-monitor-results strong {
+    color:
+        #344258;
+
+    font-family:
+        var(
+            --font-data,
+            "Geist Mono Variable",
+            monospace
+        );
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+}
+
+
+/* =========================================================
+   PAGINATION
+========================================================= */
+
+.dispatch-monitor-pagination {
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        5px;
+}
+
+
+.dispatch-page-button {
+    width:
+        38px;
+
+    height:
+        38px;
+
+    padding: 0;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    border:
+        1px solid
+        #dce4ed;
+
+    border-radius:
+        8px;
+
+    background:
+        #ffffff;
+
+    color:
+        #52627a;
+
+    font-family:
+        var(
+            --font-data,
+            "Geist Mono Variable",
+            monospace
+        );
+
+    font-size:
+        12px;
+
+    font-weight:
+        var(
+            --weight-medium,
+            510
+        );
+
+    cursor:
+        pointer;
+
+    transition:
+        background-color
+        120ms
+        ease,
+        color
+        120ms
+        ease,
+        border-color
+        120ms
+        ease;
+}
+
+
+.dispatch-page-button:hover:not(
+    :disabled
+) {
+    color:
+        #1769d2;
+
+    border-color:
+        #b9d8f7;
+
+    background:
+        #edf6ff;
+}
+
+
+.dispatch-page-button.active {
+    color:
+        #ffffff;
+
+    border-color:
+        #1976df;
+
+    background:
+        #1976df;
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+}
+
+
+.dispatch-page-button:disabled {
+    opacity:
+        0.4;
+
+    cursor:
+        default;
+}
+
+
+.dispatch-page-ellipsis {
+    width:
+        30px;
+
+    display:
+        flex;
+
+    justify-content:
+        center;
+
+    color:
+        #8491a3;
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+.dispatch-monitor-loading {
+    min-height:
+        400px;
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.dispatch-monitor-empty {
+    min-height:
+        370px;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    gap:
+        7px;
+
+    color:
+        #8592a4;
+}
+
+
+.dispatch-monitor-empty svg {
+    margin-bottom:
+        5px;
+
+    color:
+        #a7b3c2;
+}
+
+
+.dispatch-monitor-empty strong {
+    color:
+        #344258;
+
+    font-size:
+        16px;
+
+    font-weight:
+        var(
+            --weight-semibold,
+            620
+        );
+}
+
+
+.dispatch-monitor-empty span {
+    font-size:
+        13px;
+}
+
+
+/* =========================================================
+   TABLE BODY
+========================================================= */
+
+.dispatch-monitor-table-body {
+    width:
+        100%;
+}
+
+
+/* =========================================================
+   RESPONSIVE DESKTOP
+========================================================= */
+
+@media (
+    max-width: 1250px
+) {
+
+    .dispatch-monitor-page {
+        padding:
+            22px;
+    }
+
+
+    .dispatch-monitor-row {
+        grid-template-columns:
+            150px
+            120px
+            160px
+            minmax(
+                220px,
+                1.5fr
+            )
+            minmax(
+                180px,
+                1fr
+            );
+    }
+
+}
