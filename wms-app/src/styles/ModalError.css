@@ -1,67 +1,397 @@
+/* =====================================================
+   SIDIAL WMS - GLOBAL MODAL
+===================================================== */
+
+
+/* =====================================================
+   OVERLAY
+===================================================== */
+
 .modal-error-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
+
+  inset: 0;
+
   width: 100%;
   height: 100%;
-  background: rgba(62, 38, 38, 0.632);
+
+  background: rgba(15, 23, 42, 0.58);
+
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+
   display: flex;
   justify-content: center;
   align-items: center;
-  animation: fadeIn 0.25s ease;
+
+  padding: 20px;
+
+  box-sizing: border-box;
+
   z-index: 999999999;
+
+  animation: modalFadeIn 0.2s ease;
 }
+
+
+/* =====================================================
+   CONTENEDOR
+===================================================== */
 
 .modal-error-content {
-  background: white;
-  padding: 25px 30px;
-  border-radius: 12px;
-  width: 320px;
+  --modal-color: #c62828;
+  --modal-background: #fdecec;
+
+  position: relative;
+
+  width: 100%;
+  max-width: 410px;
+
+  background: #ffffff;
+
+  border-radius: 22px;
+
+  padding: 36px 30px 28px;
+
+  box-sizing: border-box;
+
   text-align: center;
-  animation: scaleIn 0.25s ease;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.18),
+    0 4px 12px rgba(0, 0, 0, 0.05);
+
+  animation: modalScaleIn 0.25s ease;
+
+  max-height: calc(100dvh - 40px);
+
+  overflow-y: auto;
 }
 
-.modal-error-content h2 {
-  margin: 0 0 10px;
-  font-size: 20px;
-  color: #d32f2f;
+
+/* =====================================================
+   ESTADO SUCCESS
+===================================================== */
+
+.modal-error-success {
+  --modal-color: #16803d;
+  --modal-background: #e8f5ed;
 }
 
-.modal-error-content p {
-  font-size: 15px;
-  margin-bottom: 20px;
+
+/* =====================================================
+   ESTADO ERROR
+===================================================== */
+
+.modal-error-error {
+  --modal-color: #c62828;
+  --modal-background: #fdecec;
 }
+
+
+/* =====================================================
+   ESTADO WARNING
+===================================================== */
+
+.modal-error-warning {
+  --modal-color: #b7791f;
+  --modal-background: #fff4df;
+}
+
+
+/* =====================================================
+   ICONO
+===================================================== */
+
+.modal-error-icon {
+  width: 74px;
+  height: 74px;
+
+  margin: 0 auto 23px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  border-radius: 50%;
+
+  color: var(--modal-color);
+
+  background: var(--modal-background);
+
+  box-shadow:
+    0 0 0 7px rgba(0, 0, 0, 0.015);
+}
+
+
+/* =====================================================
+   TITULO
+===================================================== */
+
+.modal-error-title {
+  margin: 0 0 13px;
+
+  padding: 0;
+
+  font-size: 22px;
+  font-weight: 700;
+
+  line-height: 1.3;
+
+  letter-spacing: -0.4px;
+
+  color: #20252b;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* =====================================================
+   MENSAJE
+===================================================== */
+
+.modal-error-message {
+  margin: 0 0 28px;
+
+  padding: 0;
+
+  font-size: 16px;
+  font-weight: 400;
+
+  line-height: 1.65;
+
+  letter-spacing: 0;
+
+  color: #313232;
+
+  white-space: pre-line;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* =====================================================
+   BOTÓN PRINCIPAL
+===================================================== */
 
 .modal-error-button {
-  background: #007aff;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 15px;
-  cursor: pointer;
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+
   width: 100%;
+
+  min-height: 52px;
+
+  padding: 12px 20px;
+
+  background: var(--modal-color);
+
+  color: #ffffff;
+
+  border: none;
+
+  border-radius: 12px;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  line-height: 1.3;
+
+  cursor: pointer;
+
+  transition:
+    filter 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.08);
 }
+
+
+/* =====================================================
+   HOVER
+===================================================== */
 
 .modal-error-button:hover {
-  background: #0062cc;
+  filter: brightness(0.93);
+
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.12);
 }
 
-/* Animaciones */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+
+/* =====================================================
+   ACTIVE
+===================================================== */
+
+.modal-error-button:active {
+  transform: scale(0.98);
 }
 
-@keyframes scaleIn {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+
+/* =====================================================
+   FOCUS
+===================================================== */
+
+.modal-error-button:focus-visible {
+  outline: 3px solid var(--modal-color);
+
+  outline-offset: 3px;
 }
 
-/* 📱 MOBILE */
-@media (max-width: 768px) {
-  .modal-error-content {
-    width: 280px;
+
+/* =====================================================
+   ANIMACIONES
+===================================================== */
+
+@keyframes modalFadeIn {
+
+  from {
+    opacity: 0;
   }
+
+  to {
+    opacity: 1;
+  }
+
+}
+
+
+@keyframes modalScaleIn {
+
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(14px)
+      scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+
+}
+
+
+/* =====================================================
+   TABLET
+===================================================== */
+
+@media (max-width: 768px) {
+
+  .modal-error-content {
+    max-width: 380px;
+
+    padding: 32px 26px 26px;
+  }
+
+  .modal-error-title {
+    font-size: 21px;
+  }
+
+}
+
+
+/* =====================================================
+   MOBILE / PDA
+===================================================== */
+
+@media (max-width: 600px) {
+
+  .modal-error-overlay {
+    padding: 0;
+
+    align-items: flex-end;
+  }
+
+  .modal-error-content {
+    width: 100%;
+
+    max-width: 100%;
+
+    max-height: 90dvh;
+
+    border-radius:
+      24px 24px 0 0;
+
+    padding:
+      32px
+      24px
+      calc(24px + env(safe-area-inset-bottom));
+
+    animation: modalSlideUp 0.25s ease;
+  }
+
+  .modal-error-icon {
+    width: 66px;
+    height: 66px;
+
+    margin-bottom: 20px;
+  }
+
+  .modal-error-title {
+    font-size: 20px;
+  }
+
+  .modal-error-message {
+    font-size: 14px;
+
+    line-height: 1.6;
+
+    margin-bottom: 26px;
+  }
+
+  .modal-error-button {
+    min-height: 54px;
+
+    font-size: 16px;
+  }
+
+}
+
+
+/* =====================================================
+   ANIMACIÓN MOBILE
+===================================================== */
+
+@keyframes modalSlideUp {
+
+  from {
+    opacity: 0;
+
+    transform: translateY(40px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform: translateY(0);
+  }
+
+}
+
+
+/* =====================================================
+   ACCESIBILIDAD
+===================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .modal-error-overlay,
+  .modal-error-content {
+    animation: none;
+  }
+
+  .modal-error-button {
+    transition: none;
+  }
+
 }

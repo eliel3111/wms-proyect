@@ -253,7 +253,7 @@ const movesResult = await client.query(
   ) {
     return {
       data: [],
-      message: "Ningún producto tiene inventario en ubicaciones",
+      message: "Ningún producto tiene inventario, por favor revisar los productos de la orden de venta y sus cantidades en Sidial.",
     };
   }
 

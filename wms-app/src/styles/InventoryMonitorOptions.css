@@ -1656,3 +1656,1606 @@ label[for="warehouse-select"] {
   }
 
 }
+
+
+/* =========================================================
+   GARLAS CONTROL WMS
+   ACTIVE INVENTORY SESSION
+   ERP / RESPONSIVE DESIGN
+
+   PEGAR AL FINAL DE InventoryMonitorOptions.css
+========================================================= */
+
+
+/* =========================================================
+   MAIN
+========================================================= */
+
+.inventory-monitor-container-option {
+  width: 100%;
+
+  min-height:
+    calc(
+      100dvh - 56px
+    );
+
+  padding:
+    24px
+    28px
+    40px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 18px;
+
+  overflow: visible;
+
+  box-sizing: border-box;
+
+  border: none;
+
+  border-radius: 0;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f5f7fa 0%,
+      #f8fafc 100%
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+}
+
+
+/* =========================================================
+   PAGE HEADER
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-monitor-session-up {
+  width: 100%;
+
+  min-height: 118px;
+
+  padding:
+    20px
+    24px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 17px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dce5ef;
+
+  border-radius:
+    15px;
+
+  background:
+    radial-gradient(
+      circle at 82% 50%,
+      rgba(
+        59,
+        130,
+        246,
+        0.11
+      ) 0%,
+      rgba(
+        59,
+        130,
+        246,
+        0
+      ) 36%
+    ),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #f8fbff 62%,
+      #edf5ff 100%
+    );
+
+  box-shadow:
+    0
+    4px
+    14px
+    rgba(
+      15,
+      23,
+      42,
+      0.04
+    );
+}
+
+
+/* =========================================================
+   PAGE ICON
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-page-icon {
+  width: 64px;
+
+  height: 64px;
+
+  flex:
+    0
+    0
+    64px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    #dbe9fb;
+
+  border-radius:
+    14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #edf5ff 0%,
+      #e5efff 100%
+    );
+
+  color:
+    #2878dd;
+}
+
+
+/* =========================================================
+   PAGE HEADING
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-page-heading {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+}
+
+
+/* =========================================================
+   EYEBROW
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-eyebrow {
+  margin-bottom:
+    3px;
+
+  color:
+    #718099;
+
+  font-size:
+    var(
+      --text-2xs,
+      11px
+    );
+
+  line-height:
+    16px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    0.105em;
+
+  text-transform:
+    uppercase;
+}
+
+
+/* =========================================================
+   PAGE TITLE
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-title {
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    var(
+      --text-3xl,
+      26px
+    );
+
+  line-height:
+    var(
+      --leading-tight,
+      1.15
+    );
+
+  font-weight:
+    var(
+      --weight-bold,
+      690
+    );
+
+  letter-spacing:
+    var(
+      --tracking-display,
+      -0.035em
+    );
+}
+
+
+/* =========================================================
+   PAGE SUBTITLE
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-subtitle {
+  margin-top:
+    5px;
+
+  color:
+    var(
+      --text-secondary,
+      #52627a
+    );
+
+  font-size:
+    var(
+      --text-md,
+      14px
+    );
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+/* =========================================================
+   SESSION CARD
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-monitor-session-middle {
+  width: 100%;
+
+  padding:
+    0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  overflow: hidden;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dfe6ee;
+
+  border-radius:
+    15px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0
+    5px
+    18px
+    rgba(
+      15,
+      23,
+      42,
+      0.04
+    );
+}
+
+
+/* =========================================================
+   CARD HEADER
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-card-header {
+  width: 100%;
+
+  min-height:
+    68px;
+
+  padding:
+    0
+    22px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 11px;
+
+  box-sizing: border-box;
+
+  border-bottom:
+    1px solid
+    #e6ebf1;
+
+  background:
+    linear-gradient(
+      90deg,
+      #f6f9fd 0%,
+      #edf5ff 100%
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-size:
+    var(
+      --text-xl,
+      18px
+    );
+
+  line-height:
+    24px;
+
+  font-weight:
+    var(
+      --weight-bold,
+      690
+    );
+
+  letter-spacing:
+    var(
+      --tracking-heading,
+      -0.022em
+    );
+}
+
+
+.inventory-monitor-container-option
+.inventory-session-card-header-icon {
+  width: 36px;
+
+  height: 36px;
+
+  flex:
+    0
+    0
+    36px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  color:
+    #2878dd;
+}
+
+
+/* =========================================================
+   SESSION CODE AREA
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-code-container {
+  width: 100%;
+
+  padding:
+    25px
+    28px
+    18px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 16px;
+
+  box-sizing: border-box;
+}
+
+
+.inventory-monitor-container-option
+.inventory-session-code-line {
+  width: 4px;
+
+  height: 38px;
+
+  flex:
+    0
+    0
+    4px;
+
+  border-radius:
+    999px;
+
+  background:
+    #3478ea;
+}
+
+
+.inventory-monitor-container-option
+.inventory-session-code {
+  margin: 0;
+
+  padding: 0;
+
+  color:
+    #2f67dc;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    28px;
+
+  line-height:
+    34px;
+
+  font-weight:
+    680;
+
+  letter-spacing:
+    -0.04em;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   INFORMATION GRID
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-info-grid {
+  width: 100%;
+
+  padding:
+    0
+    28px
+    28px;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: 14px;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   INFO CARD
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-info-card {
+  min-height:
+    92px;
+
+  padding:
+    16px
+    18px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 15px;
+
+  min-width: 0;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dce5ef;
+
+  border-radius:
+    12px;
+
+  background:
+    #f9fbfd;
+}
+
+
+/* =========================================================
+   INFO ICON
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-info-icon {
+  width: 46px;
+
+  height: 46px;
+
+  flex:
+    0
+    0
+    46px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    #dce9f8;
+
+  border-radius:
+    11px;
+
+  background:
+    #eaf3ff;
+
+  color:
+    #2f78d7;
+}
+
+
+/* =========================================================
+   INFO CONTENT
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-info-content {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+
+/* =========================================================
+   LABEL
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-label {
+  min-width: 0;
+
+  color:
+    var(
+      --text-secondary,
+      #52627a
+    );
+
+  font-size:
+    var(
+      --text-sm,
+      13px
+    );
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+/* =========================================================
+   VALUE
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-info-value {
+  min-width: 0;
+
+  overflow: hidden;
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-size:
+    var(
+      --text-lg,
+      16px
+    );
+
+  line-height:
+    22px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    var(
+      --tracking-heading,
+      -0.022em
+    );
+
+  text-overflow:
+    ellipsis;
+}
+
+
+/* =========================================================
+   DATE
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-date {
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    13px;
+
+  line-height:
+    19px;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+
+  letter-spacing:
+    -0.015em;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   STATUS
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-status {
+  width: fit-content;
+
+  min-height:
+    27px;
+
+  padding:
+    4px
+    10px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    transparent;
+
+  border-radius:
+    999px;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    12px;
+
+  line-height:
+    17px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    -0.01em;
+
+  text-transform:
+    lowercase;
+}
+
+
+/* DRAFT */
+
+.inventory-monitor-container-option
+.inventory-session-status.draft {
+  color:
+    #2865cf;
+
+  background:
+    #eaf2ff;
+
+  border-color:
+    #cadcff;
+}
+
+
+/* IN PROGRESS */
+
+.inventory-monitor-container-option
+.inventory-session-status.in-progress {
+  color:
+    #087443;
+
+  background:
+    #e7f8ee;
+
+  border-color:
+    #c8ead7;
+}
+
+
+/* REVIEW */
+
+.inventory-monitor-container-option
+.inventory-session-status.review {
+  color:
+    #8a6500;
+
+  background:
+    #fff7dc;
+
+  border-color:
+    #ebd689;
+}
+
+
+/* POSTED */
+
+.inventory-monitor-container-option
+.inventory-session-status.posted {
+  color:
+    #087443;
+
+  background:
+    #e7f8ee;
+
+  border-color:
+    #c8ead7;
+}
+
+
+/* CANCELLED */
+
+.inventory-monitor-container-option
+.inventory-session-status.cancelled {
+  color:
+    #6f7d90;
+
+  background:
+    #f1f4f7;
+
+  border-color:
+    #d9e0e8;
+}
+
+
+/* =========================================================
+   ACTION FOOTER
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-monitor-session-down {
+  width: auto;
+
+  margin:
+    0
+    28px;
+
+  padding:
+    22px
+    0
+    26px;
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  gap: 12px;
+
+  box-sizing: border-box;
+
+  border-top:
+    1px solid
+    #e5ebf1;
+}
+
+
+/* =========================================================
+   BUTTON BASE
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-close-btn,
+
+.inventory-monitor-container-option
+.inventory-session-action-btn {
+  width: auto;
+
+  min-width:
+    190px;
+
+  height:
+    46px;
+
+  margin: 0;
+
+  padding:
+    0
+    18px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 9px;
+
+  box-sizing: border-box;
+
+  border-radius:
+    9px;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    var(
+      --text-md,
+      14px
+    );
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+
+  cursor: pointer;
+
+  transition:
+    background-color
+    120ms
+    ease,
+    border-color
+    120ms
+    ease,
+    box-shadow
+    120ms
+    ease,
+    transform
+    100ms
+    ease;
+}
+
+
+/* =========================================================
+   CANCEL BUTTON
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-close-btn {
+  border:
+    1px solid
+    #d94d55;
+
+  background:
+    linear-gradient(
+      180deg,
+      #e23b42 0%,
+      #cf272f 100%
+    );
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0
+    4px
+    10px
+    rgba(
+      207,
+      39,
+      47,
+      0.14
+    );
+}
+
+
+.inventory-monitor-container-option
+.inventory-session-close-btn:hover {
+  background:
+    linear-gradient(
+      180deg,
+      #d9343b 0%,
+      #bd2028 100%
+    );
+
+  box-shadow:
+    0
+    5px
+    12px
+    rgba(
+      207,
+      39,
+      47,
+      0.18
+    );
+}
+
+
+/* =========================================================
+   PRIMARY BUTTON
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-action-btn {
+  border:
+    1px solid
+    #2869eb;
+
+  background:
+    linear-gradient(
+      180deg,
+      #3f7bf1 0%,
+      #2d68e7 100%
+    );
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0
+    4px
+    10px
+    rgba(
+      45,
+      104,
+      231,
+      0.17
+    );
+}
+
+
+.inventory-monitor-container-option
+.inventory-session-action-btn:hover {
+  background:
+    linear-gradient(
+      180deg,
+      #3773e7 0%,
+      #255fd7 100%
+    );
+
+  box-shadow:
+    0
+    5px
+    13px
+    rgba(
+      45,
+      104,
+      231,
+      0.22
+    );
+}
+
+
+/* =========================================================
+   GREEN BUTTON
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-action-btn.green {
+  border-color:
+    #159252;
+
+  background:
+    linear-gradient(
+      180deg,
+      #22aa64 0%,
+      #158a4d 100%
+    );
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0
+    4px
+    10px
+    rgba(
+      21,
+      138,
+      77,
+      0.16
+    );
+}
+
+
+.inventory-monitor-container-option
+.inventory-session-action-btn.green:hover {
+  background:
+    linear-gradient(
+      180deg,
+      #1c9d5b 0%,
+      #117943 100%
+    );
+
+  color:
+    #ffffff;
+}
+
+
+/* =========================================================
+   BUTTON ACTIVE
+========================================================= */
+
+.inventory-monitor-container-option
+.inventory-session-close-btn:active,
+
+.inventory-monitor-container-option
+.inventory-session-action-btn:active {
+  transform:
+    translateY(1px);
+}
+
+
+/* =========================================================
+   LARGE DESKTOP / MONITOR
+========================================================= */
+
+@media (min-width: 1600px) {
+
+  .inventory-monitor-container-option {
+    padding:
+      28px
+      34px
+      48px;
+
+    gap:
+      20px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-monitor-session-up {
+    min-height:
+      124px;
+
+    padding:
+      22px
+      26px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-card {
+    min-height:
+      96px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-code {
+    font-size:
+      30px;
+
+    line-height:
+      36px;
+  }
+
+}
+
+
+/* =========================================================
+   LAPTOP
+========================================================= */
+
+@media (
+  min-width: 901px
+)
+and (
+  max-width: 1366px
+) {
+
+  .inventory-monitor-container-option {
+    padding:
+      20px
+      22px
+      34px;
+
+    gap:
+      15px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-monitor-session-up {
+    min-height:
+      104px;
+
+    padding:
+      17px
+      20px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-page-icon {
+    width:
+      54px;
+
+    height:
+      54px;
+
+    flex:
+      0
+      0
+      54px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-title {
+    font-size:
+      24px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-card-header {
+    min-height:
+      60px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-code-container {
+    padding:
+      20px
+      22px
+      15px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-grid {
+    padding:
+      0
+      22px
+      22px;
+
+    gap:
+      12px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-card {
+    min-height:
+      82px;
+
+    padding:
+      13px
+      15px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-icon {
+    width:
+      42px;
+
+    height:
+      42px;
+
+    flex:
+      0
+      0
+      42px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-monitor-session-down {
+    margin:
+      0
+      22px;
+
+    padding:
+      18px
+      0
+      22px;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 900px) {
+
+  .inventory-monitor-container-option {
+    padding:
+      17px;
+
+    gap:
+      14px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE / PDA
+========================================================= */
+
+@media (max-width: 700px) {
+
+  .inventory-monitor-container-option {
+    min-height:
+      calc(
+        100dvh - 52px
+      );
+
+    padding:
+      12px;
+
+    gap:
+      12px;
+  }
+
+
+  /* HEADER */
+
+  .inventory-monitor-container-option
+  .inventory-monitor-session-up {
+    min-height:
+      0;
+
+    padding:
+      15px;
+
+    align-items:
+      flex-start;
+
+    gap:
+      12px;
+
+    border-radius:
+      12px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-page-icon {
+    width:
+      48px;
+
+    height:
+      48px;
+
+    flex:
+      0
+      0
+      48px;
+
+    border-radius:
+      11px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-title {
+    font-size:
+      20px;
+
+    line-height:
+      24px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-subtitle {
+    margin-top:
+      3px;
+
+    font-size:
+      12px;
+
+    line-height:
+      17px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-eyebrow {
+    font-size:
+      10px;
+
+    line-height:
+      14px;
+  }
+
+
+  /* CARD */
+
+  .inventory-monitor-container-option
+  .inventory-monitor-session-middle {
+    border-radius:
+      12px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-card-header {
+    min-height:
+      59px;
+
+    padding:
+      0
+      15px;
+
+    font-size:
+      17px;
+  }
+
+
+  /* CODE */
+
+  .inventory-monitor-container-option
+  .inventory-session-code-container {
+    padding:
+      18px
+      16px
+      14px;
+
+    gap:
+      11px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-code-line {
+    height:
+      31px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-code {
+    font-size:
+      23px;
+
+    line-height:
+      29px;
+  }
+
+
+  /* INFO */
+
+  .inventory-monitor-container-option
+  .inventory-session-info-grid {
+    padding:
+      0
+      15px
+      18px;
+
+    grid-template-columns:
+      1fr;
+
+    gap:
+      9px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-card {
+    min-height:
+      76px;
+
+    padding:
+      12px
+      13px;
+
+    gap:
+      12px;
+
+    border-radius:
+      10px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-icon {
+    width:
+      42px;
+
+    height:
+      42px;
+
+    flex:
+      0
+      0
+      42px;
+
+    border-radius:
+      10px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-info-value {
+    font-size:
+      14px;
+
+    line-height:
+      20px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-date {
+    font-size:
+      11.5px;
+
+    overflow-wrap:
+      anywhere;
+  }
+
+
+  /* ACTIONS */
+
+  .inventory-monitor-container-option
+  .inventory-monitor-session-down {
+    width:
+      auto;
+
+    margin:
+      0
+      15px;
+
+    padding:
+      15px
+      0
+      18px;
+
+    flex-direction:
+      column;
+
+    gap:
+      8px;
+  }
+
+
+  .inventory-monitor-container-option
+  .inventory-session-close-btn,
+
+  .inventory-monitor-container-option
+  .inventory-session-action-btn {
+    width:
+      100%;
+
+    min-width:
+      0;
+
+    height:
+      47px;
+
+    margin:
+      0;
+  }
+
+}

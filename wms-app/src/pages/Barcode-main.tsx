@@ -632,9 +632,22 @@ DEBOUNCE + CANCEL REQUEST
             console.log("✅ Guardado:", res.data);
 
             openModal({
-                title: "",
-                message: res.data.message
-            });
+    title:
+        res.data.success === false
+            ? "❌ NO SE PUDO GUARDAR"
+            : "✅ CÓDIGO GUARDADO",
+
+    message:
+        res.data.message ||
+        "El código de barras fue guardado correctamente.",
+
+    buttonText: "Entendido",
+
+    titleColor:
+        res.data.success === false
+            ? "red"
+            : "green"
+});
             // 🔥 opcional: limpiar o feedback
             // setSupplierCode("");
             // alert("Guardado correctamente");
@@ -646,9 +659,18 @@ DEBOUNCE + CANCEL REQUEST
                 console.log("🔥 BACKEND DATA:", error.response.data);
 
                 openModal({
-                    title: error.response.data.title,
-                    message: error.response.data.message
-                });
+    title:
+        error.response?.data?.title ||
+        "❌ ERROR GUARDANDO CÓDIGO",
+
+    message:
+        error.response?.data?.message ||
+        "No se pudo guardar el código de barras.",
+
+    buttonText: "Entendido",
+
+    titleColor: "red"
+});
 
             } else {
                 console.log("❌ Error sin response:", error.message);
@@ -852,56 +874,132 @@ DEBOUNCE + CANCEL REQUEST
         }
     }
 
+// ==========================================================
+// GUARDAR AJUSTE DE INVENTARIO
+// ==========================================================
 
-    const handleSaveInventoryAdjustment = async () => {
-        try {
-            if (!selectedLocation || !selectedProduct) return;
+const handleSaveInventoryAdjustment = async () => {
 
-            const newQty = Number(adjustQty);
+    try {
 
-            if (Number.isNaN(newQty) || newQty < 0) {
-                openModal({
-                    title: "Cantidad inválida",
-                    message: "La cantidad debe ser un número mayor o igual a 0.",
-                });
+        if (!selectedLocation || !selectedProduct) {
+            return;
+        }
 
-                return;
-            }
+        const newQty = Number(adjustQty);
 
-            const res = await apiClient.post("/inventory/adjust", {
+        // =====================================================
+        // 1. VALIDAR CANTIDAD
+        // =====================================================
+
+        if (Number.isNaN(newQty) || newQty < 0) {
+
+            openModal({
+                title: "⚠️ CANTIDAD INVÁLIDA",
+
+                message:
+                    "La cantidad debe ser un número mayor o igual a 0.",
+
+                buttonText: "Entendido",
+
+                titleColor: "#d97706"
+            });
+
+            return;
+        }
+
+        // =====================================================
+        // 2. ENVIAR AJUSTE AL BACKEND
+        // =====================================================
+
+        const res = await apiClient.post(
+            "/inventory/adjust",
+            {
                 location_id: selectedLocation.location_id,
                 warehouse_id: selectedLocation.warehouse_id,
                 product_sku: selectedProduct.sku,
                 product_id: selectedProduct.id,
                 new_qty: newQty,
-            });
-
-            console.log("RESPUESTA AJUSTE:", res.data);
-
-            openModal({
-                title: res.data.title,
-                message: res.data.message,
-            });
-
-            if (res.data.success) {
-                handleReset();
             }
+        );
 
-        } catch (error: any) {
-            console.error("Error ajustando inventario:", error);
+        console.log("📦 RESPUESTA AJUSTE:", res.data);
+
+        // =====================================================
+        // 3. VALIDAR RESPUESTA
+        // =====================================================
+
+        if (!res.data.success) {
 
             openModal({
                 title:
-                    error.response?.data?.title ||
-                    "Error ajustando inventario",
+                    res.data.title ||
+                    "❌ NO SE PUDO AJUSTAR EL INVENTARIO",
 
                 message:
-                    error.response?.data?.message ||
-                    "No se pudo actualizar el inventario.",
-            });
-        }
-    };
+                    res.data.message ||
+                    "No se pudo completar el ajuste de inventario.",
 
+                buttonText: "Entendido",
+
+                titleColor: "red"
+            });
+
+            return;
+        }
+
+        // =====================================================
+        // 4. AJUSTE EXITOSO
+        // =====================================================
+
+        console.log("✅ AJUSTE DE INVENTARIO EXITOSO");
+
+        openModal({
+            title:
+                res.data.title ||
+                "✅ INVENTARIO ACTUALIZADO",
+
+            message:
+                res.data.message ||
+                "El ajuste de inventario fue realizado correctamente.",
+
+            buttonText: "Entendido",
+
+            titleColor: "green"
+        });
+
+        // =====================================================
+        // 5. LIMPIAR FORMULARIO
+        // =====================================================
+
+        handleReset();
+
+    } catch (error: any) {
+
+        console.error(
+            "❌ ERROR AJUSTANDO INVENTARIO:",
+            error
+        );
+
+        // =====================================================
+        // 6. ERROR DEL BACKEND
+        // =====================================================
+
+        openModal({
+            title:
+                error.response?.data?.title ||
+                "❌ ERROR AJUSTANDO INVENTARIO",
+
+            message:
+                error.response?.data?.message ||
+                "No se pudo actualizar el inventario.",
+
+            buttonText: "Entendido",
+
+            titleColor: "red"
+        });
+    }
+};
 
     const handleSaveNewLocationStock =
         async () => {
@@ -913,11 +1011,16 @@ DEBOUNCE + CANCEL REQUEST
                     !newStockLocation
                 ) {
 
-                    openModal({
-                        title: "Ubicación requerida",
-                        message:
-                            "Seleccione una ubicación antes de guardar.",
-                    });
+                   openModal({
+    title: "⚠️ UBICACIÓN REQUERIDA",
+
+    message:
+        "Seleccione una ubicación antes de guardar.",
+
+    buttonText: "Entendido",
+
+    titleColor: "#d97706"
+});
 
                     return;
                 }
@@ -933,10 +1036,15 @@ DEBOUNCE + CANCEL REQUEST
                 ) {
 
                     openModal({
-                        title: "Cantidad inválida",
-                        message:
-                            "La cantidad debe ser mayor que 0.",
-                    });
+    title: "⚠️ CANTIDAD INVÁLIDA",
+
+    message:
+        "La cantidad debe ser mayor que 0.",
+
+    buttonText: "Entendido",
+
+    titleColor: "#d97706"
+});
 
                     return;
                 }
@@ -995,16 +1103,23 @@ DEBOUNCE + CANCEL REQUEST
                 // =========================================
                 // SUCCESS MODAL
                 // =========================================
+// =========================================
+// SUCCESS MODAL - VERDE
+// =========================================
 
-                openModal({
-                    title:
-                        result.title ||
-                        "Inventario agregado",
+openModal({
+    title:
+        result.title ||
+        "✅ INVENTARIO AGREGADO",
 
-                    message:
-                        result.message ||
-                        "El stock fue agregado correctamente.",
-                });
+    message:
+        result.message ||
+        "El inventario fue agregado correctamente a la ubicación seleccionada.",
+
+    buttonText: "Entendido",
+
+    titleColor: "green"
+});
 
 
             } catch (error: any) {
@@ -1015,16 +1130,20 @@ DEBOUNCE + CANCEL REQUEST
                 );
 
 
-                openModal({
-                    title:
-                        error.response?.data?.title ||
-                        "Error agregando stock",
+               openModal({
+    title:
+        error.response?.data?.title ||
+        "❌ ERROR AGREGANDO INVENTARIO",
 
-                    message:
-                        error.response?.data?.message ||
-                        error.message ||
-                        "No se pudo agregar el inventario.",
-                });
+    message:
+        error.response?.data?.message ||
+        error.message ||
+        "No se pudo agregar el inventario.",
+
+    buttonText: "Entendido",
+
+    titleColor: "red"
+});
 
 
             } finally {

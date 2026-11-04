@@ -28,16 +28,23 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 });
 
     function openModal(
-        data: Partial<Omit<ModalState, "isOpen">> & {
-            onCloseCallback?: () => void;
-        }
-    ) {
-        setModal(prev => ({
-            ...prev,
-            ...data,
-            isOpen: true,
-        }));
-    }
+  data: Partial<Omit<ModalState, "isOpen">>
+) {
+
+  setModal(prev => ({
+    ...prev,
+    ...data,
+
+    isOpen: true,
+
+    titleColor: data.titleColor ?? "red",
+
+    buttonText: data.buttonText ?? "Entendido",
+
+    onCloseCallback: data.onCloseCallback
+  }));
+
+}
 
 
     function closeModal() {

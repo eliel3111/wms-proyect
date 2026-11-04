@@ -801,6 +801,7 @@ export default function InventoryReport() {
                     message:
                         data.message ||
                         "No había productos pendientes para ajustar a cero en Citrus."
+
                 });
 
 

@@ -88,6 +88,10 @@ import {
 import {
     getAdmCloudDispatchController
 } from "./integrations/admcloud/admcloud.conduce.js";
+//Consultar stock adm cloud por producto
+import {
+  getAdmCloudStockService
+} from "./integrations/admcloud/admcloud.erpStockSync.js";
 
 
 const app = express();
@@ -121,13 +125,59 @@ console.log(resultado);
 }
 app.use(express.json());
 
-//startAdmCloudCron();
+startAdmCloudCron();
 
 
 
 
 
 
+
+
+
+
+
+
+
+// ============================================================
+// TEST - CONSULTAR STOCK ADM CLOUD POR PRODUCTO
+// ============================================================
+
+app.get(
+  "/test-admcloud-stock",
+  async (req, res) => {
+
+    try {
+
+      const result = await getAdmCloudStockService({
+        itemId: req.query.itemId,
+        sku: req.query.sku,
+        locationId: req.query.locationId
+      });
+
+      return res.status(200).json(result);
+
+    } catch (error) {
+
+      console.error(
+        "❌ ERROR TEST STOCK:",
+        error.message
+      );
+
+      return res.status(
+        error.statusCode ||
+        error.status ||
+        500
+      ).json({
+        success: false,
+        message: error.message,
+        code:
+          error.code ||
+          "ADMCLOUD_STOCK_ERROR"
+      });
+    }
+  }
+);
 
 
 // =====================================================

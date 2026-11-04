@@ -719,7 +719,7 @@
 .sv-picking-header-finish {
     width: 270px;
     height: 64px;
-    padding: 0 22px;
+    padding: 0 27px;
 
     display: flex;
     align-items: center;
@@ -1418,3 +1418,360 @@
 
 
 
+/* ============================================================
+   SIDIAL WMS - PICKING HEADER MOBILE
+   Diseño compacto para dispositivos móviles y PDA
+============================================================ */
+
+@media screen and (max-width: 600px) {
+
+    /* ========================================================
+       1. CONTENEDOR PRINCIPAL
+    ======================================================== */
+
+    .sv-picking-header {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+
+        gap: 10px;
+
+        width: auto;
+        height: auto;
+        min-height: 0;
+
+        margin: 8px 10px 12px;
+        padding: 12px 14px;
+
+        background: #ffffff;
+
+        border: 1px solid #edf0f3;
+        border-radius: 14px;
+
+        box-shadow:
+            0 2px 8px rgba(0, 0, 0, 0.035);
+
+        box-sizing: border-box;
+    }
+
+
+    /* ========================================================
+       2. INFORMACIÓN DEL PEDIDO
+    ======================================================== */
+
+    .sv-picking-header-info {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+
+        flex: 1 1 auto;
+
+        min-width: 0;
+        width: auto;
+
+        gap: 0;
+        margin: 0;
+        padding: 0;
+    }
+
+
+    /* ========================================================
+       3. OCULTAR ICONO GRANDE
+    ======================================================== */
+
+    .sv-picking-header-icon {
+        display: none !important;
+    }
+
+
+    /* ========================================================
+       4. CONTENIDO
+    ======================================================== */
+
+    .sv-picking-header-content {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+
+        width: 100%;
+        min-width: 0;
+
+        gap: 3px;
+
+        margin: 0;
+        padding: 0;
+    }
+
+
+    /* ========================================================
+       5. OCULTAR SUBTÍTULO
+    ======================================================== */
+
+    .sv-picking-header-subtitle {
+        display: none !important;
+    }
+
+
+    /* ========================================================
+       6. OCULTAR TÍTULO GRANDE
+
+       Utilizaremos "Pedido #2804" como título principal.
+    ======================================================== */
+
+    .sv-picking-header-title {
+        display: none !important;
+    }
+
+
+    /* ========================================================
+       7. METADATA COMPACTA
+    ======================================================== */
+
+    .sv-picking-header-metadata {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+
+        gap: 3px 9px;
+
+        width: 100%;
+        min-width: 0;
+
+        margin: 0;
+        padding: 0;
+    }
+
+
+    /* ========================================================
+       8. ELEMENTOS DE METADATA
+    ======================================================== */
+
+    .sv-picking-meta-item {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+
+        width: auto;
+        min-width: 0;
+
+        gap: 4px;
+
+        margin: 0;
+        padding: 0;
+
+        font-size: 11px;
+        font-weight: 500;
+
+        line-height: 1.4;
+
+        color: #8490a3;
+
+        white-space: nowrap;
+    }
+
+
+    /* ========================================================
+       9. OCULTAR ICONOS DE METADATA
+    ======================================================== */
+
+    .sv-picking-meta-item svg {
+        display: none !important;
+    }
+
+
+    /* ========================================================
+       10. OCULTAR DIVISORES
+    ======================================================== */
+
+    .sv-picking-meta-divider {
+        display: none !important;
+    }
+
+
+    /* ========================================================
+       11. NÚMERO DEL PEDIDO COMO TÍTULO
+
+       El último elemento es:
+       Pedido #{pickingId}
+
+       Lo movemos visualmente a la primera línea.
+    ======================================================== */
+
+    .sv-picking-meta-item:last-child {
+        order: -1;
+
+        flex: 0 0 100%;
+
+        width: 100%;
+
+        font-size: 17px;
+        font-weight: 750;
+
+        line-height: 1.25;
+
+        letter-spacing: -0.4px;
+
+        color: #173b91;
+
+        white-space: nowrap;
+    }
+
+
+    /* ========================================================
+       12. CONTENEDOR DEL BOTÓN FINALIZAR
+    ======================================================== */
+
+    .sv-picking-header-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+
+        flex: 0 0 auto;
+
+        width: auto;
+        min-width: 0;
+
+        margin: 0;
+        padding: 0;
+    }
+
+
+    /* ========================================================
+       13. BOTÓN FINALIZAR COMPACTO
+    ======================================================== */
+
+    .sv-picking-header-finish {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        width: auto;
+        min-width: 0;
+        height: 36px;
+        min-height: 36px;
+
+        gap: 6px;
+
+        margin: 0;
+        padding: 0 12px;
+
+        background: #333333;
+
+        border: none;
+        border-radius: 9px;
+
+        color: #ffffff;
+
+        font-size: 12px;
+        font-weight: 650;
+
+        white-space: nowrap;
+
+        cursor: pointer;
+
+        box-shadow: none;
+
+        transition:
+            background 0.2s ease,
+            transform 0.15s ease;
+    }
+
+
+    /* ========================================================
+       14. ICONO CHECK
+    ======================================================== */
+
+    .sv-picking-finish-check {
+        display: block;
+
+        width: 15px;
+        height: 15px;
+
+        flex-shrink: 0;
+
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+
+    /* ========================================================
+       15. OCULTAR FLECHA DERECHA
+    ======================================================== */
+
+    .sv-picking-finish-arrow {
+        display: none !important;
+    }
+
+
+    /* ========================================================
+       16. TEXTO DEL BOTÓN
+    ======================================================== */
+
+    .sv-picking-header-finish span {
+        font-size: 12px;
+        font-weight: 650;
+
+        line-height: 1;
+    }
+
+
+    /* ========================================================
+       17. INTERACCIÓN
+    ======================================================== */
+
+    .sv-picking-header-finish:active {
+        transform: scale(0.97);
+
+        background: #252525;
+    }
+
+}
+
+
+/* ============================================================
+   PANTALLAS MUY PEQUEÑAS
+   PDA de 320px o menos
+============================================================ */
+
+@media screen and (max-width: 350px) {
+
+    .sv-picking-header {
+        padding: 10px 11px;
+
+        gap: 6px;
+    }
+
+    .sv-picking-meta-item:last-child {
+        font-size: 15px;
+    }
+
+    .sv-picking-meta-item {
+        font-size: 10px;
+    }
+
+    .sv-picking-header-finish {
+        height: 34px;
+        min-height: 34px;
+
+        padding: 0 10px;
+
+        font-size: 11px;
+    }
+
+    .sv-picking-header-finish span {
+        font-size: 11px;
+    }
+
+    .sv-picking-finish-check {
+        width: 13px;
+        height: 13px;
+    }
+
+}

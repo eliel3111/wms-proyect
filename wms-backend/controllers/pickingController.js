@@ -1883,287 +1883,1072 @@ export async function confirmPickingLine(req, res) {
 // =====================================================
 
 export async function scanPickingCode(req, res) {
-  let client;
 
-  try {
-    const {
-      code,
-      pickingId,
-      lineId,
-      productId,
-    } = req.body;
+    let client;
 
-    if (!code || !pickingId) {
-      return res.status(400).json({
-        success: false,
-        code: "INVALID_REQUEST",
-        title: "Datos incompletos",
-        message:
-          "Debe enviar code y pickingId.",
-      });
-    }
+    try {
 
-    client = await db.connect();
+        // =====================================================
+        // 1. RECIBIR DATOS
+        // =====================================================
 
-    const normalized = String(code)
-      .trim()
-      .toUpperCase();
+        const {
+            code,
+            pickingId,
+            lineId,
+            productId,
+        } = req.body ?? {};
 
-    // =================================================
-    // 1. VERIFICAR SI ES UNA UBICACIÓN
-    // =================================================
 
-    const locationResult =
-      await getActiveStorageLocationByCode(
-        client,
-        normalized
-      );
+        console.log("");
+        console.log(
+            "\x1b[44m\x1b[37m\x1b[1m 📦 PICKING - DATOS RECIBIDOS \x1b[0m"
+        );
 
-    if (locationResult.rowCount > 0) {
-      const location =
-        locationResult.rows[0];
-
-      if (!lineId && !productId) {
-        return res.json({
-          success: false,
-          code: "PRODUCT_CONTEXT_REQUIRED",
-          title: "Seleccione una línea",
-          message:
-            "Primero debe existir una línea de recogida activa para validar la ubicación.",
+        console.log({
+            code,
+            pickingId,
+            lineId,
+            productId,
         });
-      }
 
-      // Refrescar el listado almacenado.
-      await refreshPickingLocationSnapshots(
-        client,
-        pickingId
-      );
+        console.log(
+            "\x1b[44m\x1b[37m\x1b[1m ================================== \x1b[0m"
+        );
 
-      const lineResult = lineId
-        ? await client.query(
-          `
+
+        // =====================================================
+        // 2. VALIDAR DATOS
+        // =====================================================
+
+        if (!code || !pickingId) {
+
+            return res.status(400).json({
+                success: false,
+                code: "INVALID_REQUEST",
+                title: "Datos incompletos",
+                message:
+                    "Debe enviar code y pickingId.",
+            });
+
+        }
+
+
+        client = await db.connect();
+
+
+        const normalized = String(code)
+            .trim()
+            .toUpperCase();
+
+
+        // =====================================================
+        // 3. VERIFICAR SI EL CÓDIGO ES UNA UBICACIÓN
+        //
+        // Buscamos por código sin filtrar inicialmente
+        // el tipo o estado, para poder informar por qué
+        // una ubicación existente no está permitida.
+        // =====================================================
+
+        const locationResult = await client.query(
+            `
             SELECT
-              sml.id,
-              sml.product_id,
-              sml.location_id,
-              sml.is_general,
-              sml.available_locations,
-              p.sku
-            FROM stock_move_line AS sml
-            JOIN products AS p
-              ON p.id = sml.product_id
-            WHERE sml.id = $1
-              AND sml.picking_id = $2
-              AND sml.state NOT IN ('done', 'cancel')
+                id,
+                code,
+                warehouse_id,
+                location_type,
+                is_active
+
+            FROM public.locations
+
+            WHERE UPPER(TRIM(code)) = $1
+
+            ORDER BY id ASC
+
+            LIMIT 2
             `,
-          [lineId, pickingId]
+            [normalized]
+        );
+
+
+        // =====================================================
+        // 4. EL CÓDIGO CORRESPONDE A UNA UBICACIÓN
+        // =====================================================
+
+        if (locationResult.rowCount > 0) {
+
+            console.log("");
+            console.log("📍 UBICACIÓN DETECTADA:", normalized);
+
+
+            // =================================================
+            // 4.1 EVITAR CÓDIGOS DE UBICACIÓN AMBIGUOS
+            // =================================================
+
+            if (locationResult.rowCount > 1) {
+
+                return res.json({
+                    success: false,
+                    code: "AMBIGUOUS_LOCATION",
+                    title: "Ubicación ambigua",
+                    message:
+                        `Existe más de una ubicación con el código ${normalized}. ` +
+                        "No se puede determinar cuál debe utilizarse.",
+                });
+
+            }
+
+
+            const location = locationResult.rows[0];
+
+
+            console.log("📍 DATOS UBICACIÓN:", {
+                id: location.id,
+                code: location.code,
+                warehouse_id: location.warehouse_id,
+                location_type: location.location_type,
+                is_active: location.is_active,
+            });
+
+
+            // =================================================
+            // 4.2 VALIDAR CONTEXTO DEL PRODUCTO
+            // =================================================
+
+            if (!lineId && !productId) {
+
+                return res.json({
+                    success: false,
+                    code: "PRODUCT_CONTEXT_REQUIRED",
+                    title: "Seleccione una línea",
+                    message:
+                        "Primero debe existir una línea de recogida activa para validar la ubicación.",
+                });
+
+            }
+
+
+            // =================================================
+            // 4.3 REFRESCAR UBICACIONES DEL PICKING
+            //
+            // Actualiza:
+            // - stock_move_line.available_locations
+            // - stock_move_line.max_product_qty
+            // =================================================
+
+            console.log("");
+            console.log(
+                "🔄 ACTUALIZANDO SNAPSHOTS DEL PICKING:",
+                pickingId
+            );
+
+            await refreshPickingLocationSnapshots(
+                client,
+                pickingId
+            );
+
+            console.log(
+                "✅ SNAPSHOTS ACTUALIZADOS"
+            );
+
+
+            // =================================================
+            // 4.4 BUSCAR LA LÍNEA DEL PRODUCTO
+            // =================================================
+
+            let line;
+
+
+            // =================================================
+            // CASO A: VIENE lineId
+            // =================================================
+
+            if (lineId) {
+
+                console.log("");
+                console.log(
+                    "🔎 BUSCANDO STOCK MOVE LINE:",
+                    lineId
+                );
+
+
+                const lineResult = await client.query(
+                    `
+                    SELECT
+                        sml.id,
+                        sml.product_id,
+                        sml.location_id,
+                        sml.is_general,
+                        sml.available_locations,
+                        p.sku
+
+                    FROM public.stock_move_line AS sml
+
+                    JOIN public.products AS p
+                        ON p.id = sml.product_id
+
+                    WHERE sml.id = $1
+                      AND sml.picking_id = $2
+
+                      AND COALESCE(sml.state, '')
+                          NOT IN ('done', 'cancel')
+                    `,
+                    [
+                        lineId,
+                        pickingId
+                    ]
+                );
+
+
+                if (!lineResult.rowCount) {
+
+                    return res.json({
+                        success: false,
+                        code: "LINE_NOT_FOUND",
+                        title: "Línea no encontrada",
+                        message:
+                            "No se encontró una línea activa con ese ID dentro del picking.",
+                    });
+
+                }
+
+
+                line = lineResult.rows[0];
+
+
+                // =============================================
+                // CONFIRMAR QUE productId CORRESPONDE A lineId
+                // =============================================
+
+                if (
+                    productId &&
+                    Number(line.product_id) !== Number(productId)
+                ) {
+
+                    console.log(
+                        "❌ PRODUCT ID NO COINCIDE CON LINE ID"
+                    );
+
+                    return res.json({
+                        success: false,
+                        code: "PRODUCT_LINE_MISMATCH",
+                        title: "Producto incorrecto",
+                        message:
+                            `La línea ${lineId} no pertenece al producto ${productId}. ` +
+                            "Seleccione nuevamente la línea del producto.",
+                    });
+
+                }
+
+            } else {
+
+                // =================================================
+                // CASO B: SOLAMENTE VIENE productId
+                //
+                // Conservamos este flujo.
+                //
+                // Como no hay una stock_move_line específica,
+                // calculamos el mismo listado de ubicaciones
+                // que genera refreshPickingLocationSnapshots.
+                // =================================================
+
+                console.log("");
+                console.log(
+                    "🔎 BUSCANDO PRODUCTO SIN LINE ID:",
+                    productId
+                );
+
+
+                const productContextResult = await client.query(
+                    `
+                    SELECT
+                        dsm.product_id,
+                        p.sku
+
+                    FROM public.despacho_stock_move AS dsm
+
+                    JOIN public.products AS p
+                        ON p.id = dsm.product_id
+
+                    WHERE dsm.picking_id = $1
+                      AND dsm.product_id = $2
+
+                      AND COALESCE(dsm.state, '')
+                          NOT IN ('done', 'cancel')
+
+                    LIMIT 1
+                    `,
+                    [
+                        pickingId,
+                        productId
+                    ]
+                );
+
+
+                if (!productContextResult.rowCount) {
+
+                    return res.json({
+                        success: false,
+                        code: "LINE_NOT_FOUND",
+                        title: "Producto no encontrado",
+                        message:
+                            "No se encontró una línea activa de este producto dentro del picking.",
+                    });
+
+                }
+
+
+                const productContext =
+                    productContextResult.rows[0];
+
+
+                // =============================================
+                // CONSULTAR UBICACIONES CON LOS MISMOS FILTROS
+                // DE refreshPickingLocationSnapshots
+                // =============================================
+
+                const snapshotResult = await client.query(
+                    `
+                    SELECT
+
+                        COALESCE(
+                            jsonb_agg(
+                                jsonb_build_object(
+                                    'location_id', ibl.location_id,
+                                    'warehouse_id', ibl.warehouse_id,
+                                    'code', l.code,
+                                    'qty_on_hand', ibl.qty_on_hand,
+                                    'qty_available', ibl.qty_available
+                                )
+
+                                ORDER BY
+                                    ibl.qty_on_hand DESC,
+                                    l.code
+                            ),
+
+                            '[]'::jsonb
+
+                        ) AS available_locations
+
+                    FROM public.products AS p
+
+                    JOIN public.inventory_by_location AS ibl
+                        ON ibl.product_sku = p.sku
+
+                    JOIN public.locations AS l
+                        ON l.id = ibl.location_id
+                       AND l.warehouse_id = ibl.warehouse_id
+
+                    WHERE p.id = $1
+
+                      AND ibl.qty_on_hand > 0
+
+                      AND l.is_active = TRUE
+
+                      AND l.location_type
+                          IN ('STORAGE', 'RECEIVING')
+
+                      AND UPPER(l.code)
+                          NOT LIKE 'GENERAL-%'
+                    `,
+                    [
+                        productContext.product_id
+                    ]
+                );
+
+
+                line = {
+                    id: null,
+
+                    product_id:
+                        productContext.product_id,
+
+                    sku:
+                        productContext.sku,
+
+                    location_id: null,
+
+                    is_general: false,
+
+                    available_locations:
+                        snapshotResult.rows[0]
+                            ?.available_locations ?? []
+                };
+
+            }
+
+
+            // =================================================
+            // 4.5 VERIFICAR QUE LA UBICACIÓN ESTÉ ACTIVA
+            // =================================================
+
+            if (location.is_active !== true) {
+
+                console.log(
+                    "❌ UBICACIÓN INACTIVA:",
+                    location.code
+                );
+
+                return res.json({
+                    success: false,
+                    code: "LOCATION_INACTIVE",
+                    title: "Ubicación inactiva",
+                    message:
+                        `La ubicación ${location.code} existe, ` +
+                        "pero está inactiva y no puede utilizarse para este picking.",
+                });
+
+            }
+
+
+            // =================================================
+            // 4.6 VALIDAR TIPO DE UBICACIÓN
+            // =================================================
+
+            const allowedTypes = [
+                "STORAGE",
+                "RECEIVING"
+            ];
+
+
+            if (
+                !allowedTypes.includes(location.location_type) ||
+                String(location.code).toUpperCase().startsWith("GENERAL-")
+            ) {
+
+                console.log(
+                    "❌ TIPO DE UBICACIÓN NO PERMITIDO:",
+                    location
+                );
+
+                return res.json({
+                    success: false,
+                    code: "LOCATION_TYPE_NOT_ALLOWED",
+                    title: "Ubicación no permitida",
+                    message:
+                        `La ubicación ${location.code} no puede utilizarse para recoger productos. ` +
+                        "Solo se permiten ubicaciones activas de tipo STORAGE o RECEIVING que figuren en el inventario.",
+                });
+
+            }
+
+
+            // =================================================
+            // 4.7 OBTENER UBICACIONES DEL SNAPSHOT
+            // =================================================
+
+            const listedLocations =
+                Array.isArray(line.available_locations)
+                    ? line.available_locations
+                    : [];
+
+
+            console.log("");
+            console.log(
+                "📦 UBICACIONES DISPONIBLES DEL PRODUCTO:"
+            );
+
+            console.table(
+                listedLocations.map(item => ({
+                    location_id: item.location_id,
+                    warehouse_id: item.warehouse_id,
+                    code: item.code,
+                    qty_on_hand: item.qty_on_hand,
+                    qty_available: item.qty_available
+                }))
+            );
+
+
+            // =================================================
+            // 4.8 VERIFICAR QUE LA UBICACIÓN ESCANEADA
+            // ESTÉ DENTRO DE available_locations
+            //
+            // Validamos ambos identificadores:
+            // - location_id
+            // - warehouse_id
+            // =================================================
+
+            const inventoryLocation =
+                listedLocations.find(
+                    item =>
+
+                        Number(item.location_id) ===
+                        Number(location.id)
+
+                        &&
+
+                        String(item.warehouse_id) ===
+                        String(location.warehouse_id)
+                );
+
+
+            console.log("");
+            console.log("🔎 VALIDANDO UBICACIÓN ESCANEADA:", {
+                scannedCode: normalized,
+                scannedLocationId: location.id,
+                scannedWarehouseId: location.warehouse_id,
+                productId: line.product_id,
+                sku: line.sku,
+                foundInSnapshot: Boolean(inventoryLocation)
+            });
+
+
+            // =================================================
+            // 4.9 UBICACIÓN NO ESTÁ EN EL SNAPSHOT
+            // =================================================
+
+            if (!inventoryLocation) {
+
+                console.log("");
+                console.log(
+                    "❌ UBICACIÓN NO DISPONIBLE PARA PRODUCTO"
+                );
+
+                console.log({
+                    location: location.code,
+                    location_id: location.id,
+                    product_id: line.product_id,
+                    sku: line.sku
+                });
+
+
+                return res.json({
+                    success: false,
+
+                    code: "LOCATION_WITHOUT_INVENTORY",
+
+                    title: "Ubicación sin inventario",
+
+                    message:
+                        `La ubicación ${location.code} existe, ` +
+                        `pero no figura entre las ubicaciones con inventario del producto ${line.sku}. ` +
+                        "Verifique la ubicación o seleccione otra que tenga existencias.",
+
+                });
+
+            }
+
+
+            // =================================================
+            // 4.10 CONFIRMAR SI ES LA UBICACIÓN ORIGINAL
+            // =================================================
+
+            const isOriginalLocation =
+                line.location_id !== null &&
+                line.location_id !== undefined &&
+                Number(line.location_id) ===
+                Number(location.id);
+
+
+            console.log("");
+            console.log(
+                "✅ UBICACIÓN VALIDADA CORRECTAMENTE"
+            );
+
+            console.log({
+                location_id: location.id,
+                code: location.code,
+                product_id: line.product_id,
+                sku: line.sku,
+                is_alternative: !isOriginalLocation,
+                qty_on_hand: inventoryLocation.qty_on_hand,
+                qty_available: inventoryLocation.qty_available
+            });
+
+
+            // =================================================
+            // 4.11 RESPUESTA EXITOSA
+            // =================================================
+
+            return res.json({
+                success: true,
+
+                type: "location",
+
+                data: {
+                    id: location.id,
+
+                    code: location.code,
+
+                    warehouse_id:
+                        location.warehouse_id,
+
+                    product_id:
+                        line.product_id,
+
+                    sku:
+                        line.sku,
+
+                    is_alternative:
+                        !isOriginalLocation,
+
+                    qty_on_hand: Number(
+                        inventoryLocation.qty_on_hand || 0
+                    ),
+
+                    qty_available: Number(
+                        inventoryLocation.qty_available || 0
+                    ),
+                },
+            });
+
+        }
+
+
+       // =====================================================
+// 5. SI NO ES UBICACIÓN, BUSCAR PRODUCTO
+// =====================================================
+
+console.log("");
+console.log("📦 ========================================");
+console.log("📦 VALIDANDO PRODUCTO ESCANEADO");
+console.log("📦 ========================================");
+
+console.log("🔎 Código:", normalized);
+console.log("📦 Picking:", pickingId);
+console.log("📋 Line ID:", lineId);
+console.log("🆔 Product ID esperado:", productId);
+
+
+// =====================================================
+// 5.1 BUSCAR POR SKU O POR PRODUCT_BARCODES
+// =====================================================
+
+const productResult = await client.query(
+    `
+    SELECT
+        p.id,
+        p.sku,
+        p.description,
+        p.erp_name,
+        p.erp_sku,
+
+        CASE
+            WHEN UPPER(TRIM(p.sku)) = $1
+                THEN 'sku'
+
+            ELSE 'barcode'
+        END AS matched_by
+
+    FROM public.products AS p
+
+    WHERE
+
+        -- ============================================
+        -- COINCIDENCIA POR SKU
+        -- ============================================
+
+        UPPER(TRIM(p.sku)) = $1
+
+        OR
+
+        -- ============================================
+        -- COINCIDENCIA POR CÓDIGO DE BARRAS
+        -- ============================================
+
+        EXISTS (
+            SELECT 1
+
+            FROM public.product_barcodes AS pb
+
+            WHERE pb.product_sku = p.sku
+
+              AND UPPER(TRIM(pb.barcode)) = $1
         )
-        : await client.query(
-          `
-            SELECT
-              NULL::bigint AS id,
-              dsm.product_id,
-              NULL::bigint AS location_id,
-              FALSE AS is_general,
-              '[]'::jsonb AS available_locations,
-              p.sku
-            FROM despacho_stock_move AS dsm
-            JOIN products AS p
-              ON p.id = dsm.product_id
-            WHERE dsm.picking_id = $1
-              AND dsm.product_id = $2
-              AND dsm.state NOT IN ('done', 'cancel')
-            LIMIT 1
-            `,
-          [pickingId, productId]
-        );
 
-      if (!lineResult.rowCount) {
-        return res.json({
-          success: false,
-          code: "LINE_NOT_FOUND",
-          title: "Línea no encontrada",
-          message:
-            "No se encontró la línea del producto dentro de este picking.",
-        });
-      }
+    ORDER BY p.id ASC
 
-      const line = lineResult.rows[0];
+    LIMIT 2
+    `,
+    [normalized]
+);
 
-      const isOriginalLocation =
-        Number(line.location_id) ===
-        Number(location.id);
 
-      // Una ubicación alternativa debe aparecer
-      // en la lista actualizada de inventario.
-      const listedLocations =
-        Array.isArray(line.available_locations)
-          ? line.available_locations
-          : [];
+console.log("");
+console.log(
+    "📦 PRODUCTOS ENCONTRADOS:",
+    productResult.rows
+);
 
-      let inventoryLocation =
-        listedLocations.find(
-          (item) =>
-            Number(item.location_id) ===
-            Number(location.id)
-        );
 
-      // Para un producto todavía sin línea, consultar
-      // su inventario directamente.
-      if (!lineId) {
-        const direct = await client.query(
-          `
-          SELECT
-            ibl.location_id,
-            ibl.warehouse_id,
-            ibl.qty_on_hand,
-            ibl.qty_available
-          FROM inventory_by_location AS ibl
-          JOIN products AS p
-            ON p.sku = ibl.product_sku
-          WHERE p.id = $1
-            AND ibl.location_id = $2
-            AND ibl.qty_on_hand > 0
-          `,
-          [line.product_id, location.id]
-        );
+// =====================================================
+// 5.2 VALIDAR QUE EL CÓDIGO EXISTA
+// =====================================================
 
-        inventoryLocation =
-          direct.rows[0] || null;
-      }
+if (!productResult.rowCount) {
 
-      // Mantener compatibilidad con el flujo
-      // existente de una ubicación GENERAL virtual.
-      const config =
-        await getPickingConfig(client);
-
-      const isVirtualOriginal =
-        isOriginalLocation &&
-        config.allow_picking_without_locations &&
-        normalized.startsWith("GENERAL-");
-
-      if (
-        !inventoryLocation &&
-        !isVirtualOriginal
-      ) {
-        return res.json({
-          success: false,
-          code: "LOCATION_WITHOUT_INVENTORY",
-          title: "Ubicación sin inventario",
-          message:
-            `La ubicación ${location.code} no tiene inventario disponible del producto ${line.sku}.`,
-        });
-      }
-
-      return res.json({
-        success: true,
-        type: "location",
-        data: {
-          id: location.id,
-          code: location.code,
-          product_id: line.product_id,
-          sku: line.sku,
-          is_alternative: !isOriginalLocation,
-          qty_on_hand: Number(
-            inventoryLocation?.qty_on_hand || 0
-          ),
-        },
-      });
-    }
-
-    // =================================================
-    // 2. BUSCAR PRODUCTO POR BARCODE O SKU
-    // =================================================
-
-    let productResult = await client.query(
-      `
-      SELECT p.id, p.sku
-      FROM product_barcodes AS pb
-      JOIN products AS p
-        ON p.sku = pb.product_sku
-      WHERE UPPER(pb.barcode) = $1
-      LIMIT 1
-      `,
-      [normalized]
+    console.log(
+        "❌ CÓDIGO NO REGISTRADO:",
+        normalized
     );
-
-    if (!productResult.rowCount) {
-      productResult = await client.query(
-        `
-        SELECT id, sku
-        FROM products
-        WHERE UPPER(sku) = $1
-        LIMIT 1
-        `,
-        [normalized]
-      );
-    }
-
-    if (!productResult.rowCount) {
-      return res.json({
-        success: false,
-        code: "INVALID_CODE",
-        title: "Código inválido",
-        message:
-          "El código no corresponde a una ubicación ni a un producto.",
-      });
-    }
-
-    const product =
-      productResult.rows[0];
-
-    // =================================================
-    // 3. VERIFICAR QUE EL PRODUCTO PERTENECE AL PICKING
-    // =================================================
-
-    const membershipResult = await client.query(
-      `
-      SELECT id
-      FROM despacho_stock_move
-      WHERE picking_id = $1
-        AND product_id = $2
-        AND state NOT IN ('done', 'cancel')
-      LIMIT 1
-      `,
-      [pickingId, product.id]
-    );
-
-    if (!membershipResult.rowCount) {
-      return res.json({
-        success: false,
-        code: "NOT_IN_PICKING",
-        title: "Producto no válido",
-        message:
-          "Este producto no pertenece al despacho.",
-      });
-    }
 
     return res.json({
-      success: true,
-      type: "product",
-      data: product,
+        success: false,
+
+        code: "INVALID_PRODUCT_CODE",
+
+        title: "Producto no encontrado",
+
+        message:
+            `El código ${normalized} no está registrado como SKU ni como código de barras de ningún producto.`,
     });
 
-  } catch (error) {
-    console.error(
-      "❌ ERROR scanPickingCode:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      code: "SCAN_ERROR",
-      title: "Error de escaneo",
-      message:
-        "No se pudo validar el código escaneado.",
-    });
-
-  } finally {
-    client?.release();
-  }
 }
 
 
+// =====================================================
+// 5.3 EVITAR CÓDIGOS ASOCIADOS A VARIOS PRODUCTOS
+// =====================================================
+
+if (productResult.rowCount > 1) {
+
+    console.log(
+        "❌ CÓDIGO ASOCIADO A VARIOS PRODUCTOS"
+    );
+
+    return res.json({
+        success: false,
+
+        code: "AMBIGUOUS_PRODUCT_CODE",
+
+        title: "Código de producto duplicado",
+
+        message:
+            `El código ${normalized} está asociado a más de un producto. ` +
+            "Debe corregirse antes de utilizarlo en el picking.",
+    });
+
+}
+
+
+const product = productResult.rows[0];
+
+
+console.log("");
+console.log("✅ PRODUCTO IDENTIFICADO:", {
+    id: product.id,
+    sku: product.sku,
+    matched_by: product.matched_by
+});
+
+
+// =====================================================
+// 6. DETERMINAR EL PRODUCTO ESPERADO
+// =====================================================
+
+let expectedProductId = null;
+let expectedSku = null;
+
+
+// =====================================================
+// 6.1 SI VIENE lineId, VALIDAR LA LÍNEA
+// =====================================================
+
+if (lineId) {
+
+    const expectedLineResult = await client.query(
+        `
+        SELECT
+            sml.id,
+            sml.product_id,
+            p.sku
+
+        FROM public.stock_move_line AS sml
+
+        JOIN public.products AS p
+            ON p.id = sml.product_id
+
+        WHERE sml.id = $1
+
+          AND sml.picking_id = $2
+
+          AND COALESCE(sml.state, '')
+              NOT IN ('done', 'cancel')
+
+        LIMIT 1
+        `,
+        [
+            lineId,
+            pickingId
+        ]
+    );
+
+
+    if (!expectedLineResult.rowCount) {
+
+        return res.json({
+            success: false,
+
+            code: "LINE_NOT_FOUND",
+
+            title: "Línea no encontrada",
+
+            message:
+                `La línea ${lineId} no existe o ya no está activa dentro del picking ${pickingId}.`,
+        });
+
+    }
+
+
+    const expectedLine =
+        expectedLineResult.rows[0];
+
+
+    expectedProductId =
+        Number(expectedLine.product_id);
+
+    expectedSku =
+        expectedLine.sku;
+
+
+    // =================================================
+    // VALIDAR CONSISTENCIA ENTRE lineId Y productId
+    // =================================================
+
+    if (
+        productId &&
+        expectedProductId !== Number(productId)
+    ) {
+
+        console.log(
+            "❌ PRODUCT ID NO CORRESPONDE A LA LÍNEA"
+        );
+
+        return res.json({
+            success: false,
+
+            code: "PRODUCT_LINE_MISMATCH",
+
+            title: "Producto incorrecto",
+
+            message:
+                `La línea ${lineId} corresponde al producto ${expectedSku}, ` +
+                `pero el frontend envió el producto ID ${productId}.`,
+        });
+
+    }
+
+}
+
+
+// =====================================================
+// 6.2 SI NO VIENE lineId, UTILIZAR productId
+// =====================================================
+
+else if (productId) {
+
+    const expectedProductResult = await client.query(
+        `
+        SELECT
+            dsm.product_id,
+            p.sku
+
+        FROM public.despacho_stock_move AS dsm
+
+        JOIN public.products AS p
+            ON p.id = dsm.product_id
+
+        WHERE dsm.picking_id = $1
+
+          AND dsm.product_id = $2
+
+          AND COALESCE(dsm.state, '')
+              NOT IN ('done', 'cancel')
+
+        LIMIT 1
+        `,
+        [
+            pickingId,
+            productId
+        ]
+    );
+
+
+    if (!expectedProductResult.rowCount) {
+
+        return res.json({
+            success: false,
+
+            code: "PRODUCT_NOT_IN_PICKING",
+
+            title: "Producto no válido",
+
+            message:
+                "El producto seleccionado no tiene movimientos activos en este picking.",
+        });
+
+    }
+
+
+    expectedProductId =
+        Number(
+            expectedProductResult.rows[0].product_id
+        );
+
+    expectedSku =
+        expectedProductResult.rows[0].sku;
+
+}
+
+
+// =====================================================
+// 7. CONFIRMAR QUE ES EL PRODUCTO ESPERADO
+// =====================================================
+
+if (
+    expectedProductId !== null &&
+    Number(product.id) !== expectedProductId
+) {
+
+    console.log("");
+    console.log(
+        "❌ PRODUCTO ESCANEADO NO COINCIDE"
+    );
+
+    console.log({
+        expectedProductId,
+        expectedSku,
+
+        scannedProductId: product.id,
+        scannedSku: product.sku,
+
+        scannedCode: normalized
+    });
+
+
+    return res.json({
+        success: false,
+
+        code: "WRONG_PRODUCT",
+
+        title: "Producto incorrecto",
+
+        message:
+            `El código ${normalized} pertenece al producto ${product.sku}, ` +
+            `pero debes recoger el producto ${expectedSku}.`,
+    });
+
+}
+
+
+// =====================================================
+// 8. CONFIRMAR QUE PERTENECE AL PICKING
+// =====================================================
+
+const membershipResult = await client.query(
+    `
+    SELECT id
+
+    FROM public.despacho_stock_move
+
+    WHERE picking_id = $1
+
+      AND product_id = $2
+
+      AND COALESCE(state, '')
+          NOT IN ('done', 'cancel')
+
+    LIMIT 1
+    `,
+    [
+        pickingId,
+        product.id
+    ]
+);
+
+
+if (!membershipResult.rowCount) {
+
+    console.log(
+        "❌ PRODUCTO NO PERTENECE AL PICKING"
+    );
+
+    return res.json({
+        success: false,
+
+        code: "NOT_IN_PICKING",
+
+        title: "Producto no válido",
+
+        message:
+            `El producto ${product.sku} no pertenece a las líneas activas de este despacho.`,
+    });
+
+}
+
+
+// =====================================================
+// 9. PRODUCTO VALIDADO CORRECTAMENTE
+// =====================================================
+
+console.log("");
+console.log("✅ ========================================");
+console.log("✅ PRODUCTO VALIDADO CORRECTAMENTE");
+console.log("✅ ========================================");
+
+console.log({
+    scannedCode: normalized,
+    productId: product.id,
+    sku: product.sku,
+    matchedBy: product.matched_by,
+    lineId,
+    pickingId
+});
+
+
+// =====================================================
+// 10. RESPUESTA EXITOSA
+// =====================================================
+
+return res.json({
+    success: true,
+
+    type: "product",
+
+    data: {
+        id: product.id,
+
+        sku: product.sku,
+
+        matched_by: product.matched_by,
+
+        erp_name: product.erp_name,
+
+        erp_sku: product.erp_sku
+    },
+});
+
+
+    } catch (error) {
+
+        // =====================================================
+        // ERROR GENERAL
+        // =====================================================
+
+        console.error(
+            "❌ ERROR scanPickingCode:",
+            error
+        );
+
+
+        return res.status(500).json({
+            success: false,
+            code: "SCAN_ERROR",
+            title: "Error de escaneo",
+            message:
+                "No se pudo validar el código escaneado.",
+        });
+
+    } finally {
+
+        // =====================================================
+        // LIBERAR CONEXIÓN
+        // =====================================================
+
+        client?.release();
+
+    }
+}
 
 
 
@@ -2655,21 +3440,24 @@ export async function getPickingProductsWithLocations(req, res) {
     // 2. BUSCAR PICKING Y SALE ID
     // ==========================================================
 
-    const pickingResult = await client.query(
-      `
-      SELECT
-        id,
-        sale_id,
-        state
+   const pickingResult = await client.query(
+  `
+  SELECT
+    id,
+    sale_id,
+    state,
+    order_name
 
-      FROM public.stock_picking
+  FROM public.stock_picking
 
-      WHERE id = $1
-      `,
-      [pickingId]
-    );
+  WHERE id = $1
+  `,
+  [pickingId]
+);
 
-    const localPicking = pickingResult.rows[0];
+const localPicking = pickingResult.rows[0];
+
+   
 
     if (!localPicking) {
       return res.status(404).json({
@@ -2680,18 +3468,51 @@ export async function getPickingProductsWithLocations(req, res) {
       });
     }
 
-    if (
-      ["done", "cancel"].includes(
-        localPicking.state
-      )
-    ) {
-      return res.status(409).json({
-        success: false,
-        title: "Picking cerrado",
-        message:
-          "No se puede preparar un picking finalizado o cancelado.",
-      });
-    }
+   // ==========================================================
+// PICKING FINALIZADO
+// ==========================================================
+
+if (localPicking.state === "done") {
+
+  return res.status(200).json({
+
+    success: true,
+
+    code: "ALL_DISPATCHED",
+
+    title: "Todo despachado",
+
+    message:
+      "Este picking ya fue finalizado. Todos los productos fueron despachados.",
+
+    pending_qty: 0,
+
+    order_name: localPicking.order_name ?? null,
+
+    data: []
+
+  });
+}
+
+// ==========================================================
+// PICKING CANCELADO
+// ==========================================================
+
+if (localPicking.state === "cancel") {
+
+  return res.status(409).json({
+
+    success: false,
+
+    code: "PICKING_CANCELLED",
+
+    title: "Picking cancelado",
+
+    message:
+      "Este picking está cancelado y no puede prepararse."
+
+  });
+}
 
     const saleId = String(
       localPicking.sale_id ?? ""
@@ -2918,47 +3739,158 @@ export async function getPickingProductsWithLocations(req, res) {
         pickingId
       );
 
-    // ==========================================================
-    // 11. SI NO HAY PRODUCTOS CON UBICACIONES
-    //
-    // NUEVO:
-    // Conservar las líneas existentes del picking.
-    // ==========================================================
+      // ==========================================================
+// 10.1 VERIFICAR CANTIDADES PENDIENTES DE DESPACHO
+// ==========================================================
 
-    if (
-      !result.data ||
-      result.data.length === 0
-    ) {
+console.log("");
+console.log("📊 ========================================");
+console.log("📊 VERIFICANDO CANTIDADES PENDIENTES");
+console.log("📊 Picking ID:", pickingId);
 
-      const existingLines =
-        await getMoveLinesOrderedByLocation(
-          client,
-          pickingId
-        );
+const pendingQtyResult = await client.query(
+  `
+  SELECT
+    COALESCE(
+      SUM(
+        GREATEST(
+          COALESCE(dsm.pending_qty, 0),
+          0
+        )
+      ),
+      0
+    ) AS pending_qty
 
-      await client.query("COMMIT");
+  FROM despacho_stock_move AS dsm
 
-      transactionStarted = false;
+  WHERE dsm.picking_id = $1
 
-      return res.status(200).json({
-        success:
-          existingLines.length > 0,
+    AND COALESCE(dsm.state, '')
+        NOT IN ('done', 'cancel')
+  `,
+  [pickingId]
+);
 
-        title:
-          existingLines.length > 0
-            ? "Ruta existente"
-            : "Sin ubicaciones disponibles",
+const pendingQty = Number(
+  pendingQtyResult.rows[0]?.pending_qty || 0
+);
 
-        message:
-          existingLines.length > 0
-            ? "Se conservaron las líneas existentes del picking."
-            : result.message ||
-            "No hay ubicaciones disponibles para recoger.",
+console.log("📦 Cantidad pendiente:", pendingQty);
 
-        data:
-          existingLines,
-      });
-    }
+console.log(
+  pendingQty === 0
+    ? "✅ NO HAY CANTIDADES PENDIENTES"
+    : "⚠️ EXISTEN CANTIDADES PENDIENTES"
+);
+
+console.log("📊 ========================================");
+
+   // ==========================================================
+// 11. SI NO HAY PRODUCTOS CON UBICACIONES
+// ==========================================================
+
+if (
+  !result.data ||
+  result.data.length === 0
+) {
+
+  console.log("");
+  console.log("🔎 NO HAY PRODUCTOS CON UBICACIONES");
+
+  // ========================================================
+  // 11.1 BUSCAR LÍNEAS EXISTENTES
+  // ========================================================
+
+  const existingLines =
+    await getMoveLinesOrderedByLocation(
+      client,
+      pickingId
+    );
+
+  console.log("📦 Líneas existentes:", existingLines.length);
+  console.log("📊 Cantidad pendiente:", pendingQty);
+
+  // ========================================================
+  // 11.2 DETERMINAR ESTADO
+  // ========================================================
+
+  let responseCode;
+  let responseTitle;
+  let responseMessage;
+
+  // CASO 1: EXISTEN LÍNEAS PREPARADAS
+  if (existingLines.length > 0) {
+
+    responseCode = "EXISTING_ROUTE";
+
+    responseTitle = "Ruta existente";
+
+    responseMessage =
+      "Se conservaron las líneas existentes del picking.";
+
+    console.log("✅ RUTA EXISTENTE CONSERVADA");
+  }
+
+  // CASO 2: TODO FUE DESPACHADO
+  else if (pendingQty === 0) {
+
+    responseCode = "ALL_DISPATCHED";
+
+    responseTitle = "Todo despachado";
+
+    responseMessage =
+      "Todos los productos de este pedido ya fueron despachados. " +
+      "No quedan cantidades pendientes por recoger.";
+
+    console.log("✅ TODO DESPACHADO");
+  }
+
+  // CASO 3: FALTAN CANTIDADES
+  else {
+
+    responseCode = "PENDING_WITHOUT_LINES";
+
+    responseTitle = "Cantidades pendientes";
+
+    responseMessage =
+      `Este pedido tiene ${pendingQty} unidades pendientes de despacho, ` +
+      "pero no hay líneas de recogida disponibles. " +
+      "Revise las cantidades o las ubicaciones del inventario.";
+
+    console.log("⚠️ CANTIDADES PENDIENTES SIN LÍNEAS");
+  }
+
+  // ========================================================
+  // 11.3 FINALIZAR TRANSACCIÓN
+  // ========================================================
+
+  await client.query("COMMIT");
+
+  transactionStarted = false;
+
+  // ========================================================
+  // 11.4 RESPUESTA
+  // ========================================================
+
+  return res.status(200).json({
+
+    success: true,
+
+    code: responseCode,
+
+    title: responseTitle,
+
+    message: responseMessage,
+
+    pending_qty: pendingQty,
+
+    order_name: localPicking.order_name ?? null,
+
+    data: existingLines
+
+  });
+
+}
 
     // ==========================================================
     // 12. SELECCIONAR MEJORES UBICACIONES
@@ -3487,23 +4419,78 @@ export async function getPickingProductsWithLocations(req, res) {
     // 25. RESPUESTA FINAL
     // ==========================================================
 
-    return res.status(200).json({
-      success: true,
+  // ==========================================================
+// 25. RESPUESTA FINAL
+// ==========================================================
 
-      title:
-        "Picking preparado",
+const noLinesAvailable = finalResult.length === 0;
 
-      message:
-        noNewReservations
-          ? finalResult.length > 0
-            ? "El picking ya tiene líneas asignadas."
-            : "Pedido actualizado, pero no se pudo reservar inventario."
-          : result.message ||
-          "Picking actualizado correctamente.",
+let responseCode = "PICKING_READY";
+let responseTitle = "Picking preparado";
 
-      data:
-        finalResult,
-    });
+let responseMessage =
+  noNewReservations
+    ? "El picking ya tiene líneas asignadas."
+    : result.message ||
+      "Picking actualizado correctamente.";
+
+// ==========================================================
+// TODO DESPACHADO
+// ==========================================================
+
+if (noLinesAvailable && pendingQty === 0) {
+
+  responseCode = "ALL_DISPATCHED";
+
+  responseTitle = "Todo despachado";
+
+  responseMessage =
+    "Todos los productos de este pedido ya fueron despachados. " +
+    "No quedan cantidades pendientes por recoger.";
+
+  console.log("✅ PICKING COMPLETAMENTE DESPACHADO");
+}
+
+// ==========================================================
+// CANTIDADES PENDIENTES SIN LÍNEAS
+// ==========================================================
+
+else if (noLinesAvailable && pendingQty > 0) {
+
+  responseCode = "PENDING_WITHOUT_LINES";
+
+  responseTitle = "Cantidades pendientes";
+
+  responseMessage =
+    `Este pedido tiene ${pendingQty} unidades pendientes ` +
+    "de despacho, pero no hay líneas de recogida disponibles.";
+
+  console.log(
+    "⚠️ PICKING SIN LÍNEAS, PERO CON CANTIDADES PENDIENTES"
+  );
+}
+
+// ==========================================================
+// RESPUESTA
+// ==========================================================
+
+return res.status(200).json({
+
+  success: true,
+
+  code: responseCode,
+
+  title: responseTitle,
+
+  message: responseMessage,
+
+  pending_qty: pendingQty,
+
+  order_name: localPicking.order_name ?? null,
+
+  data: finalResult
+
+});
 
   } catch (error) {
 

@@ -49,6 +49,7 @@ export default function PickingRoute() {
     const { closeModal } = useModal();
     const [pickings, setPickings] = useState<StockMoveLine[]>([]);
     const [pickingId, setPickingId] = useState<number | null>(null);
+    const [orderName, setOrderName] = useState<string | null>(null);
     const pickingIdRef = useRef<number | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const isModalOpenRef = useRef(false);
@@ -80,6 +81,14 @@ export default function PickingRoute() {
 
     const [qty, setQty] = useState<string>("");
     const qtyRef = useRef<string>("");
+
+    // Evitar mostrar la advertencia repetidamente
+    const extraQtyWarningRef = useRef(false);
+
+    useEffect(() => {
+        extraQtyWarningRef.current = false;
+    }, [currentLine?.id, isModalOpen]);
+
 
     //State de error de location rojo
     //const [locationError, setLocationError] = useState(false);
@@ -143,105 +152,386 @@ export default function PickingRoute() {
     }, [pickingId]);
 
 
+    // =====================================================
+// OBTENER PICKING, PRODUCTOS Y NOMBRE DEL PEDIDO
+// =====================================================
 
-    const fetchData = async () => {
-        try {
-            // 🔹 2. Hacer request
-            const response = await apiClient.get(
-                `/picking/${pickingId}/products-locations`
-            );
+const fetchData = async () => {
 
-            // 🔹 3. Log del resultado
-            console.log("📦 Products Locations:", response.data);
+    try {
 
-            if (!response.data.success) {
-                setPickings([]);
-                openModal({
-                    title: "NO SE PUDO INICIAR RECOGIDA",
-                    message: response.data.message
-                });
-                return;
-            }
+        // =====================================================
+        // 1. CONSULTAR BACKEND
+        // =====================================================
 
-            setPickings(
-                Array.isArray(response.data.data)
-                    ? response.data.data
-                    : []
-            );
-            setLoading(false);
+        const response = await apiClient.get(
+            `/picking/${pickingId}/products-locations`
+        );
 
-        } catch (error) {
-            console.error("❌ Error fetching products locations:", error);
+        const result = response.data;
+
+        console.log(
+            "📦 PRODUCTS LOCATIONS:",
+            result
+        );
+
+        // =====================================================
+        // 2. GUARDAR ORDER NAME
+        // =====================================================
+
+        const receivedOrderName =
+            result.order_name ?? null;
+
+        console.log(
+            "📄 ORDER NAME RECIBIDO:",
+            receivedOrderName
+        );
+
+        setOrderName(receivedOrderName);
+
+        // =====================================================
+        // 3. OBTENER STOCK MOVE LINES
+        // =====================================================
+
+        const lines = Array.isArray(result.data)
+            ? result.data
+            : [];
+
+        console.log("📦 TOTAL LÍNEAS:", lines.length);
+        console.log("📊 CANTIDAD PENDIENTE:", result.pending_qty);
+        console.log("📋 ESTADO:", result.code);
+
+        // =====================================================
+        // 4. TODO DESPACHADO
+        // =====================================================
+
+        if (result.code === "ALL_DISPATCHED") {
+
+            console.log("");
+            console.log("✅ ====================================");
+            console.log("✅ TODO EL PEDIDO FUE DESPACHADO");
+            console.log("✅ Picking ID:", pickingId);
+            console.log("✅ Pedido:", receivedOrderName);
+            console.log("✅ ====================================");
+
+            setPickings([]);
+
+            openModal({
+                title: "✅ TODO DESPACHADO",
+
+                message:
+                    result.message ||
+                    "¡Excelente! Todos los productos de este pedido ya fueron despachados. No quedan cantidades pendientes por recoger.",
+
+                buttonText: "Entendido",
+
+                titleColor: "green"
+            });
+
+            return;
         }
-    };
 
-    const fetchUpdatedMoveLines = async () => {
-  if (!pickingId) {
-    return false;
-  }
+        // =====================================================
+        // 5. CANTIDADES PENDIENTES SIN LÍNEAS DISPONIBLES
+        // =====================================================
 
-  try {
-    const response = await apiClient.get(
-      `/picking/${pickingId}/move-lines`
-    );
+        if (result.code === "PENDING_WITHOUT_LINES") {
 
-    const result = response.data;
+            console.log("");
+            console.log("⚠️ ====================================");
+            console.log("⚠️ CANTIDADES PENDIENTES");
+            console.log("⚠️ Picking ID:", pickingId);
+            console.log("⚠️ Pedido:", receivedOrderName);
+            console.log("⚠️ Pendiente:", result.pending_qty);
+            console.log("⚠️ ====================================");
 
-    console.log(
-      "📦 Move lines actualizadas:",
-      result
-    );
+            setPickings([]);
 
-    if (!result.success) {
-      openModal({
-        title:
-          result.title ||
-          "No se pudieron actualizar las líneas",
+            const pendingQty = Number(
+                result.pending_qty || 0
+            );
 
-        message:
-          result.message ||
-          "Ocurrió un error obteniendo las líneas del picking.",
-      });
+            openModal({
+                title: "⚠️ CANTIDADES PENDIENTES",
 
-      return false;
+                message:
+                    result.message ||
+                    (
+                        `Este pedido tiene ${pendingQty} unidades pendientes ` +
+                        "de despacho, pero no existen líneas de recogida disponibles. " +
+                        "Revise las cantidades o las ubicaciones del inventario."
+                    ),
+
+                buttonText: "Entendido",
+
+                titleColor: "#d97706"
+            });
+
+            return;
+        }
+
+        // =====================================================
+        // 6. VALIDAR ERRORES REALES DEL BACKEND
+        // =====================================================
+
+        if (!result.success) {
+
+            console.log("");
+            console.log("❌ ====================================");
+            console.log("❌ ERROR CARGANDO PICKING");
+            console.log("❌ Código:", result.code);
+            console.log("❌ Mensaje:", result.message);
+            console.log("❌ ====================================");
+
+            setPickings([]);
+            setOrderName(null);
+
+            openModal({
+                title:
+                    result.title ||
+                    "NO SE PUDO INICIAR RECOGIDA",
+
+                message:
+                    result.message ||
+                    "No se pudo obtener la información del picking.",
+
+                buttonText: "Entendido",
+
+                titleColor: "red"
+            });
+
+            return;
+        }
+
+        // =====================================================
+        // 7. VALIDAR SI NO HAY LÍNEAS
+        // Y EL BACKEND NO DEVOLVIÓ UN ESTADO
+        // =====================================================
+
+        if (lines.length === 0) {
+
+            console.log("");
+            console.log("⚠️ ====================================");
+            console.log("⚠️ NO HAY LÍNEAS DISPONIBLES");
+            console.log("⚠️ SIN ESTADO DEFINIDO");
+            console.log("⚠️ ====================================");
+
+            setPickings([]);
+
+            openModal({
+                title: "⚠️ SIN LÍNEAS DISPONIBLES",
+
+                message:
+                    "No se encontraron líneas de recogida para este pedido. " +
+                    "No fue posible determinar si está completamente despachado " +
+                    "o si todavía tiene cantidades pendientes.",
+
+                buttonText: "Entendido",
+
+                titleColor: "#d97706"
+            });
+
+            return;
+        }
+
+        // =====================================================
+        // 8. GUARDAR STOCK MOVE LINES
+        // =====================================================
+
+        setPickings(lines);
+
+        // =====================================================
+        // 9. LOG FINAL
+        // =====================================================
+
+        console.log("");
+        console.log("✅ ====================================");
+        console.log("✅ PICKING CARGADO CORRECTAMENTE");
+        console.log("📦 Picking ID:", pickingId);
+        console.log("📄 Pedido:", receivedOrderName);
+        console.log("📋 Estado:", result.code);
+        console.log("📦 Total líneas:", lines.length);
+        console.log("✅ ====================================");
+
+    } catch (error) {
+
+        console.error("");
+        console.error("❌ ERROR FETCHING PRODUCTS LOCATIONS:");
+        console.error(error);
+
+        // =====================================================
+        // 10. OBTENER MENSAJE DEL BACKEND
+        // =====================================================
+
+        const backendError = (
+            error as {
+                response?: {
+                    status?: number;
+                    data?: {
+                        success?: boolean;
+                        code?: string;
+                        title?: string;
+                        message?: string;
+                        order_name?: string;
+                        pending_qty?: number;
+                    };
+                };
+            }
+        )?.response?.data;
+
+        console.log("📥 ERROR BACKEND:", backendError);
+
+        setPickings([]);
+
+        // =====================================================
+        // 11. MANEJAR ESTADOS EN RESPUESTAS HTTP DE ERROR
+        // =====================================================
+
+        if (backendError?.code === "ALL_DISPATCHED") {
+
+            setOrderName(
+                backendError.order_name ?? null
+            );
+
+            openModal({
+                title: "✅ TODO DESPACHADO",
+
+                message:
+                    backendError.message ||
+                    "Todos los productos de este pedido ya fueron despachados.",
+
+                buttonText: "Entendido",
+
+                titleColor: "green"
+            });
+
+            return;
+        }
+
+        if (backendError?.code === "PENDING_WITHOUT_LINES") {
+
+            setOrderName(
+                backendError.order_name ?? null
+            );
+
+            openModal({
+                title: "⚠️ CANTIDADES PENDIENTES",
+
+                message:
+                    backendError.message ||
+                    "Existen cantidades pendientes de despacho, pero no hay líneas disponibles para recogerlas.",
+
+                buttonText: "Entendido",
+
+                titleColor: "#d97706"
+            });
+
+            return;
+        }
+
+        // =====================================================
+        // 12. ERROR GENERAL
+        // =====================================================
+
+        setOrderName(null);
+
+        openModal({
+            title:
+                backendError?.title ||
+                "ERROR CARGANDO PICKING",
+
+            message:
+                backendError?.message ||
+                "No fue posible obtener los datos del pedido. Inténtalo nuevamente.",
+
+            buttonText: "Entendido",
+
+            titleColor: "red"
+        });
+
+    } finally {
+
+        // =====================================================
+        // 13. FINALIZAR LOADING
+        // =====================================================
+
+        setLoading(false);
+
+        console.log("");
+        console.log("📦 FIN FETCH PRODUCTS LOCATIONS");
+        console.log("====================================");
+
     }
 
-    const updatedLines =
-      Array.isArray(result.data)
-        ? result.data
-        : [];
-
-    // Guardar las líneas nuevas en pickings.
-    setPickings(updatedLines);
-
-    console.log(
-      "✅ Pickings actualizado:",
-      updatedLines
-    );
-
-    return true;
-  } catch (error: any) {
-    const backendError =
-      error.response?.data;
-
-    console.error(
-      "❌ Error obteniendo move lines:",
-      backendError || error
-    );
-
-    openModal({
-      title:
-        backendError?.title ||
-        "Información guardada",
-
-      message:
-        backendError?.message ||
-        "La línea fue guardada, pero no se pudo actualizar la lista del picking.",
-    });
-
-    return false;
-  }
 };
+
+    const fetchUpdatedMoveLines = async () => {
+        if (!pickingId) {
+            return false;
+        }
+
+        try {
+            const response = await apiClient.get(
+                `/picking/${pickingId}/move-lines`
+            );
+
+            const result = response.data;
+
+            console.log(
+                "📦 Move lines actualizadas:",
+                result
+            );
+
+            if (!result.success) {
+                openModal({
+                    title:
+                        result.title ||
+                        "No se pudieron actualizar las líneas",
+
+                    message:
+                        result.message ||
+                        "Ocurrió un error obteniendo las líneas del picking.",
+                });
+
+                return false;
+            }
+
+            const updatedLines =
+                Array.isArray(result.data)
+                    ? result.data
+                    : [];
+
+            // Guardar las líneas nuevas en pickings.
+            setPickings(updatedLines);
+
+            console.log(
+                "✅ Pickings actualizado:",
+                updatedLines
+            );
+
+            return true;
+        } catch (error: any) {
+            const backendError =
+                error.response?.data;
+
+            console.error(
+                "❌ Error obteniendo move lines:",
+                backendError || error
+            );
+
+            openModal({
+                title:
+                    backendError?.title ||
+                    "Información guardada",
+
+                message:
+                    backendError?.message ||
+                    "La línea fue guardada, pero no se pudo actualizar la lista del picking.",
+            });
+
+            return false;
+        }
+    };
 
     const alreadyCheckedRef = useRef(false);
 
@@ -340,10 +630,47 @@ export default function PickingRoute() {
                 logScannerState("ANTES DE LLAMAR BACKEND /picking/scan", scanned);
 
                 try {
-                    const res = await apiClient.post("/picking/scan", {
+                    // =====================================================
+                    // DATOS DE LA LÍNEA ACTUAL DEL PICKING
+                    // =====================================================
+
+                    const lineId = currentLineRef.current?.id;
+                    const productId = currentLineRef.current?.product_id;
+
+                    // =====================================================
+                    // PREPARAR PAYLOAD
+                    // =====================================================
+
+                    const payload = {
                         code: scanned,
                         pickingId: pickingIdRef.current,
-                    });
+
+                        ...(lineId != null && lineId > 0 && {
+                            lineId,
+                        }),
+
+                        ...(productId != null && productId > 0 && {
+                            productId,
+                        }),
+                    };
+
+                    // =====================================================
+                    // LOG
+                    // =====================================================
+
+                    console.log(
+                        "📦 PAYLOAD ENVIADO A /picking/scan:",
+                        payload
+                    );
+
+                    // =====================================================
+                    // LLAMAR BACKEND
+                    // =====================================================
+
+                    const res = await apiClient.post(
+                        "/picking/scan",
+                        payload
+                    );
 
                     const data = res.data;
 
@@ -420,12 +747,121 @@ export default function PickingRoute() {
                         });
                     }
 
-                    else {
-                        console.log("⚠️ RESPUESTA DESCONOCIDA:", data);
+                    // =====================================================
+                    // ERRORES DE UBICACIÓN
+                    // =====================================================
+
+                    else if (
+                        !data.success &&
+                        [
+                            "LOCATION_WITHOUT_INVENTORY",
+                            "LOCATION_INACTIVE",
+                            "LOCATION_TYPE_NOT_ALLOWED",
+                            "AMBIGUOUS_LOCATION"
+                        ].includes(data.code)
+                    ) {
+
+                        console.log("❌ UBICACIÓN RECHAZADA:", {
+                            code: scanned,
+                            error: data.code,
+                            recommendedLocation: currentLineRef.current?.code
+                        });
+
+                        // Eliminar la ubicación previamente validada
+                        resetScannedLocation();
+
+                        // Mostrar error del backend
+                        openModal({
+                            title: data.title || "Ubicación incorrecta",
+
+                            message:
+                                data.message ||
+                                `La ubicación ${scanned} no está disponible para este producto.`,
+
+                            buttonText: "Entendido",
+
+                            titleColor: "red"
+                        });
+
+                        return;
                     }
 
-                } catch (error) {
-                    console.error("🔥 Error llamando /picking/scan:", error);
+
+                    // =====================================================
+                    // OTROS ERRORES DEL BACKEND
+                    // =====================================================
+
+                    else if (!data.success) {
+
+                        console.log("❌ ERROR DEL BACKEND:", data);
+
+                        openModal({
+                            title: data.title || "Error de escaneo",
+
+                            message:
+                                data.message ||
+                                "No fue posible validar el código escaneado.",
+
+                            buttonText: "Entendido",
+
+                            titleColor: "red"
+                        });
+
+                        return;
+                    }
+
+
+                    // =====================================================
+                    // RESPUESTA DESCONOCIDA
+                    // =====================================================
+
+                    else {
+
+                        console.log(
+                            "⚠️ RESPUESTA DESCONOCIDA:",
+                            data
+                        );
+
+                    }
+
+                } catch (error: unknown) {
+
+                    console.error(
+                        "🔥 Error llamando /picking/scan:",
+                        error
+                    );
+
+                    const apiError = error as {
+                        response?: {
+                            data?: {
+                                title?: string;
+                                message?: string;
+                                code?: string;
+                            };
+                        };
+                        message?: string;
+                    };
+
+                    const backendError =
+                        apiError.response?.data;
+
+                    openModal({
+
+                        title:
+                            backendError?.title ||
+                            "Error de escaneo",
+
+                        message:
+                            backendError?.message ||
+                            apiError.message ||
+                            "No fue posible validar el código escaneado.",
+
+                        buttonText: "Cerrar",
+
+                        titleColor: "red",
+
+                    });
+
                 }
 
                 return;
@@ -459,6 +895,42 @@ export default function PickingRoute() {
             window.removeEventListener("keydown", handleKeyDown);
         };
     }, []);
+
+
+
+    // =====================================================
+    // LIMPIAR UBICACIÓN DESPUÉS DE UN ESCANEO INVÁLIDO
+    // =====================================================
+
+    function resetScannedLocation() {
+
+        console.log("🟡 RESTABLECIENDO UBICACIÓN RECOMENDADA");
+
+        console.log(
+            "📍 Ubicación recomendada:",
+            currentLineRef.current?.code
+        );
+
+        // Eliminar ubicación validada anteriormente
+        setFromLocation(null);
+        fromLocationRef.current = null;
+
+        // Eliminar producto escaneado anteriormente
+        setSelectedProduct(null);
+        selectedProductRef.current = null;
+
+        // Limpiar cantidad
+        setQty("");
+        qtyRef.current = "";
+
+        // Quitar foco de cantidad
+        qtyInputRef.current?.blur();
+
+        console.log(
+            "✅ Ubicación restablecida a:",
+            currentLineRef.current?.code
+        );
+    }
 
 
     // FUNCTION: Handle scanned location code
@@ -750,12 +1222,57 @@ export default function PickingRoute() {
 
 
         } catch (error) {
-            console.error("🔥 ERROR confirm-line:", error);
+
+            console.error(
+                "❌ ERROR CONFIRMANDO PICKING:",
+                error
+            );
+
+            // ==========================================
+            // 1. EXTRAER ERROR DEL BACKEND
+            // ==========================================
+
+            const apiError = (
+                error as {
+                    response?: {
+                        status?: number;
+                        data?: {
+                            success?: boolean;
+                            title?: string;
+                            message?: string;
+                            code?: string;
+                        };
+                    };
+                }
+            )?.response;
+
+            const errorData = apiError?.data;
+
+            console.log("📥 ERROR RECIBIDO DEL BACKEND:", {
+                status: apiError?.status,
+                title: errorData?.title,
+                message: errorData?.message,
+                code: errorData?.code,
+            });
+
+            // ==========================================
+            // 2. MOSTRAR MENSAJE REAL DEL BACKEND
+            // ==========================================
 
             openModal({
-                title: "Error",
-                message: "No se pudo guardar la información"
+                title:
+                    errorData?.title ||
+                    "Error confirmando recogida",
+
+                message:
+                    errorData?.message ||
+                    "No se pudo guardar la información. Inténtalo nuevamente.",
+
+                buttonText: "Entendido",
+
+                titleColor: "red",
             });
+
         }
     }
 
@@ -764,13 +1281,27 @@ export default function PickingRoute() {
     }
 
     function closeModals() {
-        // ✅ TODO BIEN → LIMPIAR UI
-        setFromLocation(null);
-        setSelectedProduct(null);
-        setQty("");
 
+        // Limpiar ubicación
+        setFromLocation(null);
+        fromLocationRef.current = null;
+
+        // Limpiar producto
+        setSelectedProduct(null);
+        selectedProductRef.current = null;
+
+        // Limpiar cantidad
+        setQty("");
+        qtyRef.current = "";
+
+        // Limpiar escáner
+        scanBuffer.current = "";
+        lastScannerKeyTimeRef.current = 0;
+
+        // Cerrar modal
         setIsModalOpen(false);
         isModalOpenRef.current = false;
+
         setStartedPicking(false);
     }
 
@@ -964,7 +1495,9 @@ export default function PickingRoute() {
                                     <path d="M8 2v4M16 2v4M3 10h18" />
                                 </svg>
 
-                                <span>Pedido #{pickingId ?? "—"}</span>
+                                <span>
+                                    {orderName || `Pedido #${pickingId ?? "—"}`}
+                                </span>
                             </div>
 
                         </div>
@@ -1067,25 +1600,45 @@ export default function PickingRoute() {
                 <div className="transfer-page">
                     <div className="transfer-card">
 
-                        {/* ORIGEN */}
+
+                        {/* =====================================================
+    UBICACIÓN DE ORIGEN
+===================================================== */}
+
                         <section
-                            className={`pick-user-location-card ${!fromLocation
-                                ? "pick-user-location-empty"
-                                : ""
+                            className={`pick-user-location-card ${fromLocation
+                                ? "pick-user-location-success"
+                                : "pick-user-location-empty"
                                 }`}
                         >
+
                             <span className="pick-user-location-label">
-                                Lea la ubicación:
+
+                                {fromLocation
+                                    ? "✅ Ubicación confirmada:"
+                                    : "📍 Lea la ubicación:"}
+
                             </span>
+
                             <div className="pick-user-location-header">
 
-
                                 <span className="pick-user-location-code">
-                                    {currentLine?.code}
+
+                                    {fromLocation?.code ??
+                                        currentLine?.code ??
+                                        "Sin ubicación"}
+
                                 </span>
+
                             </div>
 
                         </section>
+
+
+
+
+
+
 
                         {/* 1) PRODUCTO */}
                         <section
@@ -1115,44 +1668,117 @@ export default function PickingRoute() {
                         <section
                             className={`section-qty block ${currentLine && !qty ? "ready" : ""}`}
                         >
+                            {/* CANTIDAD INGRESADA */}
                             <div className="pick-user-qty-div-a">
-                                <div className="block-title">Cantidad:</div>
+                                <div className="block-title">
+                                    Cantidad:
+                                </div>
+
                                 <input
                                     ref={qtyInputRef}
                                     className="qty-input"
                                     type="number"
+                                    min="0"
                                     value={qty}
+
                                     onFocus={() => {
                                         scanBuffer.current = "";
                                         lastScannerKeyTimeRef.current = 0;
                                     }}
-                                    onChange={(e) => {
-                                        const value = Number(e.target.value);
-                                        const max = Math.trunc(Number(currentLine?.product_uom_qty || 0));
 
-                                        if (value > max) {
-                                            setQty(String(max));
+                                    onChange={(e) => {
+                                        const inputValue = e.target.value;
+
+                                        const value = Number(inputValue);
+
+                                        const max = Math.trunc(
+                                            Number(
+                                                currentLine?.product_uom_qty || 0
+                                            )
+                                        );
+
+                                        // ==========================================
+                                        // 1. PERMITIR BORRAR EL INPUT
+                                        // ==========================================
+
+                                        if (inputValue === "") {
+                                            setQty("");
+                                            qtyRef.current = "";
                                             return;
                                         }
+
+                                        // ==========================================
+                                        // 2. NO PERMITIR CANTIDADES NEGATIVAS
+                                        // ==========================================
 
                                         if (value < 0) {
                                             setQty("0");
+                                            qtyRef.current = "0";
                                             return;
                                         }
 
-                                        setQty(e.target.value);
+                                        // ==========================================
+                                        // 3. GUARDAR LA CANTIDAD SIN LIMITARLA
+                                        // ==========================================
+
+                                        setQty(inputValue);
+
+                                        // Actualizar referencia inmediatamente
+                                        qtyRef.current = inputValue;
+
+                                        // ==========================================
+                                        // 4. ADVERTIR SI SUPERA LO SOLICITADO
+                                        // ==========================================
+
+                                        if (
+                                            currentLine &&
+                                            value > max &&
+                                            !extraQtyWarningRef.current
+                                        ) {
+                                            // Marcar advertencia como mostrada
+                                            extraQtyWarningRef.current = true;
+
+                                            console.log(
+                                                "⚠️ CANTIDAD SUPERIOR A LA SOLICITADA",
+                                                {
+                                                    productId: currentLine.product_id,
+                                                    sku: currentLine.sku,
+                                                    orderedQty: max,
+                                                    enteredQty: value,
+                                                }
+                                            );
+
+                                            openModal({
+                                                title: "⚠️ CANTIDAD SUPERIOR AL PEDIDO",
+
+                                                message:
+                                                    `La cantidad solicitada para este producto es de ${max} unidades, ` +
+                                                    `pero estás ingresando ${value} unidades.\n\n` +
+                                                    `Puedes continuar con esta cantidad. ` +
+                                                    `El sistema verificará si es posible registrarla al guardar.`,
+
+                                                buttonText: "Entendido",
+
+                                                titleColor: "#d97706",
+                                            });
+                                        }
                                     }}
                                 />
                             </div>
 
+                            {/* CANTIDAD DEL PEDIDO */}
                             <div>
-                                <div className="block-title">Pedido:</div>
+                                <div className="block-title">
+                                    Pedido:
+                                </div>
+
                                 <div className="qty-display">
-                                    {Math.trunc(Number(currentLine?.product_uom_qty || 0))}
+                                    {Math.trunc(
+                                        Number(currentLine?.product_uom_qty || 0)
+                                    )}
                                 </div>
                             </div>
                         </section>
-
                         {/* BOTONES */}
                         <section className="block-actions">
                             <button className="btn btn-exit" onClick={closeModals}>
