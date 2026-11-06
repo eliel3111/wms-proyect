@@ -2879,79 +2879,207 @@ export async function CancelPurchaseOrderReception(req, res) {
     console.log("📉 INVENTARIO DESCONTADO:");
     console.table(inventoryDeductions);
 
-  // ========================================================
-// 13. CREAR INVENTORY MOVEMENTS
-//
-// Cada resta genera un movimiento.
-//
-// from_location_id = ubicación descontada
-// to_location_id   = NULL
-// movement_type    = RECEIPT_CANCEL
-// reference_type   = RECEIPT
-// reference_id     = receiptId
-// user_id          = usuario autenticado
-// ========================================================
+  
+  
+    // ========================================================
+    // 13. CREAR INVENTORY MOVEMENTS
+    //
+    // Cada descuento genera un movimiento histórico.
+    //
+    // product_sku      = Producto descontado
+    // from_location_id = Ubicación donde se descontó
+    // to_location_id   = NULL
+    // qty              = Cantidad descontada
+    // movement_type    = RECEIPT_CANCEL
+    // reference_type   = RECEIPT
+    // reference_id     = ID de recepción
+    // created_by       = Usuario autenticado
+    // note             = Descripción del movimiento
+    // ========================================================
 
-if (inventoryDeductions.length > 0) {
+    console.log("========================================");
+    console.log("🧾 [STEP 13] CREANDO INVENTORY MOVEMENTS");
+    console.log("========================================");
 
-  const movementValues = [];
-  const movementParams = [];
+    console.log("👤 USER ID:", userId);
+    console.log("📄 RECEIPT ID:", normalizedReceiptId);
 
-  inventoryDeductions.forEach((line, index) => {
-
-    // AHORA SON 8 PARÁMETROS POR MOVIMIENTO
-    const base = index * 8;
-
-    movementValues.push(`
-      (
-        $${base + 1},
-        $${base + 2},
-        $${base + 3},
-        $${base + 4},
-        $${base + 5},
-        $${base + 6},
-        $${base + 7},
-        $${base + 8}
-      )
-    `);
-
-    movementParams.push(
-      line.sku,
-      line.location_id,
-      null,
-      line.qty,
-      "RECEIPT_CANCEL",
-      "RECEIPT",
-      String(normalizedReceiptId),
-      userId
+    console.log(
+        "📦 TOTAL INVENTORY DEDUCTIONS:",
+        inventoryDeductions.length
     );
 
-  });
+    console.table(inventoryDeductions);
 
-  await client.query(
-    `
-    INSERT INTO inventory_movements
-    (
-      product_sku,
-      from_location_id,
-      to_location_id,
-      qty,
-      movement_type,
-      reference_type,
-      reference_id,
-      user_id
-    )
+    if (inventoryDeductions.length > 0) {
 
-    VALUES
+        const movementValues = [];
+        const movementParams = [];
 
-    ${movementValues.join(",")}
-    `,
-    movementParams
-  );
-}
+        // ====================================================
+        // 1️⃣ PREPARAR MOVIMIENTOS
+        // ====================================================
 
-console.log("✅ INVENTORY_MOVEMENTS CREADOS");
-console.log("👤 USUARIO RESPONSABLE:", userId);
+        inventoryDeductions.forEach((line, index) => {
+
+            // 9 parámetros por movimiento
+            const base = index * 9;
+
+            movementValues.push(`
+                (
+                    $${base + 1},
+                    $${base + 2},
+                    $${base + 3},
+                    $${base + 4},
+                    $${base + 5},
+                    $${base + 6},
+                    $${base + 7},
+                    $${base + 8},
+                    $${base + 9}
+                )
+            `);
+
+            movementParams.push(
+
+                line.sku,
+
+                Number(line.location_id),
+
+                null,
+
+                Number(line.qty),
+
+                "RECEIPT_CANCEL",
+
+                "RECEIPT",
+
+                String(normalizedReceiptId),
+
+                Number(userId),
+
+                `Cancelación de recepción ${normalizedReceiptId} - PO ${normalizedPurchaseOrderId} - Ubicación ${line.location_code}`
+
+            );
+
+            console.log("========================================");
+            console.log("📦 PREPARANDO MOVIMIENTO:", index + 1);
+
+            console.log({
+                sku: line.sku,
+                warehouse_id: line.warehouse_id,
+                from_location_id: line.location_id,
+                from_location_code: line.location_code,
+                qty: line.qty,
+                movement_type: "RECEIPT_CANCEL",
+                reference_type: "RECEIPT",
+                reference_id: normalizedReceiptId,
+                created_by: userId
+            });
+
+        });
+
+        // ====================================================
+        // 2️⃣ EJECUTAR INSERT
+        // ====================================================
+
+        console.log("========================================");
+        console.log("💾 INSERTANDO INVENTORY MOVEMENTS");
+        console.log("========================================");
+
+        console.log(
+            "📊 TOTAL MOVIMIENTOS:",
+            inventoryDeductions.length
+        );
+
+        console.log(
+            "📊 TOTAL PARÁMETROS:",
+            movementParams.length
+        );
+
+        const movementsResult = await client.query(
+            `
+            INSERT INTO inventory_movements
+            (
+                product_sku,
+                from_location_id,
+                to_location_id,
+                qty,
+                movement_type,
+                reference_type,
+                reference_id,
+                created_by,
+                note
+            )
+
+            VALUES
+
+            ${movementValues.join(",")}
+
+            RETURNING
+                id,
+                product_sku,
+                from_location_id,
+                to_location_id,
+                qty,
+                movement_type,
+                reference_type,
+                reference_id,
+                created_by,
+                note,
+                created_at
+            `,
+            movementParams
+        );
+
+        // ====================================================
+        // 3️⃣ VALIDAR RESULTADO
+        // ====================================================
+
+        console.log("========================================");
+        console.log("✅ INVENTORY MOVEMENTS INSERTADOS");
+        console.log("========================================");
+
+        console.log(
+            "📊 ROWCOUNT:",
+            movementsResult.rowCount
+        );
+
+        console.table(movementsResult.rows);
+
+        if (
+            movementsResult.rowCount !==
+            inventoryDeductions.length
+        ) {
+
+            console.log(
+                "❌ ERROR: CANTIDAD DE MOVIMIENTOS NO COINCIDE"
+            );
+
+            throw new Error(
+                "No se registraron todos los movimientos de cancelación de recepción."
+            );
+
+        }
+
+        console.log(
+            "✅ TODOS LOS MOVIMIENTOS FUERON INSERTADOS"
+        );
+
+    } else {
+
+        console.log(
+            "⚠️ NO EXISTEN DESCUENTOS PARA REGISTRAR"
+        );
+
+    }
+
+    console.log("========================================");
+    console.log("✅ [STEP 13] INVENTORY MOVEMENTS COMPLETADO");
+    console.log("========================================");
+
+    console.log("👤 USUARIO RESPONSABLE:", userId);
+    console.log("📄 RECEIPT ID:", normalizedReceiptId);
+
 
     // ========================================================
     // 14. BORRAR SOLAMENTE LA RELACIÓN DE ESTA PO

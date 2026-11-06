@@ -1265,83 +1265,47 @@ export async function saveInventoryByCount(
     note = "Ajuste por conteo físico",
   }
 ) {
-  console.log("🟦 saveInventoryByCount INICIADO");
 
-  //PENDIENTE POR ACTUALIZAR 🟧🟧🟧🟧🟧🟧
-  // =====================================
-  // VALIDAR SESIÓN DE INVENTARIO ACTIVA
-  // Solo se puede leer/contar si hay una sola sesión
-  // y está en estado in-progress
-  // =====================================
+  console.log("");
+  console.log("🟦 ========================================");
+  console.log("📦 saveInventoryByCount INICIADO");
+  console.log("🟦 ========================================");
 
-  console.log("🔍 VALIDANDO SESIÓN DE INVENTARIO");
+  // ============================================================
+  // 1. VALIDAR USUARIO
+  // ============================================================
 
-  const sessionResult = await client.query(`
-  SELECT
-    id,
-    code,
-    status
-  FROM inventory_sessions
-  WHERE status IN ('draft', 'in-progress')
-  ORDER BY created_at ASC
-`);
+  const countedUserId = Number(userId);
 
-  console.log("📋 SESIONES ABIERTAS ENCONTRADAS:", sessionResult.rows.length);
+  if (
+    !Number.isSafeInteger(countedUserId) ||
+    countedUserId <= 0
+  ) {
 
-  if (sessionResult.rows.length === 0) {
-    console.log("❌ No hay sesión de inventario abierta");
+    console.error("❌ USER ID INVÁLIDO:", userId);
 
-    return res.status(200).json({
+    return {
       success: false,
-      title: "No hay sesión de inventario",
-      message: "Debe crear e iniciar una sesión de inventario antes de leer productos.",
-    });
+      title: "Usuario inválido",
+      message:
+        "No se pudo identificar al usuario que realiza el conteo.",
+    };
   }
 
-  if (sessionResult.rows.length > 1) {
-    console.log("❌ Hay más de una sesión abierta:", sessionResult.rows);
+  console.log("👤 USER ID:", countedUserId);
 
-    return res.status(200).json({
-      success: false,
-      title: "Más de una sesión abierta",
-      message: "Solo puede haber una sesión de inventario en draft o in-progress.",
-    });
-  }
+  // ============================================================
+  // 2. VALIDAR DATOS OBLIGATORIOS
+  // ============================================================
 
-  const activeSession = sessionResult.rows[0];
+  if (
+    locationSelected == null ||
+    productSelected == null ||
+    qty == null ||
+    qty === ""
+  ) {
 
-  console.log("📦 SESIÓN ENCONTRADA:", {
-    id: activeSession.id,
-    code: activeSession.code,
-    status: activeSession.status,
-  });
-
-  if (activeSession.status === "draft") {
-    console.log("⚠️ La sesión está en draft. Debe iniciarse antes de contar.");
-
-    return res.status(200).json({
-      success: false,
-      title: "Sesión no iniciada",
-      message: "Debe iniciar la sesión de inventario antes de leer productos.",
-    });
-  }
-
-  if (activeSession.status !== "in-progress") {
-    console.log("❌ Estado de sesión inválido:", activeSession.status);
-
-    return res.status(200).json({
-      success: false,
-      title: "Sesión inválida",
-      message: "Solo puede leer productos cuando la sesión está en progreso.",
-    });
-  }
-
-  console.log("✅ Todo bien. La sesión está en progreso:", activeSession.code);
-  //PENDIENTE POR ACTUALIZAR 🟧🟧🟧🟧🟧🟧
-
-  // 1) Validar los 3 datos obligatorios
-  if (!locationSelected || !productSelected || qty == null) {
-    console.log("❌ Datos incompletos:", {
+    console.error("❌ DATOS INCOMPLETOS:", {
       locationSelected,
       productSelected,
       qty,
@@ -1350,159 +1314,652 @@ export async function saveInventoryByCount(
     return {
       success: false,
       title: "Datos incompletos",
-      message: "Debe enviar ubicación, producto y cantidad.",
+      message:
+        "Debe enviar ubicación, producto y cantidad.",
     };
   }
 
-  console.log("1️⃣ UBICACIÓN LEÍDA:", locationSelected);
-  console.log("2️⃣ PRODUCTO LEÍDO:", productSelected);
-  console.log("3️⃣ CANTIDAD RECIBIDA:", qty);
+  const selectedLocationId =
+    Number(locationSelected);
 
-  const countedQty = Number(qty);
+  const selectedProductId =
+    Number(productSelected);
 
-  if (Number.isNaN(countedQty) || countedQty < 0) {
-    console.log("❌ Cantidad inválida:", qty);
+  const countedQty =
+    Number(qty);
 
-    return {
-      success: false,
-      title: "Cantidad inválida",
-      message: "La cantidad contada no es válida.",
-    };
-  }
-
-  // 2) Validar ubicación
-  const locationResult = await client.query(
-    `
-    SELECT id, warehouse_id
-    FROM locations
-    WHERE id = $1
-      AND is_active = true
-    LIMIT 1
-    `,
-    [locationSelected]
-  );
-
-  if (locationResult.rows.length === 0) {
-    console.log("❌ Ubicación inválida:", locationSelected);
+  if (
+    !Number.isSafeInteger(selectedLocationId) ||
+    selectedLocationId <= 0
+  ) {
 
     return {
       success: false,
       title: "Ubicación inválida",
-      message: "La ubicación que leíste no existe o no está activa.",
+      message:
+        "El identificador de la ubicación no es válido.",
     };
   }
 
-  const locationId = locationResult.rows[0].id;
-  const warehouseId = locationResult.rows[0].warehouse_id;
-
-  console.log("✅ Ubicación confirmada:", {
-    locationId,
-    warehouseId,
-  });
-
-  // 3) Validar producto
-  const productResult = await client.query(
-    `
-    SELECT id, sku
-    FROM products
-    WHERE id = $1
-      AND status = 'ACTIVE'
-      AND deleted_erp = false
-    LIMIT 1
-    `,
-    [productSelected]
-  );
-
-  if (productResult.rows.length === 0) {
-    console.log("❌ Producto inválido:", productSelected);
+  if (
+    !Number.isSafeInteger(selectedProductId) ||
+    selectedProductId <= 0
+  ) {
 
     return {
       success: false,
       title: "Producto inválido",
-      message: "El producto no existe, no está activo o fue eliminado del ERP.",
+      message:
+        "El identificador del producto no es válido.",
     };
   }
 
-  const productId = productResult.rows[0].id;
-  const productSku = productResult.rows[0].sku;
+  if (
+    !Number.isFinite(countedQty) ||
+    countedQty < 0
+  ) {
 
-  console.log("✅ Producto confirmado:", {
-    productId,
-    productSku,
-  });
+    console.error(
+      "❌ CANTIDAD INVÁLIDA:",
+      qty
+    );
 
-  // 4) Buscar línea actual con LOCK
-  const invResult = await client.query(
+    return {
+      success: false,
+      title: "Cantidad inválida",
+      message:
+        "La cantidad contada debe ser un número válido mayor o igual a cero.",
+    };
+  }
+
+  console.log("📍 LOCATION ID:", selectedLocationId);
+  console.log("📦 PRODUCT ID:", selectedProductId);
+  console.log("🔢 CANTIDAD:", countedQty);
+
+  // ============================================================
+  // 3. BUSCAR SESIÓN DE INVENTARIO ACTIVA
+  //
+  // Se conserva la regla original:
+  // Solo puede existir una sesión draft/in-progress.
+  //
+  // FOR SHARE evita que esta sesión sea modificada
+  // mientras se guarda el conteo en la transacción actual.
+  // ============================================================
+
+  console.log("");
+  console.log("🔍 VALIDANDO SESIÓN DE INVENTARIO");
+
+  const sessionResult = await client.query(
     `
-    SELECT id, qty_on_hand, qty_reserved, inventory_quantity
-    FROM inventory_by_location
-    WHERE location_id = $1
-      AND product_sku = $2
-    FOR UPDATE
-    `,
-    [locationId, productSku]
+    SELECT
+      id,
+      code,
+      status,
+      erp_warehouse_id,
+      start_date
+
+    FROM inventory_sessions
+
+    WHERE status IN (
+      'draft',
+      'in-progress'
+    )
+
+    ORDER BY created_at ASC
+
+    LIMIT 2
+
+    FOR SHARE
+    `
   );
 
+  console.log(
+    "📋 SESIONES ABIERTAS:",
+    sessionResult.rows.length
+  );
+
+  if (sessionResult.rows.length === 0) {
+
+    console.error(
+      "❌ NO EXISTE SESIÓN DE INVENTARIO"
+    );
+
+    return {
+      success: false,
+      title: "No hay sesión de inventario",
+      message:
+        "Debe crear e iniciar una sesión de inventario antes de contar productos.",
+    };
+  }
+
+  if (sessionResult.rows.length > 1) {
+
+    console.error(
+      "❌ EXISTEN VARIAS SESIONES ABIERTAS"
+    );
+
+    return {
+      success: false,
+      title: "Más de una sesión abierta",
+      message:
+        "Solo puede existir una sesión de inventario abierta.",
+    };
+  }
+
+  const activeSession =
+    sessionResult.rows[0];
+
+  // ============================================================
+  // 4. VALIDAR ESTADO DE LA SESIÓN
+  // ============================================================
+
+  if (activeSession.status === "draft") {
+
+    console.warn(
+      "⚠️ SESIÓN TODAVÍA EN DRAFT"
+    );
+
+    return {
+      success: false,
+      title: "Sesión no iniciada",
+      message:
+        "Debe iniciar la sesión de inventario antes de realizar conteos.",
+    };
+  }
+
+  if (activeSession.status !== "in-progress") {
+
+    return {
+      success: false,
+      title: "Sesión inválida",
+      message:
+        "Solo puede contar productos cuando la sesión está en progreso.",
+    };
+  }
+
+  const sessionId =
+    Number(activeSession.id);
+
+  const erpWarehouseId =
+    String(
+      activeSession.erp_warehouse_id ?? ""
+    ).trim().toLowerCase();
+
+  if (
+    !Number.isSafeInteger(sessionId) ||
+    sessionId <= 0
+  ) {
+
+    return {
+      success: false,
+      title: "Sesión inválida",
+      message:
+        "La sesión de inventario no tiene un ID válido.",
+    };
+  }
+
+  if (!erpWarehouseId) {
+
+    console.error(
+      "❌ SESIÓN SIN ERP WAREHOUSE ID"
+    );
+
+    return {
+      success: false,
+      title: "Almacén ERP inválido",
+      message:
+        "La sesión no tiene un almacén ERP configurado.",
+    };
+  }
+
+  if (!activeSession.start_date) {
+
+    return {
+      success: false,
+      title: "Sesión sin fecha de inicio",
+      message:
+        "La sesión no tiene una fecha de inicio válida.",
+    };
+  }
+
+  console.log(
+    "✅ SESIÓN EN PROGRESO:",
+    {
+      sessionId,
+      code: activeSession.code,
+      status: activeSession.status,
+      erpWarehouseId,
+      startDate: activeSession.start_date,
+    }
+  );
+
+  // ============================================================
+  // 5. IDENTIFICAR ALMACÉN WMS DE LA SESIÓN
+  //
+  // inventory_sessions.erp_warehouse_id = GUID ADM Cloud
+  // warehouses.erp_warehouse_id = GUID ADM Cloud
+  // warehouses.id = ID interno WMS
+  // ============================================================
+
+  console.log("");
+  console.log("🏬 IDENTIFICANDO ALMACÉN WMS");
+
+  const warehouseResult = await client.query(
+    `
+    SELECT
+      id,
+      code,
+      name,
+      erp_warehouse_id
+
+    FROM warehouses
+
+    WHERE LOWER(erp_warehouse_id::text) = $1
+
+    ORDER BY id ASC
+
+    LIMIT 2
+    `,
+    [erpWarehouseId]
+  );
+
+  // ============================================================
+  // 6. VALIDAR ALMACÉN DE LA SESIÓN
+  // ============================================================
+
+  if (warehouseResult.rows.length !== 1) {
+
+    console.error(
+      "❌ NO SE IDENTIFICÓ UN ÚNICO ALMACÉN WMS:",
+      erpWarehouseId
+    );
+
+    return {
+      success: false,
+      title: "Almacén WMS inválido",
+      message:
+        "No se pudo identificar un único almacén WMS para esta sesión de inventario.",
+    };
+  }
+
+  const sessionWarehouse =
+    warehouseResult.rows[0];
+
+  const sessionWarehouseId =
+    Number(sessionWarehouse.id);
+
+  if (
+    !Number.isSafeInteger(sessionWarehouseId) ||
+    sessionWarehouseId <= 0
+  ) {
+
+    return {
+      success: false,
+      title: "Almacén inválido",
+      message:
+        "El almacén WMS de esta sesión no tiene un identificador válido.",
+    };
+  }
+
+  console.log(
+    "✅ ALMACÉN DE LA SESIÓN:",
+    {
+      sessionId,
+      warehouseId: sessionWarehouseId,
+      warehouseName: sessionWarehouse.name,
+      erpWarehouseId,
+    }
+  );
+
+  // ============================================================
+  // 7. VALIDAR QUE LA UBICACIÓN PERTENEZCA AL ALMACÉN
+  //
+  // Esta es la protección principal.
+  //
+  // La ubicación debe:
+  // - Existir.
+  // - Estar activa.
+  // - Pertenecer al almacén de la sesión.
+  //
+  // No se confía en ningún warehouseId enviado por el frontend.
+  // ============================================================
+
+  console.log("");
+  console.log("🔍 VALIDANDO UBICACIÓN DE LA SESIÓN");
+
+  const locationResult = await client.query(
+    `
+    SELECT
+      id,
+      code,
+      warehouse_id
+
+    FROM locations
+
+    WHERE id = $1
+
+      AND warehouse_id = $2
+
+      AND is_active = true
+
+    LIMIT 1
+    `,
+    [
+      selectedLocationId,
+      sessionWarehouseId,
+    ]
+  );
+
+  if (locationResult.rows.length === 0) {
+
+    console.error(
+      "❌ UBICACIÓN NO PERMITIDA:",
+      {
+        locationId: selectedLocationId,
+        sessionWarehouseId,
+      }
+    );
+
+    return {
+      success: false,
+      title: "Ubicación no permitida",
+      message:
+        "La ubicación seleccionada no existe, está inactiva o pertenece a otro almacén. Solo puede contar productos en las ubicaciones del almacén de esta sesión.",
+    };
+  }
+
+  const location =
+    locationResult.rows[0];
+
+  const locationId =
+    Number(location.id);
+
+  const warehouseId =
+    Number(location.warehouse_id);
+
+  console.log(
+    "✅ UBICACIÓN VALIDADA:",
+    {
+      locationId,
+      locationCode: location.code,
+      warehouseId,
+      sessionWarehouseId,
+    }
+  );
+
+  // ============================================================
+  // 8. VALIDACIÓN ADICIONAL DE SEGURIDAD
+  // ============================================================
+
+  if (warehouseId !== sessionWarehouseId) {
+
+    console.error(
+      "🟥 BLOQUEADO: UBICACIÓN FUERA DEL ALMACÉN"
+    );
+
+    return {
+      success: false,
+      title: "Ubicación no permitida",
+      message:
+        "No puede realizar conteos fuera del almacén asignado a la sesión.",
+    };
+  }
+
+  console.log(
+    "🟩 UBICACIÓN CORRESPONDE AL ALMACÉN DE LA SESIÓN"
+  );
+
+  // ============================================================
+  // 9. VALIDAR PRODUCTO
+  // ============================================================
+
+  console.log("");
+  console.log("🔍 VALIDANDO PRODUCTO");
+
+  const productResult = await client.query(
+    `
+    SELECT
+      id,
+      sku
+
+    FROM products
+
+    WHERE id = $1
+
+      AND status = 'ACTIVE'
+
+      AND deleted_erp = false
+
+    LIMIT 1
+    `,
+    [selectedProductId]
+  );
+
+  if (productResult.rows.length === 0) {
+
+    console.error(
+      "❌ PRODUCTO INVÁLIDO:",
+      selectedProductId
+    );
+
+    return {
+      success: false,
+      title: "Producto inválido",
+      message:
+        "El producto no existe, no está activo o fue eliminado del ERP.",
+    };
+  }
+
+  const productId =
+    Number(productResult.rows[0].id);
+
+  const productSku =
+    productResult.rows[0].sku;
+
+  console.log(
+    "✅ PRODUCTO VALIDADO:",
+    {
+      productId,
+      productSku,
+    }
+  );
+
+  // ============================================================
+  // 10. BUSCAR INVENTARIO EXISTENTE CON LOCK
+  //
+  // Se agrega warehouse_id al WHERE.
+  // Así nunca se modifica una línea de otro almacén.
+  // ============================================================
+
+  console.log("");
+  console.log("🔍 BUSCANDO INVENTARIO EXISTENTE");
+
+  const invResult = await client.query(
+    `
+    SELECT
+      id,
+      warehouse_id,
+      location_id,
+      product_sku,
+      qty_on_hand,
+      qty_reserved,
+      inventory_quantity
+
+    FROM inventory_by_location
+
+    WHERE warehouse_id = $1
+
+      AND location_id = $2
+
+      AND product_sku = $3
+
+    FOR UPDATE
+    `,
+    [
+      sessionWarehouseId,
+      locationId,
+      productSku,
+    ]
+  );
+
+  if (invResult.rows.length > 1) {
+
+    console.error(
+      "❌ SE ENCONTRARON LÍNEAS DUPLICADAS"
+    );
+
+    return {
+      success: false,
+      title: "Inventario duplicado",
+      message:
+        "Se encontraron varias líneas del mismo producto en la misma ubicación. Debe revisarse el inventario antes de guardar.",
+    };
+  }
+
   let inventoryRowId = null;
+
   let oldQtyOnHand = 0;
+
   let previousInventoryQuantity = null;
+
   let action = "SKIP";
+
   let difference = 0;
+
   let wasCreated = false;
 
-  // 5) Si existe, actualizar SOLO inventory_quantity
-  if (invResult.rows.length > 0) {
-    const row = invResult.rows[0];
+  // ============================================================
+  // 11. SI EXISTE, ACTUALIZAR SOLO INVENTORY_QUANTITY
+  //
+  // No modificamos qty_on_hand todavía.
+  // El ajuste final se realiza mediante el worker.
+  // ============================================================
 
-    inventoryRowId = row.id;
-    oldQtyOnHand = Number(row.qty_on_hand || 0);
+  if (invResult.rows.length > 0) {
+
+    const row =
+      invResult.rows[0];
+
+    inventoryRowId =
+      Number(row.id);
+
+    oldQtyOnHand =
+      Number(row.qty_on_hand || 0);
+
     previousInventoryQuantity =
       row.inventory_quantity == null
         ? null
         : Number(row.inventory_quantity);
 
-    difference = countedQty - oldQtyOnHand;
+    difference =
+      countedQty - oldQtyOnHand;
 
-    if (difference > 0) action = "GAIN";
-    if (difference < 0) action = "LOSS";
-    if (difference === 0) action = "SKIP";
+    if (difference > 0) {
+      action = "GAIN";
+    }
 
-    console.log("✅ Línea existente encontrada:", {
-      inventoryRowId,
-      oldQtyOnHand,
-      previousInventoryQuantity,
-      countedQty,
-      difference,
-      action,
-    });
+    if (difference < 0) {
+      action = "LOSS";
+    }
 
-    await client.query(
+    if (difference === 0) {
+      action = "SKIP";
+    }
+
+    console.log(
+      "📦 LÍNEA DE INVENTARIO EXISTENTE:",
+      {
+        inventoryRowId,
+        warehouseId,
+        locationId,
+        productSku,
+        oldQtyOnHand,
+        previousInventoryQuantity,
+        countedQty,
+        difference,
+        action,
+      }
+    );
+
+    const updateResult = await client.query(
       `
       UPDATE inventory_by_location
+
       SET
         inventory_quantity = $1,
+
         counted_by = $2,
+
         counted_at = NOW(),
+
         updated_at = NOW()
+
       WHERE id = $3
+
+        AND warehouse_id = $4
+
+        AND location_id = $5
+
+      RETURNING id
       `,
-      [countedQty, userId, inventoryRowId]
+      [
+        countedQty,
+        countedUserId,
+        inventoryRowId,
+        sessionWarehouseId,
+        locationId,
+      ]
     );
+
+    if (updateResult.rowCount !== 1) {
+
+      throw new Error(
+        "No se pudo actualizar la línea de inventario validada."
+      );
+    }
+
+    console.log(
+      "✅ INVENTORY_QUANTITY ACTUALIZADA:",
+      {
+        inventoryRowId,
+        countedQty,
+      }
+    );
+
   } else {
-    // 6) Si no existe, crear línea nueva
+
+    // ==========================================================
+    // 12. SI NO EXISTE, CREAR LÍNEA DE INVENTARIO
+    //
+    // El warehouse_id se obtiene de la sesión.
+    // Nunca se acepta desde req.body.
+    // ==========================================================
+
     oldQtyOnHand = 0;
+
     previousInventoryQuantity = null;
+
     difference = countedQty;
-    action = countedQty > 0 ? "GAIN" : "SKIP";
+
+    action =
+      countedQty > 0
+        ? "GAIN"
+        : "SKIP";
+
     wasCreated = true;
 
-    console.log("🟨 No existía línea. Creando nueva línea:", {
-      warehouseId,
-      locationId,
-      productSku,
-      countedQty,
-      userId,
-    });
+    console.log("");
+    console.log(
+      "🟨 CREANDO NUEVA LÍNEA DE INVENTARIO:",
+      {
+        sessionId,
+        sessionWarehouseId,
+        locationId,
+        productSku,
+        countedQty,
+        userId: countedUserId,
+      }
+    );
 
     const insertResult = await client.query(
       `
@@ -1518,40 +1975,94 @@ export async function saveInventoryByCount(
         counted_at,
         updated_at
       )
-      VALUES ($1, $2, $3, 0.00, $4, 0.00, 0.00, $5, NOW(), NOW())
+
+      VALUES (
+        $1,
+        $2,
+        $3,
+        0.00,
+        $4,
+        0.00,
+        0.00,
+        $5,
+        NOW(),
+        NOW()
+      )
+
       RETURNING id
       `,
-      [warehouseId, locationId, productSku, countedQty, userId]
+      [
+        sessionWarehouseId,
+        locationId,
+        productSku,
+        countedQty,
+        countedUserId,
+      ]
     );
 
-    inventoryRowId = insertResult.rows[0].id;
+    inventoryRowId =
+      Number(insertResult.rows[0].id);
+
+    console.log(
+      "✅ LÍNEA DE INVENTARIO CREADA:",
+      inventoryRowId
+    );
+
   }
 
-  console.log("✅ Conteo guardado correctamente:", {
-    inventoryRowId,
-    productSku,
-    locationId,
-    countedQty,
-  });
+  // ============================================================
+  // 13. RESULTADO FINAL
+  // ============================================================
+
+  console.log("");
+  console.log("🟩 ========================================");
+  console.log("✅ CONTEO GUARDADO CORRECTAMENTE");
+  console.log("🆔 SESIÓN:", sessionId);
+  console.log("🏬 ALMACÉN WMS:", sessionWarehouseId);
+  console.log("📍 UBICACIÓN:", locationId);
+  console.log("📦 PRODUCTO:", productSku);
+  console.log("🔢 CANTIDAD CONTADA:", countedQty);
+  console.log("📊 DIFERENCIA:", difference);
+  console.log("📌 ACCIÓN:", action);
+  console.log("🟩 ========================================");
 
   return {
     success: true,
-    title: "Conteo guardado",
-    message: "El conteo fue guardado correctamente.",
+
+    title:
+      "Conteo guardado",
+
+    message:
+      "El conteo fue guardado correctamente.",
+
     data: {
       inventoryRowId,
+
+      sessionId,
+
       productId,
       productSku,
+
       locationId,
-      warehouseId,
+
+      warehouseId:
+        sessionWarehouseId,
+
+      erpWarehouseId,
+
       countedQty,
+
       previousInventoryQuantity,
+
       oldQtyOnHand,
+
       difference,
       action,
+
       wasCreated,
     },
   };
+
 }
 
 

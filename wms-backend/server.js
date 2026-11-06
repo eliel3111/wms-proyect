@@ -92,7 +92,9 @@ import {
 import {
   getAdmCloudStockService
 } from "./integrations/admcloud/admcloud.erpStockSync.js";
-
+import {
+  crearAjusteInventarioAdmCloud
+} from "./integrations/admcloud/admcloud.adjustmentStock.js";
 
 const app = express();
 
@@ -125,7 +127,7 @@ console.log(resultado);
 }
 app.use(express.json());
 
-startAdmCloudCron();
+//startAdmCloudCron();
 
 
 
@@ -134,10 +136,187 @@ startAdmCloudCron();
 
 
 
+/**
+ * ============================================================
+ * TEST - CREAR AJUSTE DE INVENTARIO ADM CLOUD
+ * ============================================================
+ *
+ * MÉTODO: POST
+ * URL: http://localhost:3000/test-admcloud-adjustment-stock
+ *
 
+ *
+ * BODY: JSON
+ *
+ * ejecutar: false = VISTA PREVIA
+ * ejecutar: true  = AJUSTE REAL (requiere habilitación)
+ * ============================================================
+ */
 
+app.post(
+  "/test-admcloud-adjustment-stock",
+  async (req, res) => {
 
+    console.log("");
+    console.log("🟦 ===================================");
+    console.log("📦 TEST ADM CLOUD ADJUSTMENT STOCK");
+    console.log("🟦 ===================================");
 
+    // ========================================================
+    // 1. BLOQUEAR EN PRODUCCIÓN
+    // ========================================================
+
+    if (process.env.NODE_ENV === "production") {
+
+      return res.status(404).json({
+        success: false,
+        message: "Endpoint de prueba no disponible."
+      });
+
+    }
+
+    // ========================================================
+    // 2. OBTENER CLAVE DEL .ENV Y HEADER
+    // ========================================================
+
+    const expectedKey = 2414;
+
+    const receivedKey =
+      req.get("x-test-key");
+
+    // ========================================================
+    // 3. DEBUG DE AUTENTICACIÓN
+    // ========================================================
+
+    console.log("🔐 TEST API KEY DEBUG:", {
+
+      envConfigured: Boolean(
+        expectedKey
+      ),
+
+      headerReceived: Boolean(
+        receivedKey
+      ),
+
+      keysMatch:
+        receivedKey === expectedKey
+
+    });
+
+    // ========================================================
+    // 4. VALIDAR CLAVE
+    // ========================================================
+
+    if (
+      !expectedKey ||
+      !receivedKey ||
+      receivedKey !== expectedKey
+    ) {
+
+      console.log(
+        "❌ CLAVE DE PRUEBA INVÁLIDA"
+      );
+
+      return res.status(403).json({
+        success: false,
+        title: "Acceso denegado",
+        message: "Clave de prueba inválida."
+      });
+
+    }
+
+    console.log(
+      "✅ CLAVE DE PRUEBA CORRECTA"
+    );
+
+    // ========================================================
+    // 5. EJECUTAR SERVICIO ADM CLOUD
+    // ========================================================
+
+    try {
+
+      console.log("📥 BODY RECIBIDO:", {
+
+        ejecutar:
+          req.body?.ejecutar,
+
+        locationId:
+          req.body?.locationId,
+
+        totalItems:
+          req.body?.items?.length || 0,
+
+        referencia:
+          req.body?.referencia
+
+      });
+
+      const result =
+        await crearAjusteInventarioAdmCloud(
+          req.body
+        );
+
+      // ======================================================
+      // 6. RESULTADO
+      // ======================================================
+
+      console.log(
+        "✅ RESULTADO ADM CLOUD:",
+        {
+          success: result.success,
+          ejecutado: result.ejecutado,
+          modo: result.modo,
+          adjustmentId:
+            result.data?.adjustmentId ?? null
+        }
+      );
+
+      return res.status(
+        result.ejecutado ? 201 : 200
+      ).json(result);
+
+    } catch (error) {
+
+      // ======================================================
+      // 7. MANEJO DE ERRORES
+      // ======================================================
+
+      console.error(
+        "❌ ERROR ADM CLOUD ADJUSTMENT:",
+        {
+          message: error.message,
+          code: error.code,
+          status:
+            error.statusCode ||
+            error.status
+        }
+      );
+
+      return res.status(
+        error.statusCode ||
+        error.status ||
+        500
+      ).json({
+
+        success: false,
+
+        title:
+          "Error al ajustar inventario",
+
+        message:
+          error.message ||
+          "Ocurrió un error interno.",
+
+        code:
+          error.code ||
+          "ADMCLOUD_ADJUSTMENT_ERROR"
+
+      });
+
+    }
+
+  }
+);
 
 // ============================================================
 // TEST - CONSULTAR STOCK ADM CLOUD POR PRODUCTO

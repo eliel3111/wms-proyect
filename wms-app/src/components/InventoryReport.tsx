@@ -35,12 +35,7 @@ const reports: ReportOption[] = [
         description:
             "Este reporte muestra los productos que existen en Citrus con balance, pero que no fueron encontrados o contados en el WMS.",
     },
-    {
-        id: 3,
-        title: "Reporte de Auditoria",
-        description:
-            "Este reporte muestra un resumen general de diferencias, ganancias, pérdidas y productos que requieren revisión antes de aplicar el inventario.",
-    },
+   
 ];
 
 export default function InventoryReport() {
@@ -414,59 +409,203 @@ export default function InventoryReport() {
         ]
     );
 
-    //REPORTE FINAL DEL INVENTARIO
-    async function handleReporteFinalInventario() {
-        console.log("📄 Ejecutando Reporte Final del Inventario");
+    
+async function handleReporteFinalInventario() {
 
-        try {
-            const response = await apiClient.get("/inventory/report/final", {
-                responseType: "blob",
-            });
+  console.log(
+    "📄 GENERANDO REPORTE FINAL DEL INVENTARIO"
+  );
 
-            const contentType = response.headers["content-type"];
+  try {
 
-            // Si el backend devuelve JSON de error, aunque responseType sea blob,
-            // hay que convertirlo a texto y luego a JSON.
-            if (contentType?.includes("application/json")) {
-                const text = await response.data.text();
-                const data = JSON.parse(text);
+    // =====================================================
+    // 1. SOLICITAR REPORTE AL BACKEND
+    // =====================================================
 
-                if (!data.success) {
-                    openModal({
-                        title: data.title || "Error",
-                        message: data.message || "No se pudo generar el reporte final.",
-                    });
+    const response = await apiClient.get(
+      "/inventory/report/final",
+      {
+        responseType: "blob"
+      }
+    );
 
-                    return;
-                }
-            }
+    console.log(
+      "✅ RESPUESTA REPORTE:",
+      response.status
+    );
 
-            // Si llegó aquí, asumimos que el backend devolvió el Excel
-            const blob = new Blob([response.data], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            });
+    const contentType =
+      response.headers["content-type"] || "";
 
-            const url = window.URL.createObjectURL(blob);
+    // =====================================================
+    // 2. VALIDAR RESPUESTA JSON
+    // =====================================================
 
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute("download", "inventario-fisico.xlsx");
-            document.body.appendChild(link);
-            link.click();
+    if (contentType.includes("application/json")) {
 
-            link.remove();
-            window.URL.revokeObjectURL(url);
+      const text = await response.data.text();
 
-            console.log("✅ Reporte final descargado correctamente");
-        } catch (error) {
-            console.error("❌ Error generando reporte final:", error);
+      const data = JSON.parse(text);
 
-            openModal({
-                title: "Error generando reporte",
-                message: "No se pudo generar el reporte final del inventario.",
-            });
-        }
+      openModal({
+        title:
+          data.title ||
+          "❌ ERROR GENERANDO REPORTE",
+
+        message:
+          data.message ||
+          "El backend no pudo generar el reporte.",
+
+        buttonText: "Entendido",
+        titleColor: "red"
+      });
+
+      return;
     }
+
+    // =====================================================
+    // 3. GENERAR DESCARGA EXCEL
+    // =====================================================
+
+    const blob = new Blob(
+      [response.data],
+      {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      }
+    );
+
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+      "inventario-fisico.xlsx";
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+
+    console.log(
+      "✅ REPORTE FINAL DESCARGADO CORRECTAMENTE"
+    );
+
+  } catch (error: any) {
+
+    // =====================================================
+    // 4. OBTENER ERROR REAL DEL BACKEND
+    // =====================================================
+
+    console.error(
+      "❌ ERROR GENERANDO REPORTE FINAL:",
+      error
+    );
+
+    const status =
+      error?.response?.status;
+
+    const errorData =
+      error?.response?.data;
+
+    let backendMessage =
+      "No se pudo generar el reporte final del inventario.";
+
+    let backendTitle =
+      "❌ ERROR GENERANDO REPORTE";
+
+    // =====================================================
+    // 5. SI EL ERROR LLEGA COMO BLOB
+    // =====================================================
+
+    if (errorData instanceof Blob) {
+
+      try {
+
+        const text =
+          await errorData.text();
+
+        console.error(
+          "📄 ERROR BACKEND RAW:",
+          text
+        );
+
+        const parsed =
+          JSON.parse(text);
+
+        backendMessage =
+          parsed.message ||
+          parsed.error ||
+          backendMessage;
+
+        backendTitle =
+          parsed.title ||
+          backendTitle;
+
+      } catch (parseError) {
+
+        console.error(
+          "❌ No se pudo interpretar el error JSON:",
+          parseError
+        );
+      }
+
+    } else if (errorData) {
+
+      // =====================================================
+      // 6. SI EL ERROR LLEGA COMO JSON NORMAL
+      // =====================================================
+
+      backendMessage =
+        errorData.message ||
+        errorData.error ||
+        backendMessage;
+
+      backendTitle =
+        errorData.title ||
+        backendTitle;
+
+    }
+
+    console.error(
+      "🟥 STATUS HTTP:",
+      status
+    );
+
+    console.error(
+      "🟥 MENSAJE BACKEND:",
+      backendMessage
+    );
+
+    // =====================================================
+    // 7. MOSTRAR MODAL ROJO
+    // =====================================================
+
+    openModal({
+
+      title: backendTitle,
+
+      message:
+        status
+          ? `Error ${status}: ${backendMessage}`
+          : backendMessage,
+
+      buttonText: "Entendido",
+
+      titleColor: "red"
+
+    });
+
+  }
+}
+
 
     //REPORTE DE INVENTARIO POR UBICACIONES
     async function handleReporteInventarioFisicoUbicacion() {
@@ -1514,89 +1653,103 @@ export default function InventoryReport() {
 
 
 
-            {/* 3. BUTTON */}
-            <div className="inventory-report-button">
-                <div
-                    className={`
+{/* 3. BUTTON */}
+<div className="inventory-report-button">
+
+    {/* ==========================================
+        APLICAR INVENTARIO EN CERO - DISABLED
+    ========================================== */}
+
+    <div
+    className={`
         inventory-report-button-action
         zero-adjustment
+        disabled
         ${zeroAdjustmentStarting ? "disabled" : ""}
     `}
+    aria-disabled="true"
+    style={{
+        pointerEvents: "none",
+        opacity: 0.5,
+        cursor: "not-allowed"
+    }}
+    onClick={() => {
 
-                    onClick={() => {
+        if (zeroAdjustmentStarting) {
+            return;
+        }
 
-                        if (zeroAdjustmentStarting) {
-                            return;
-                        }
+        openConfirmation({
+            title:
+                "Aplicar inventario en cero",
 
-                        openConfirmation({
-                            title:
-                                "Aplicar inventario en cero",
+            message:
+                "¿Está seguro de que desea ajustar a cero en ADM Cloud los productos no encontrados durante este inventario?",
 
-                            message:
-                                "¿Está seguro de que desea llevar a cero (0.000) en Citrus todos los productos que no fueron contados durante el inventario físico?",
+            confirmText:
+                "Aplicar CERO",
 
-                            confirmText:
-                                "Aplicar en CERO",
+            action:
+                handleApplyInventoryZero
+        });
 
-                            action:
-                                handleApplyInventoryZero
-                        });
+    }}
+>
+    <CheckSquare size={24} />
 
-                    }}
-                >
-                    <CheckSquare size={24} />
+    <span>
+        {
+            zeroAdjustmentStarting
+                ? "Iniciando ajuste..."
+                : "Aplicar Inventario en CERO (0.000)"
+        }
+    </span>
+</div>
 
-                    <span>
-                        {
-                            zeroAdjustmentStarting
-                                ? "Iniciando ajuste a CERO..."
-                                : "Aplicar Inventario en CERO (0.000)"
-                        }
-                    </span>
-                </div>
+    {/* ==========================================
+        APLICAR INVENTARIO CONTADO - ACTIVE
+    ========================================== */}
 
+    <div
+        className={`
+            inventory-report-button-action
+            ${adjustmentStarting ? "disabled" : ""}
+        `}
 
-                <div
-                    className={`
-        inventory-report-button-action
-        ${adjustmentStarting ? "disabled" : ""}
-    `}
+        onClick={() => {
 
-                    onClick={() => {
+            if (adjustmentStarting) {
+                return;
+            }
 
-                        if (adjustmentStarting) {
-                            return;
-                        }
+            openConfirmation({
+                title:
+                    "Aplicar inventario contado",
 
-                        openConfirmation({
-                            title:
-                                "Aplicar inventario contado",
+                message:
+                    "¿Está seguro de que desea aplicar en ADM Cloud las cantidades físicas contadas durante este inventario?",
 
-                            message:
-                                "¿Está seguro de que desea aplicar en Citrus las cantidades físicas contadas durante este inventario?",
+                confirmText:
+                    "Aplicar CONTADO",
 
-                            confirmText:
-                                "Aplicar CONTADO",
+                action:
+                    handleApplyInventory
+            });
 
-                            action:
-                                handleApplyInventory
-                        });
+        }}
+    >
+        <CheckSquare size={24} />
 
-                    }}
-                >
-                    <CheckSquare size={24} />
+        <span>
+            {
+                adjustmentStarting
+                    ? "Iniciando ajuste..."
+                    : "Aplicar Inventario CONTADO"
+            }
+        </span>
+    </div>
 
-                    <span>
-                        {
-                            adjustmentStarting
-                                ? "Iniciando ajuste..."
-                                : "Aplicar Inventario CONTADO"
-                        }
-                    </span>
-                </div>
-            </div>
-
+</div>
 
 
             <ConfirmationModal

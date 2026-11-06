@@ -1,0 +1,20 @@
+warning: in the working copy of 'wms-app/dev-dist/sw.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'wms-app/dev-dist/workbox-5a5d9309.js', LF will be replaced by CRLF the next time Git touches it
+wms-app/src/components/InventoryActiveSessionView.tsx:347: trailing whitespace.
+[32m+[m[41m       [m
+wms-app/src/components/InventoryReport.tsx:38: trailing whitespace.
+[32m+[m[41m   [m
+wms-app/src/components/InventoryReport.tsx:412: trailing whitespace.
+[32m+[m[41m    [m
+wms-backend/controllers/inventoryController.js:6779: trailing whitespace.
+[32m+[m[41m    [m
+wms-backend/controllers/putawayController.js:964: trailing whitespace.
+[32m+[m[41m [m
+wms-backend/controllers/receivingController.js:2882: trailing whitespace.
+[32m+[m[41m  [m
+wms-backend/controllers/receivingController.js:2883: trailing whitespace.
+[32m+[m[41m  [m
+wms-backend/services/inventoryAdjustment.worker.js:1221: trailing whitespace.
+[32m+[m[41m  [m
+wms-backend/services/inventoryAdjustment.worker.js:1284: trailing whitespace.
+[32m+[m[41m  [m

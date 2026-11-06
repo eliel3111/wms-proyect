@@ -1,9 +1,7 @@
 //wms-backend/services/inventoryAdjustment.worker.js
 import sgMail from "@sendgrid/mail";
 //🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧🟧 Every ERP will have different function
-import {
-  buscarExistenciaActualCitrus
-} from "../integrations/citrus/citrus.erpStockSync.js";
+
 
 import {
   emitInventoryAdjustmentProgress
@@ -14,10 +12,21 @@ import {
 
 import { db } from "../db.js";
 
-import {
-  ajustarExistenciaAlmacen
-} from "../integrations/citrus/adjustWarehouseInventoryService.js";
+// ============================================================
+// ADM CLOUD - CONSULTAR EXISTENCIA ACTUAL
+// ============================================================
 
+import {
+  buscarExistenciaActualAdmCloud
+} from "../integrations/admcloud/admcloud.erpStockSync.js";
+
+// ============================================================
+// ADM CLOUD - CREAR AJUSTE DE INVENTARIO
+// ============================================================
+
+import {
+  crearAjusteInventarioAdmCloud
+} from "../integrations/admcloud/admcloud.adjustmentStock.js";
 
 // ============================================================
 // SENDGRID
@@ -1169,406 +1178,495 @@ El worker continuará intentando automáticamente.
 // EJECUTAR AJUSTE DE UNA LÍNEA
 // ============================================================
 
-async function executeAdjustment({
-  job,
-  line,
-  cantidadActual
-}) {
+
+async function executeAdjustment({ job, line, cantidadActual }) {
 
   console.log("");
-  console.log(
-    "🟨🟨🟨 ========================================"
-  );
+  console.log("🟦 ========================================");
+  console.log("📦 AJUSTE REAL ADM CLOUD");
+  console.log("🟦 ========================================");
 
-  console.log(
-    "📦 PROCESANDO LÍNEA:",
-    line.id
-  );
+  const itemId = String(
+    line.erp_product_id ?? ""
+  ).trim();
 
-  console.log(
-    "🆔 ERP PRODUCT:",
-    line.erp_product_id
-  );
+  const locationId = String(
+    line.erp_warehouse_id ?? ""
+  ).trim();
 
-  console.log(
-    "🏬 ERP WAREHOUSE:",
-    line.erp_warehouse_id
-  );
-
-  console.log(
-    "📊 CANTIDAD ACTUAL:",
-    cantidadActual
-  );
-
-  console.log(
-    "🎯 CANTIDAD DESEADA:",
+  const desiredQty = Number(
     line.desired_qty
   );
 
-  console.log(
-    "🟨🟨🟨 ========================================"
-  );
+  const reference =
+    `WMS-INV-${job.inventory_session_id}-${job.id}-${line.id}`;
 
+  const MAX_RECALCULOS = 3;
+  const MAX_VERIFICACIONES = 5;
+  const EPSILON = 0.000001;
 
-  await markJobProcessing(
-    job.id,
-    line.id
-  );
+  let postPuedeHaberOcurrido = false;
+  let adjustmentId = null;
+  let stockAntesDelPost = null;
 
+  console.log("🆔 ITEM GUID:", itemId);
+  console.log("🏬 LOCATION GUID:", locationId);
+  console.log("🎯 CANTIDAD DESEADA:", desiredQty);
+  console.log("📄 REFERENCIA:", reference);
 
-  await markLineProcessing(
-    line.id
-  );
+  // ==========================================================
+  // AUTORIZACIÓN PARA AJUSTES REALES
+  // ==========================================================
 
+  
+
+  // ==========================================================
+  // HELPER - CONFIRMAR PRODUCTO
+  // ==========================================================
+
+  const confirmarProducto = async ({
+    stockAntes,
+    stockFinal,
+    mensaje,
+    extra = {}
+  }) => {
+
+    await markLineSuccess({
+      lineId: line.id,
+
+      citrusMessage: mensaje,
+
+      citrusResponse: {
+        erp: "ADMCLOUD",
+        verified: true,
+        reference,
+        adjustmentId,
+        stockAntes,
+        stockFinal,
+        desiredQty,
+        ...extra
+      },
+
+      currentQty: stockAntes
+    });
+
+    await refreshJobCounters(job.id);
+
+    console.log(
+      "✅ LÍNEA CONFIRMADA:",
+      line.id,
+      "STOCK:",
+      stockFinal
+    );
+
+    return {
+      status: "success"
+    };
+  };
 
   try {
 
-    // ==========================================================
-    // LLAMAR TU SERVICIO YA EXISTENTE
-    // ==========================================================
-
-    const resultado =
-      await withTimeout(
-
-        ajustarExistenciaAlmacen([
-          {
-
-            itemId:
-              Number(
-                line.erp_product_id
-              ),
-
-            almacenId:
-              Number(
-                line.erp_warehouse_id
-              ),
-
-            cantidadNueva:
-              Number(
-                line.desired_qty
-              ),
-
-            cantidadActual:
-              Number(
-                cantidadActual
-              )
-
-          }
-        ]),
-
-        WORKER_REQUEST_TIMEOUT_MS,
-
-        "Citrus no respondió al ajuste dentro del tiempo esperado."
-
-      );
-
-
-    const citrusResult =
-      getCitrusResult(
-        resultado
-      );
-
-
-    console.log(
-      "📦 CITRUS RESULT:",
-      citrusResult
-    );
-
-
-    const success =
-      getCitrusSuccess(
-        citrusResult
-      );
-
-
-    // ==========================================================
-    // SUCCESS = 1
-    // ==========================================================
+    // ========================================================
+    // 1. VALIDACIONES
+    // ========================================================
 
     if (
-      success === 1
+      !itemId ||
+      !locationId ||
+      !Number.isFinite(desiredQty) ||
+      desiredQty < 0
     ) {
+      throw new Error(
+        "ItemID, LocationID o cantidad deseada inválidos."
+      );
+    }
+
+  
+
+    await markJobProcessing(
+      job.id,
+      line.id
+    );
+
+    await markLineProcessing(
+      line.id
+    );
+
+    // ========================================================
+    // 2. CONSULTAR Y RECALCULAR STOCK
+    // ========================================================
+
+    for (
+      let intento = 1;
+      intento <= MAX_RECALCULOS;
+      intento++
+    ) {
+
+      console.log("");
+      console.log(
+        `🔄 CONSULTA Y RECÁLCULO ${intento}/${MAX_RECALCULOS}`
+      );
+
+      const stockActual = Number(
+        await buscarExistenciaActualAdmCloud({
+          itemId,
+          almacenId: locationId
+        })
+      );
+
+      if (!Number.isFinite(stockActual)) {
+        throw new Error(
+          "ADM Cloud devolvió una existencia inválida."
+        );
+      }
 
       console.log(
-        "✅ AJUSTE EXITOSO."
+        "📊 STOCK ADM CLOUD:",
+        stockActual
       );
 
-
-      await markLineSuccess({
-
-        lineId:
-          line.id,
-
-        citrusMessage:
-          citrusResult?.Mensaje ||
-          "OK",
-
-        citrusResponse:
-          citrusResult,
-
-        currentQty:
-          cantidadActual
-
-      });
-
-
-      await refreshJobCounters(
-        job.id
+      console.log(
+        "🎯 STOCK DESEADO:",
+        desiredQty
       );
 
+      // ======================================================
+      // 3. STOCK YA COINCIDE
+      // ======================================================
 
-      return {
-        status:
-          "success"
+      if (
+        Math.abs(stockActual - desiredQty) < EPSILON
+      ) {
+
+        console.log(
+          "✅ STOCK YA COINCIDE. NO SE CREARÁ OTRO DOCUMENTO."
+        );
+
+        return await confirmarProducto({
+          stockAntes: stockActual,
+          stockFinal: stockActual,
+
+          mensaje:
+            "ADM Cloud ya tiene la existencia deseada. " +
+            "No fue necesario crear otro ajuste.",
+
+          extra: {
+            skipped: true,
+            motivo: "STOCK_ALREADY_MATCHES"
+          }
+        });
+      }
+
+      // ======================================================
+      // 4. PREPARAR AJUSTE REAL
+      // ======================================================
+
+      stockAntesDelPost = stockActual;
+
+      const datosAjuste = {
+
+        ejecutar: true,
+
+        fechaDocumento:
+          new Date().toISOString().slice(0, 10),
+
+        referencia: reference,
+
+        notas:
+          `Ajuste WMS - Sesión ${job.inventory_session_id}`,
+
+        locationId,
+
+        rowType: 0,
+
+        items: [
+          {
+            itemId,
+            cantidadActual: stockActual,
+            cantidadNueva: desiredQty,
+            precio: 0,
+
+            comentario:
+              `Job ${job.id}, línea ${line.id}`
+          }
+        ]
       };
 
-    }
-
-
-
-    // ==========================================================
-    // SUCCESS = 0
-    // ==========================================================
-
-    if (
-      success === 0
-    ) {
-
-      const message =
-        citrusResult?.Mensaje ||
-        "Citrus rechazó el ajuste de inventario.";
-
-
-      console.error("");
-      console.error(
-        "🟥 ERROR EN EL AJUSTE DE INVENTARIO"
+      console.log(
+        "📊 DIFERENCIA SOLICITADA:",
+        desiredQty - stockActual
       );
 
-      console.error(
-        "🟥 MENSAJE CITRUS:",
-        message
+      console.log(
+        "🚀 SOLICITANDO AJUSTE REAL A ADM CLOUD"
       );
 
+      // ======================================================
+      // 5. ENVIAR AJUSTE REAL
+      // ======================================================
 
-      await markLineFailed({
+      let resultado;
 
-        lineId:
-          line.id,
+      postPuedeHaberOcurrido = true;
 
-        citrusMessage:
-          message,
+      try {
 
-        citrusResponse:
-          citrusResult
+        resultado =
+          await crearAjusteInventarioAdmCloud(
+            datosAjuste
+          );
 
+      } catch (error) {
+
+        // STOCK_CHANGED se detecta ANTES del POST.
+        // Por eso se permite recalcular.
+
+        if (error?.code === "STOCK_CHANGED") {
+
+          postPuedeHaberOcurrido = false;
+
+          console.warn(
+            "🟨 STOCK_CHANGED ANTES DEL POST:",
+            error.message
+          );
+
+          console.warn(
+            "📦 NUEVO STOCK:",
+            error.stockActual
+          );
+
+          if (intento < MAX_RECALCULOS) {
+            continue;
+          }
+        }
+
+        throw error;
+      }
+
+      // ======================================================
+      // 6. ADM CLOUD YA NO TIENE DIFERENCIAS
+      // ======================================================
+
+      if (
+        resultado?.success === true &&
+        resultado?.ejecutado === false &&
+        resultado?.modo === "SIN_DIFERENCIAS"
+      ) {
+
+        postPuedeHaberOcurrido = false;
+
+        const verificado = Number(
+          await buscarExistenciaActualAdmCloud({
+            itemId,
+            almacenId: locationId
+          })
+        );
+
+        if (
+          Number.isFinite(verificado) &&
+          Math.abs(verificado - desiredQty) < EPSILON
+        ) {
+
+          return await confirmarProducto({
+            stockAntes: verificado,
+            stockFinal: verificado,
+
+            mensaje:
+              "ADM Cloud ya coincide. Ajuste omitido.",
+
+            extra: {
+              skipped: true,
+              motivo: "NO_DIFFERENCES"
+            }
+          });
+        }
+
+        if (intento < MAX_RECALCULOS) {
+          continue;
+        }
+
+        throw new Error(
+          "ADM Cloud informó que no hay diferencias, " +
+          "pero el stock consultado no coincide."
+        );
+      }
+
+      // ======================================================
+      // 7. VALIDAR RESPUESTA DEL POST
+      // ======================================================
+
+      if (
+        resultado?.success !== true ||
+        resultado?.ejecutado !== true
+      ) {
+
+        throw new Error(
+          "ADM Cloud no confirmó la creación del ajuste."
+        );
+      }
+
+      adjustmentId =
+        resultado.data?.adjustmentId ?? null;
+
+      console.log(
+        "✅ DOCUMENTO ADM CLOUD CREADO:",
+        adjustmentId
+      );
+
+      // ======================================================
+      // 8. GUARDAR EVIDENCIA DEL DOCUMENTO
+      // ======================================================
+
+      await markLineVerifying({
+        lineId: line.id,
+
+        message:
+          "Documento ADM Cloud creado. Verificando existencia.",
+
+        response: {
+          erp: "ADMCLOUD",
+          adjustmentId,
+          reference,
+          resultado
+        }
       });
 
+      // ======================================================
+      // 9. VERIFICAR STOCK DESPUÉS DEL POST
+      // ======================================================
 
-      await markJobFailed({
+      for (
+        let verificacion = 1;
+        verificacion <= MAX_VERIFICACIONES;
+        verificacion++
+      ) {
 
-        jobId:
-          job.id,
+        if (verificacion > 1) {
+          await sleep(1500);
+        }
 
-        lineId:
-          line.id,
+        try {
 
-        message
+          const stockDespues = Number(
+            await buscarExistenciaActualAdmCloud({
+              itemId,
+              almacenId: locationId
+            })
+          );
 
-      });
+          console.log(
+            `🔎 VERIFICACIÓN ${verificacion}/${MAX_VERIFICACIONES}:`,
+            stockDespues
+          );
 
+          if (
+            Number.isFinite(stockDespues) &&
+            Math.abs(stockDespues - desiredQty) < EPSILON
+          ) {
 
+            console.log(
+              "✅ EXISTENCIA CONFIRMADA EN ADM CLOUD"
+            );
 
+            return await confirmarProducto({
+              stockAntes: stockAntesDelPost,
+              stockFinal: stockDespues,
 
+              mensaje:
+                "Documento ADM Cloud creado " +
+                "y existencia confirmada.",
 
+              extra: {
+                adjustmentId,
+                skipped: false
+              }
+            });
+          }
 
-      return {
+        } catch (verificationError) {
 
-        status:
-          "failed",
+          console.warn(
+            "🟨 ERROR CONSULTANDO STOCK:",
+            verificationError.message
+          );
+        }
+      }
 
-        message
+      // ======================================================
+      // 10. POST ACEPTADO, PERO STOCK NO CONFIRMADO
+      // ======================================================
 
-      };
-
+      throw new Error(
+        `ADM Cloud aceptó el documento ` +
+        `${adjustmentId || reference}, pero el stock ` +
+        `todavía no coincide con ${desiredQty}. ` +
+        "Se requiere verificar el documento. " +
+        "No se enviará otro POST."
+      );
     }
 
-
-
-    // ==========================================================
-    // NO SUCCESS 0 NI SUCCESS 1
-    // ==========================================================
-    //
-    // NO sabemos si Citrus realizó el ajuste.
-    //
-    // NO LO VOLVEMOS A MANDAR.
-    //
-    // Primero verificamos la existencia.
-    //
-    // ==========================================================
-
-    console.log(
-      "⚠️ RESPUESTA INDETERMINADA."
+    throw new Error(
+      "Se agotaron los intentos de recálculo."
     );
-
-    console.log(
-      "🔎 SE VERIFICARÁ EXISTENCIA."
-    );
-
-
-    await markLineVerifying({
-
-      lineId:
-        line.id,
-
-      message:
-        "Respuesta indeterminada de Citrus. Verificando existencia.",
-
-      response:
-        citrusResult
-
-    });
-
-
-    return {
-      status:
-        "verify"
-    };
-
 
   } catch (error) {
 
-    // ==========================================================
-    // CITRUS RESPONDIÓ Y RECHAZÓ EL AJUSTE
-    // ==========================================================
+    // ========================================================
+    // 11. MANEJAR ERROR
+    // ========================================================
 
-    if (
-      error.code ===
-      "CITRUS_REJECTED"
-    ) {
+    const message = postPuedeHaberOcurrido
+      ? "AJUSTE REAL POSIBLE O CONFIRMADO. " +
+      "No reenviar POST. " +
+      error.message
+      : error.message;
 
-      console.error("");
-      console.error(
-        "🟥 CITRUS RECHAZÓ EL AJUSTE."
-      );
+    console.error(
+      "🟥 ERROR EN AJUSTE ADM CLOUD:",
+      message
+    );
 
-      console.error(
-        "🟥 LINE ID:",
-        line.id
-      );
+    if (postPuedeHaberOcurrido) {
 
-      console.error(
-        "🟥 ERP PRODUCT:",
-        line.erp_product_id
-      );
+      await markLineVerifying({
+        lineId: line.id,
+        message,
 
-      console.error(
-        "🟥 MESSAGE:",
-        error.message
-      );
+        response: {
+          erp: "ADMCLOUD",
+          reference,
+          adjustmentId,
+          possiblePost: true,
+          errorCode: error.code ?? null,
+          error: error.message
+        }
+      });
 
-
-      // ========================================================
-      // MARCAR LÍNEA FAILED
-      // ========================================================
+    } else {
 
       await markLineFailed({
+        lineId: line.id,
+        citrusMessage: message,
 
-        lineId:
-          line.id,
-
-        citrusMessage:
-          error.message,
-
-        citrusResponse:
-          error.citrusResult || {}
-
+        citrusResponse: {
+          erp: "ADMCLOUD",
+          reference,
+          code: error.code ?? null
+        }
       });
-
-
-      // ========================================================
-      // MARCAR JOB FAILED
-      // ========================================================
-
-      await markJobFailed({
-
-        jobId:
-          job.id,
-
-        lineId:
-          line.id,
-
-        message:
-          error.message
-
-      });
-
-
-      // ========================================================
-      // ENVIAR EMAIL
-      // ========================================================
-
-      await sendCitrusAdjustmentErrorEmail({
-
-        job,
-
-        line,
-
-        error
-
-      });
-
-
-      return {
-
-        status:
-          "failed",
-
-        message:
-          error.message
-
-      };
-
     }
 
-
-    // ==========================================================
-    // TIMEOUT / INTERNET / CITRUS CAÍDO
-    // ==========================================================
-
-    console.error("");
-    console.error(
-      "⚠️ NO SE PUDO CONFIRMAR EL AJUSTE."
-    );
-
-    console.error(
-      error.message
-    );
-
-
-    await markLineVerifying({
-
-      lineId:
-        line.id,
-
-      message:
-        error.message ||
-        "No se pudo confirmar la respuesta de Citrus.",
-
-      response:
-        serializeError(
-          error
-        )
-
+    await markJobFailed({
+      jobId: job.id,
+      lineId: line.id,
+      message
     });
 
-
     return {
-      status:
-        "verify"
+      status: "failed",
+      message
     };
-
   }
-
 }
 
 
@@ -1577,521 +1675,137 @@ async function executeAdjustment({
 // VERIFICAR EXISTENCIA EN CITRUS
 // ============================================================
 
-async function verifyLine(
-  job,
-  originalLine
-) {
+async function verifyLine(job, originalLine) {
 
-  let line =
-    await getLine(
-      originalLine.id
-    );
-
+  const line = await getLine(
+    originalLine.id
+  );
 
   if (!line) {
-
     throw new Error(
       `No existe la línea ${originalLine.id}.`
     );
-
   }
 
-
-
-  // ============================================================
-  // SI ESTÁ EN WAITING_CITRUS
-  // YA SUPERÓ LOS 12 INTENTOS RÁPIDOS
-  // ============================================================
-
-  const slowMode =
-    line.status ===
-    "waiting_citrus";
-
-
-
-  // ============================================================
-  // RESPETAR next_retry_at
-  // ============================================================
-
-  if (
-    line.next_retry_at
-  ) {
-
-    const nextRetry =
-      new Date(
-        line.next_retry_at
-      ).getTime();
-
-
-    const now =
-      Date.now();
-
-
-    if (
-      nextRetry > now
-    ) {
-
-      const waitTime =
-        nextRetry -
-        now;
-
-
-      console.log(
-        `⏳ Esperando ${Math.ceil(
-          waitTime / 1000
-        )} segundos antes de consultar Citrus...`
-      );
-
-
-      await sleep(
-        waitTime
-      );
-
-    }
-
-  }
-
-
-
-  console.log("");
-  console.log(
-    "🔎 VERIFICANDO EXISTENCIA EN CITRUS"
-  );
-
-  console.log(
-    "📦 LINE ID:",
-    line.id
-  );
-
-  console.log(
-    "🆔 ERP PRODUCT:",
+  const itemId = String(
     line.erp_product_id
-  );
+  ).trim();
 
-  console.log(
-    "🎯 CANTIDAD DESEADA:",
+  const locationId = String(
+    line.erp_warehouse_id
+  ).trim();
+
+  const desiredQty = Number(
     line.desired_qty
   );
 
-
+  console.log("");
+  console.log("🔎 VERIFICANDO EXISTENCIA ADM CLOUD");
+  console.log("📦 LINE ID:", line.id);
+  console.log("🆔 ITEM GUID:", itemId);
+  console.log("🏬 LOCATION GUID:", locationId);
 
   try {
 
-    // ==========================================================
-    // CONSULTAR EXISTENCIA REAL
-    // ==========================================================
-
-    const existenciaActual =
-      await withTimeout(
-
-        buscarExistenciaActualCitrus({
-
-          itemId:
-            Number(
-              line.erp_product_id
-            ),
-
-          almacenId:
-            Number(
-              line.erp_warehouse_id
-            )
-
-        }),
-
-        WORKER_REQUEST_TIMEOUT_MS,
-
-        "Citrus no respondió al consultar existencia."
-
-      );
-
-
-    const currentQty =
-      Number(
-        existenciaActual
-      );
-
-
-    if (
-      !Number.isFinite(
-        currentQty
-      )
-    ) {
-
-      throw new Error(
-        `La existencia obtenida de Citrus no es válida: ${existenciaActual}`
-      );
-
-    }
-
-
-    console.log(
-      "✅ CITRUS RESPONDIÓ."
-    );
-
-    console.log(
-      "📊 EXISTENCIA ACTUAL:",
-      currentQty
-    );
-
-
-    const desiredQty =
-      Number(
-        line.desired_qty
-      );
-
-
-
-    // ==========================================================
-    // EXISTENCIA YA ES IGUAL A LA DESEADA
-    // ==========================================================
-    //
-    // Significa que probablemente el ajuste anterior
-    // sí se realizó pero perdimos la respuesta.
-    //
-    // NO volvemos a ajustar.
-    //
-    // ==========================================================
-
-    if (
-      currentQty ===
-      desiredQty
-    ) {
-
-      console.log(
-        "✅ EXISTENCIA YA COINCIDE."
-      );
-
-      console.log(
-        "✅ MARCANDO LÍNEA COMO SUCCESS."
-      );
-
-
-      await markLineSuccess({
-
-        lineId:
-          line.id,
-
-        citrusMessage:
-          "Ajuste confirmado mediante consulta de existencia en Citrus.",
-
-        citrusResponse: {
-          verified:
-            true,
-
-          currentQty,
-
-          desiredQty
-        },
-
-        currentQty
-
+    const stockActual =
+      await buscarExistenciaActualAdmCloud({
+        itemId,
+        almacenId: locationId
       });
 
+    console.log(
+      "📊 STOCK ACTUAL:",
+      stockActual
+    );
+
+    console.log(
+      "🎯 STOCK DESEADO:",
+      desiredQty
+    );
+
+    // ========================================================
+    // EXISTENCIA COINCIDE
+    // ========================================================
+
+    if (
+      Math.abs(stockActual - desiredQty) < 0.000001
+    ) {
+
+      await markLineSuccess({
+        lineId: line.id,
+        citrusMessage:
+          "Existencia verificada en ADM Cloud.",
+        citrusResponse: {
+          erp: "ADMCLOUD",
+          verified: true,
+          stockActual,
+          desiredQty
+        },
+        currentQty: stockActual
+      });
 
       await markJobProcessing(
         job.id,
         line.id
       );
 
-
       await refreshJobCounters(
         job.id
       );
 
-
       return {
-        status:
-          "success"
+        status: "success"
       };
-
     }
 
+    // ========================================================
+    // EXISTENCIA NO COINCIDE
+    // NO REINTENTAR POST
+    // ========================================================
 
+    const message =
+      `La existencia de ADM Cloud es ${stockActual}, ` +
+      `pero se esperaban ${desiredQty}. ` +
+      "Revisar el ajuste antes de volver a enviarlo.";
 
-    // ==========================================================
-    // CITRUS RESPONDIÓ PERO LA EXISTENCIA ES DIFERENTE
-    // ==========================================================
-    //
-    // AHORA SÍ podemos volver a ajustar.
-    //
-    // PERO utilizamos:
-    //
-    // cantidadActual = EXISTENCIA RECIÉN CONSULTADA
-    //
-    // cantidadNueva = desired_qty
-    //
-    // ==========================================================
-
-    console.log("");
-    console.log(
-      "⚠️ EXISTENCIA DIFERENTE."
+    console.error(
+      "🟥 VERIFICACIÓN NO CONFIRMADA:",
+      message
     );
 
-    console.log(
-      "📊 Citrus:",
-      currentQty
-    );
+    await markJobFailed({
+      jobId: job.id,
+      lineId: line.id,
+      message
+    });
 
-    console.log(
-      "🎯 Deseada:",
-      desiredQty
-    );
-
-    console.log(
-      "🔄 REINTENTANDO AJUSTE CON EXISTENCIA NUEVA."
-    );
-
-
-    // Actualizar cantidad actual conocida.
-
-    await db.query(
-      `
-      UPDATE inventory_adjustment_job_lines
-
-      SET
-
-        citrus_qty_before =
-          $2,
-
-        status =
-          'verifying',
-
-        next_retry_at =
-          NULL,
-
-        updated_at =
-          NOW()
-
-      WHERE
-        id = $1
-      `,
-      [
-        line.id,
-        currentQty
-      ]
-    );
-
-
-    line =
-      await getLine(
-        line.id
-      );
-
-
-    // ==========================================================
-    // VOLVER A EJECUTAR AJUSTE
-    // ==========================================================
-
-    const result =
-      await executeAdjustment({
-
-        job,
-
-        line,
-
-        cantidadActual:
-          currentQty
-
-      });
-
-
-    return result;
-
+    return {
+      status: "failed",
+      message
+    };
 
   } catch (error) {
 
-    // ==========================================================
-    // CITRUS SIGUE SIN RESPONDER
-    // ==========================================================
-
-    console.error("");
-    console.error(
-      "🟥 CITRUS NO RESPONDE A CONSULTA DE EXISTENCIA."
-    );
+    const message =
+      "No fue posible verificar ADM Cloud: " +
+      error.message;
 
     console.error(
-      error.message
+      "❌ ERROR DE VERIFICACIÓN:",
+      message
     );
 
-
-    // Volver a leer línea.
-
-    line =
-      await getLine(
-        line.id
-      );
-
-
-    const attempts =
-      Number(
-        line.verification_attempts ||
-        0
-      ) + 1;
-
-
-
-    // ==========================================================
-    // PRIMEROS 12 INTENTOS
-    // ==========================================================
-
-    if (
-      attempts <
-      FAST_VERIFICATION_ATTEMPTS
-    ) {
-
-      console.log(
-        `🔄 INTENTO ${attempts}/${FAST_VERIFICATION_ATTEMPTS}`
-      );
-
-
-      await incrementVerificationAttempt({
-
-        lineId:
-          line.id,
-
-        message:
-          `Citrus no responde. Intento ${attempts}/${FAST_VERIFICATION_ATTEMPTS}.`,
-
-        nextDelaySeconds:
-          FAST_VERIFICATION_DELAY_MS /
-          1000
-
-      });
-
-
-      return {
-        status:
-          "verify"
-      };
-
-    }
-
-
-
-    // ==========================================================
-    // INTENTO 12
-    // ==========================================================
-
-    if (
-      attempts ===
-      FAST_VERIFICATION_ATTEMPTS
-    ) {
-
-      console.error("");
-      console.error(
-        "🟥 CITRUS NO RESPONDIÓ DESPUÉS DE 12 INTENTOS."
-      );
-
-
-      await incrementVerificationAttempt({
-
-        lineId:
-          line.id,
-
-        message:
-          "Citrus no respondió después de 12 intentos.",
-
-        nextDelaySeconds:
-          SLOW_VERIFICATION_DELAY_MS /
-          1000
-
-      });
-
-
-      const freshLine =
-        await getLine(
-          line.id
-        );
-
-
-      await markWaitingCitrus({
-
-        jobId:
-          job.id,
-
-        lineId:
-          line.id,
-
-        message:
-          "Citrus no responde. El worker continuará verificando automáticamente."
-
-      });
-
-
-      await sendCitrusNoResponseEmail({
-
-        job,
-
-        line:
-          freshLine
-
-      });
-
-
-      return {
-        status:
-          "waiting_citrus"
-      };
-
-    }
-
-
-
-    // ==========================================================
-    // MÁS DE 12 INTENTOS
-    // ==========================================================
-    //
-    // El correo ya debió enviarse.
-    //
-    // Seguimos verificando cada 60 segundos.
-    //
-    // ==========================================================
-
-    console.log(
-      "⏳ CITRUS SIGUE CAÍDO."
-    );
-
-    console.log(
-      "🔄 SE VOLVERÁ A INTENTAR EN 60 SEGUNDOS."
-    );
-
-
-    await incrementVerificationAttempt({
-
-      lineId:
-        line.id,
-
-      message:
-        `Citrus sigue sin responder. Intento ${attempts}.`,
-
-      nextDelaySeconds:
-        SLOW_VERIFICATION_DELAY_MS /
-        1000
-
+    await markJobFailed({
+      jobId: job.id,
+      lineId: line.id,
+      message
     });
-
-
-    await markWaitingCitrus({
-
-      jobId:
-        job.id,
-
-      lineId:
-        line.id,
-
-      message:
-        "Esperando que Citrus vuelva a estar disponible."
-
-    });
-
 
     return {
-      status:
-        "waiting_citrus"
+      status: "failed",
+      message
     };
-
   }
-
 }
 
 
@@ -2108,21 +1822,21 @@ async function verifyLine(
 
 
 // ============================================================
-// APLICAR RESULTADO FINAL DEL INVENTARIO EN EL WMS
+// APLICAR RESULTADO FINAL DEL INVENTARIO EN WMS
 // ============================================================
 //
-// Se ejecuta SOLAMENTE después de que todas las líneas
-// del job terminaron correctamente en Citrus.
+// Se ejecuta desde markJobCompleted() después de
+// verificar que todas las líneas del job estén success.
 //
 // COUNTED:
-//   → qty_on_hand = inventory_quantity
-//   → todos los productos físicamente contados
+//   - Solo almacén de la sesión.
+//   - Solo conteos de la sesión.
+//   - Solo productos procesados exitosamente por el job.
+//   - qty_on_hand = inventory_quantity.
 //
 // ZERO:
-//   → SOLO líneas NO CONTADAS
-//   → SOLO del warehouse ERP de este job
-//   → qty_on_hand = 0
-//   → qty_reserved = 0
+//   - Se conserva para el ERP legado (Citrus).
+//   - Deshabilitado para ADM Cloud hasta migrar su worker.
 //
 // ============================================================
 
@@ -2132,209 +1846,414 @@ async function applyCompletedInventoryJobToWms(
 ) {
 
   console.log("");
-  console.log(
-    "📦📦📦 ========================================"
-  );
-
-  console.log(
-    "📦 ACTUALIZANDO INVENTARIO LOCAL WMS"
-  );
-
-  console.log(
-    "🆔 JOB:",
-    job.id
-  );
-
-  console.log(
-    "📌 JOB TYPE:",
-    job.job_type
-  );
-
-  console.log(
-    "🏬 ERP WAREHOUSE:",
-    job.erp_warehouse_id
-  );
-
-  console.log(
-    "📦📦📦 ========================================"
-  );
-
+  console.log("📦📦📦 ========================================");
+  console.log("📦 ACTUALIZANDO INVENTARIO LOCAL WMS");
+  console.log("📦📦📦 ========================================");
 
   // ==========================================================
-  // COUNTED
+  // 1. VALIDAR INFORMACIÓN DEL JOB
   // ==========================================================
-  //
-  // Todos los productos físicamente contados.
-  //
-  // NO se filtra por warehouse.
-  //
-  // inventory_quantity
-  //        ↓
-  // qty_on_hand
-  //
-  // ==========================================================
+
+  const jobId = Number(job?.id);
+
+  const sessionId = Number(
+    job?.inventory_session_id
+  );
+
+  const erpWarehouseId = String(
+    job?.erp_warehouse_id ?? ""
+  ).trim();
 
   if (
-    job.job_type === "counted"
+    !Number.isSafeInteger(jobId) ||
+    jobId <= 0
   ) {
+    throw new Error(
+      "El ID del job de inventario es inválido."
+    );
+  }
 
-    const result =
-      await client.query(
-        `
-        UPDATE inventory_by_location
+  if (
+    !Number.isSafeInteger(sessionId) ||
+    sessionId <= 0
+  ) {
+    throw new Error(
+      "El ID de sesión del job es inválido."
+    );
+  }
 
-        SET
-          qty_on_hand =
-            inventory_quantity,
+  if (!erpWarehouseId) {
+    throw new Error(
+      "El job no tiene un almacén ERP válido."
+    );
+  }
 
-          updated_at =
-            NOW()
+  const GUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-        WHERE
-          counted_by IS NOT NULL
+  const isAdmCloud =
+    GUID_REGEX.test(erpWarehouseId);
 
-          AND counted_at IS NOT NULL
+  console.log("🆔 JOB ID:", jobId);
+  console.log("🆔 SESSION ID:", sessionId);
+  console.log("📌 JOB TYPE:", job.job_type);
+  console.log("🏬 ERP WAREHOUSE:", erpWarehouseId);
+  console.log(
+    "🌐 ERP:",
+    isAdmCloud ? "ADM CLOUD" : "ERP LEGADO"
+  );
 
-          AND inventory_quantity IS NOT NULL
+  // ==========================================================
+  // 2. SEGURIDAD ADM CLOUD
+  //
+  // No actualizar el stock local mientras el worker
+  // se encuentre en modo PREVIEW.
+  // ==========================================================
 
-        RETURNING
-          id,
-          warehouse_id,
-          product_sku,
-          location_id,
-          inventory_quantity,
-          qty_on_hand
-        `
-      );
+  // ==========================================================
+  // 3. COUNTED - PRODUCTOS CONTADOS
+  // ==========================================================
+  //
+  // Solo se actualizan registros:
+  //
+  // 1. Del almacén asociado a la sesión.
+  // 2. Contados durante esa sesión.
+  // 3. Pertenecientes al job actual.
+  // 4. Con líneas del job en estado success.
+  //
+  // ==========================================================
 
+  if (job.job_type === "counted") {
 
-    console.log(
-      "✅ LÍNEAS CONTADAS ACTUALIZADAS EN WMS:",
-      result.rows.length
+    console.log("");
+    console.log("🟦 ========================================");
+    console.log("📦 ACTUALIZANDO PRODUCTOS CONTADOS");
+    console.log("🟦 ========================================");
+
+    // ========================================================
+    // VALIDAR JOB COMPLETO ANTES DE MODIFICAR WMS
+    // ========================================================
+
+    const linesResult = await client.query(
+      `
+      SELECT
+        COUNT(*)::integer AS total,
+
+        COUNT(*) FILTER (
+          WHERE status = 'success'
+        )::integer AS successful
+
+      FROM inventory_adjustment_job_lines
+
+      WHERE job_id = $1
+      `,
+      [jobId]
     );
 
+    const totalLines =
+      Number(linesResult.rows[0]?.total ?? 0);
+
+    const successfulLines =
+      Number(linesResult.rows[0]?.successful ?? 0);
+
+    console.log("📊 TOTAL LÍNEAS:", totalLines);
+    console.log("✅ LÍNEAS SUCCESS:", successfulLines);
+
+    if (
+      totalLines === 0 ||
+      successfulLines !== totalLines
+    ) {
+
+      throw new Error(
+        `El job ${jobId} no puede actualizar WMS: ` +
+        `${successfulLines}/${totalLines} líneas están success.`
+      );
+    }
+
+    // ========================================================
+    // ACTUALIZAR INVENTARIO
+    // ========================================================
+
+    const result = await client.query(
+      `
+      WITH target_session AS (
+
+        SELECT
+          s.id,
+          s.start_date,
+          s.end_date,
+          w.id AS warehouse_id
+
+        FROM inventory_sessions s
+
+        INNER JOIN warehouses w
+          ON LOWER(w.erp_warehouse_id::text) =
+             LOWER(s.erp_warehouse_id::text)
+
+        WHERE s.id = $1
+
+          AND s.status = 'review'
+
+          AND LOWER(s.erp_warehouse_id::text) =
+              LOWER($2::text)
+
+          AND s.start_date IS NOT NULL
+      )
+
+      UPDATE inventory_by_location AS ibl
+
+      SET
+
+        old_qty_on_hand = ibl.qty_on_hand,
+
+        qty_on_hand = ibl.inventory_quantity,
+
+        updated_at = NOW()
+
+      FROM target_session ts
+
+      WHERE ibl.warehouse_id = ts.warehouse_id
+
+        -- El conteo tiene que pertenecer
+        -- al período de esta sesión.
+        AND ibl.counted_by IS NOT NULL
+
+        AND ibl.counted_at IS NOT NULL
+
+        AND ibl.counted_at >= ts.start_date
+
+        AND (
+          ts.end_date IS NULL
+          OR ibl.counted_at <= ts.end_date
+        )
+
+        AND ibl.inventory_quantity IS NOT NULL
+
+        -- Solo productos procesados en este job.
+        AND EXISTS (
+
+          SELECT 1
+
+          FROM inventory_adjustment_job_lines jal
+
+          INNER JOIN inventory_erp_report ier
+            ON ier.id = jal.report_line_id
+
+          WHERE jal.job_id = $3
+
+            AND jal.status = 'success'
+
+            AND ier.session_id = ts.id
+
+            AND ier.wms_counted = true
+
+            AND ier.sku = ibl.product_sku
+
+            AND ier.erp_id::text =
+                jal.erp_product_id::text
+        )
+
+      RETURNING
+
+        ibl.id,
+
+        ibl.warehouse_id,
+
+        ibl.location_id,
+
+        ibl.product_sku,
+
+        ibl.inventory_quantity,
+
+        ibl.old_qty_on_hand,
+
+        ibl.qty_on_hand
+      `,
+      [
+        sessionId,
+        erpWarehouseId,
+        jobId
+      ]
+    );
+
+    // ========================================================
+    // VALIDAR ACTUALIZACIÓN
+    // ========================================================
+
+    const updatedLines = result.rows.length;
+
+    console.log("");
+    console.log("🟩 ========================================");
+    console.log("✅ INVENTARIO WMS ACTUALIZADO");
+    console.log("🆔 JOB:", jobId);
+    console.log("🏬 ERP WAREHOUSE:", erpWarehouseId);
+    console.log("📦 LÍNEAS ACTUALIZADAS:", updatedLines);
+    console.log("🟩 ========================================");
+
+    if (updatedLines === 0) {
+
+      throw new Error(
+        `El job ${jobId} terminó sin actualizar ninguna ` +
+        "línea de inventario del almacén seleccionado."
+      );
+    }
 
     return {
-
-      type:
-        "counted",
-
-      jobId:
-        Number(job.id),
-
-      updatedLines:
-        result.rows.length
-
+      type: "counted",
+      jobId,
+      sessionId,
+      erpWarehouseId,
+      totalProducts: totalLines,
+      updatedLines,
+      updatedInventory: result.rows
     };
 
   }
 
-
   // ==========================================================
-  // ZERO
+  // 4. ZERO - PRODUCTOS NO CONTADOS
   // ==========================================================
-  //
-  // SOLO actualiza líneas NO CONTADAS.
   //
   // IMPORTANTE:
   //
-  // Solamente se ponen en cero las líneas pertenecientes
-  // al warehouse ERP que está asociado a este job.
+  // El controlador ZERO del ERP legado todavía
+  // necesita migrarse a GUID para ADM Cloud.
   //
-  // Warehouse A → se está ajustando
-  // Warehouse B → NO se toca
-  //
+  // Para evitar poner existencias en cero por error,
+  // no se permite ejecutar ZERO con ADM Cloud.
   // ==========================================================
 
-  if (
-    job.job_type === "zero"
-  ) {
+  if (job.job_type === "zero") {
 
-    const result =
-      await client.query(
-        `
-        UPDATE inventory_by_location ibl
+    console.log("");
+    console.log("🟨 ========================================");
+    console.log("📦 PROCESANDO JOB ZERO");
+    console.log("🟨 ========================================");
 
-        SET
-          qty_on_hand =
-            0.000,
+    if (isAdmCloud) {
 
-          qty_reserved =
-            0.000,
-
-          updated_at =
-            NOW()
-
-        FROM warehouses w
-
-        WHERE
-          w.id =
-            ibl.warehouse_id
-
-          AND w.erp_warehouse_id =
-            $1
-
-          AND ibl.counted_by IS NULL
-
-          AND ibl.counted_at IS NULL
-
-          AND (
-            COALESCE(
-              ibl.qty_on_hand,
-              0
-            ) <> 0
-
-            OR
-
-            COALESCE(
-              ibl.qty_reserved,
-              0
-            ) <> 0
-          )
-
-        RETURNING
-          ibl.id,
-          ibl.warehouse_id,
-          ibl.product_sku,
-          ibl.location_id,
-          ibl.qty_on_hand,
-          ibl.qty_reserved
-        `,
-        [
-          job.erp_warehouse_id
-        ]
+      console.error(
+        "🛑 ZERO ADM CLOUD NO ESTÁ HABILITADO"
       );
 
+      throw new Error(
+        "El ajuste ZERO de ADM Cloud está deshabilitado. " +
+        "Debe migrarse y verificarse su controller y worker " +
+        "antes de modificar existencias en cero."
+      );
+    }
 
-    console.log(
-      "✅ LÍNEAS NO CONTADAS DEL WAREHOUSE PUESTAS EN CERO:",
-      result.rows.length
+    // ========================================================
+    // VALIDAR QUE TODAS LAS LÍNEAS ESTÉN SUCCESS
+    // ========================================================
+
+    const linesResult = await client.query(
+      `
+      SELECT
+        COUNT(*)::integer AS total,
+
+        COUNT(*) FILTER (
+          WHERE status = 'success'
+        )::integer AS successful
+
+      FROM inventory_adjustment_job_lines
+
+      WHERE job_id = $1
+      `,
+      [jobId]
     );
 
+    const totalLines =
+      Number(linesResult.rows[0]?.total ?? 0);
+
+    const successfulLines =
+      Number(linesResult.rows[0]?.successful ?? 0);
+
+    if (
+      totalLines === 0 ||
+      successfulLines !== totalLines
+    ) {
+
+      throw new Error(
+        `El job ZERO ${jobId} no está completamente procesado.`
+      );
+    }
+
+    // ========================================================
+    // ACTUALIZAR SOLO EL ALMACÉN DEL JOB
+    //
+    // Se conserva el comportamiento original para Citrus.
+    // ========================================================
+
+    const result = await client.query(
+      `
+      UPDATE inventory_by_location AS ibl
+
+      SET
+
+        qty_on_hand = 0.000,
+
+        qty_reserved = 0.000,
+
+        updated_at = NOW()
+
+      FROM warehouses w
+
+      WHERE w.id = ibl.warehouse_id
+
+        AND w.erp_warehouse_id::text = $1::text
+
+        AND ibl.counted_by IS NULL
+
+        AND ibl.counted_at IS NULL
+
+        AND (
+          COALESCE(ibl.qty_on_hand, 0) <> 0
+
+          OR
+
+          COALESCE(ibl.qty_reserved, 0) <> 0
+        )
+
+      RETURNING
+
+        ibl.id,
+
+        ibl.warehouse_id,
+
+        ibl.product_sku,
+
+        ibl.location_id,
+
+        ibl.qty_on_hand,
+
+        ibl.qty_reserved
+      `,
+      [erpWarehouseId]
+    );
+
+    const updatedLines = result.rows.length;
+
+    console.log("");
+    console.log("🟩 ========================================");
+    console.log("✅ JOB ZERO COMPLETADO EN WMS");
+    console.log("🆔 JOB:", jobId);
+    console.log("🏬 ALMACÉN:", erpWarehouseId);
+    console.log("📦 LÍNEAS ACTUALIZADAS:", updatedLines);
+    console.log("🟩 ========================================");
 
     return {
-
-      type:
-        "zero",
-
-      jobId:
-        Number(job.id),
-
-      erpWarehouseId:
-        Number(
-          job.erp_warehouse_id
-        ),
-
-      updatedLines:
-        result.rows.length
-
+      type: "zero",
+      jobId,
+      sessionId,
+      erpWarehouseId,
+      updatedLines
     };
 
   }
 
-
   // ==========================================================
-  // JOB TYPE NO SOPORTADO
+  // 5. JOB TYPE NO SOPORTADO
   // ==========================================================
 
   throw new Error(
@@ -2342,7 +2261,6 @@ async function applyCompletedInventoryJobToWms(
   );
 
 }
-
 
 
 
@@ -3020,9 +2938,36 @@ export async function startInventoryAdjustmentWorker(
         );
 
 
-        await markJobCompleted(
-          jobId
-        );
+        try {
+
+          await markJobCompleted(jobId);
+
+        } catch (closeError) {
+
+          const message =
+            "El ERP puede estar ajustado, pero falló " +
+            "el cierre local WMS: " +
+            closeError.message +
+            ". Revisar la sesión sin repetir el POST ADM Cloud.";
+
+          console.error(
+            "🟥 ERROR DE CONCILIACIÓN FINAL:",
+            message
+          );
+
+          await markJobFailed({
+            jobId,
+            lineId: job.current_line_id ?? null,
+            message
+          });
+
+          await emitInventoryAdjustmentProgress(jobId, {
+            phase: "failed",
+            message
+          });
+
+          return;
+        }
 
 
         await emitInventoryAdjustmentProgress(
@@ -3074,10 +3019,7 @@ export async function startInventoryAdjustmentWorker(
                 line.id
               ),
 
-            erpProductId:
-              Number(
-                line.erp_product_id
-              ),
+            erpProductId: String(line.erp_product_id),
 
             desiredQty:
               Number(
@@ -3171,10 +3113,7 @@ export async function startInventoryAdjustmentWorker(
                 lineId:
                   Number(line.id),
 
-                erpProductId:
-                  Number(
-                    line.erp_product_id
-                  ),
+                erpProductId: String(line.erp_product_id),
 
                 desiredQty:
                   Number(
@@ -3236,10 +3175,7 @@ export async function startInventoryAdjustmentWorker(
                 lineId:
                   Number(line.id),
 
-                erpProductId:
-                  Number(
-                    line.erp_product_id
-                  )
+                erpProductId: String(line.erp_product_id)
 
               }
 
@@ -3279,10 +3215,7 @@ export async function startInventoryAdjustmentWorker(
                 lineId:
                   Number(line.id),
 
-                erpProductId:
-                  Number(
-                    line.erp_product_id
-                  )
+                erpProductId: String(line.erp_product_id)
 
               }
 
@@ -3354,10 +3287,7 @@ export async function startInventoryAdjustmentWorker(
               lineId:
                 Number(line.id),
 
-              erpProductId:
-                Number(
-                  line.erp_product_id
-                )
+              erpProductId: String(line.erp_product_id)
 
             }
 

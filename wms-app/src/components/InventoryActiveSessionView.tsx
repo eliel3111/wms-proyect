@@ -344,17 +344,20 @@ export default function InventoryActiveSessionView({
         // MENSAJE
         // ======================================================
 
-        openModal({
+       
+openModal({
+  title:
+    data.title ||
+    "✅ INVENTARIO FINALIZADO",
 
-          title:
-            data.title ||
-            "Inventario finalizado",
+  message:
+    data.message ||
+    "La sesión de inventario fue finalizada correctamente.",
 
-          message:
-            data.message ||
-            "La sesión de inventario fue finalizada correctamente."
+  buttonText: "Entendido",
+  titleColor: "green"
+});
 
-        });
 
 
       } catch (error) {

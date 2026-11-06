@@ -8,28 +8,34 @@ export async function emitInventorySummary(client) {
 
   console.log("🚀 Inicio resumen");
 
-
   // ============================================================
-  // 1. OBTENER SESIÓN ACTIVA
+  // 1. OBTENER SESIÓN ACTIVA Y SU ALMACÉN WMS
   // ============================================================
 
   const sessionResult = await client.query(`
     SELECT
-      id,
-      code,
-      status
+      s.id,
+      s.code,
+      s.status,
+      s.erp_warehouse_id,
 
-    FROM inventory_sessions
+      w.id AS warehouse_id
 
-    WHERE status IN (
+    FROM inventory_sessions s
+
+    LEFT JOIN warehouses w
+      ON LOWER(w.erp_warehouse_id::text) =
+         LOWER(s.erp_warehouse_id::text)
+
+    WHERE s.status IN (
       'draft',
       'in-progress',
       'review'
     )
 
     ORDER BY
-      updated_at DESC,
-      id DESC
+      s.updated_at DESC,
+      s.id DESC
 
     LIMIT 1
   `);
@@ -66,22 +72,44 @@ export async function emitInventorySummary(client) {
 
   const sessionId = Number(session.id);
 
+  // ============================================================
+  // NUEVO - OBTENER ALMACÉN DE LA SESIÓN
+  // ============================================================
+
+  const warehouseId = Number(
+    session.warehouse_id
+  );
+
+  if (
+    !Number.isSafeInteger(warehouseId) ||
+    warehouseId <= 0
+  ) {
+
+    throw new Error(
+      `La sesión ${sessionId} no tiene un almacén WMS válido.`
+    );
+
+  }
+
 
   console.log(
     "📦 SESSION SUMMARY:",
     {
       sessionId,
-      code: session.code
+      code: session.code,
+      warehouseId,
+      erpWarehouseId: session.erp_warehouse_id
     }
   );
 
 
   // ============================================================
   // 2. PRODUCTOS ÚNICOS CONTADOS POR USUARIO
-  // SIN IMPORTAR WAREHOUSE
+  // FILTRADOS POR ALMACÉN DE LA SESIÓN
   // ============================================================
 
-  const summaryResult = await client.query(`
+  const summaryResult = await client.query(
+    `
     SELECT
       ibl.counted_by AS user_id,
       u.full_name,
@@ -100,21 +128,26 @@ export async function emitInventorySummary(client) {
 
       AND ibl.counted_at IS NOT NULL
 
+      AND ibl.warehouse_id = $1
+
     GROUP BY
       ibl.counted_by,
       u.full_name
 
     ORDER BY
       total_lines_counted DESC
-  `);
+    `,
+    [warehouseId]
+  );
 
 
   // ============================================================
   // 3. TOTAL DE PRODUCTOS ÚNICOS CONTADOS
-  // SIN IMPORTAR WAREHOUSE
+  // FILTRADOS POR ALMACÉN DE LA SESIÓN
   // ============================================================
 
-  const countedProductsResult = await client.query(`
+  const countedProductsResult = await client.query(
+    `
     SELECT
       COUNT(
         DISTINCT ibl.product_sku
@@ -126,7 +159,11 @@ export async function emitInventorySummary(client) {
       ibl.counted_by IS NOT NULL
 
       AND ibl.counted_at IS NOT NULL
-  `);
+
+      AND ibl.warehouse_id = $1
+    `,
+    [warehouseId]
+  );
 
 
   const total = Number(

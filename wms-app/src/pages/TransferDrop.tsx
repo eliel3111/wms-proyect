@@ -262,7 +262,12 @@ export default function TransferPickPage() {
 
             await loadPendingTransfers();
 
-            openModal({ title: "OK", message: "Transferencia registrada." });
+            openModal({
+    title: "✅ TRASLADO REGISTRADO",
+    message: "El traslado se registró correctamente.",
+    buttonText: "Entendido",
+    titleColor: "green"
+});
 
         } catch (err) {
             // ❌ NO abrir modal aquí (ya se abrió en saveTransferLine)

@@ -96,113 +96,281 @@ export default function PutawayPickPage() {
 
 
   {/*ESCUCHA LA LECTURA DEL SCANER*/ }
-  useEffect(() => {
+ useEffect(() => {
+
     async function handleKeyDown(e: KeyboardEvent) {
-      const target = e.target as HTMLElement;
 
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
+        const target = e.target as HTMLElement;
+
+        const isEndKey =
+            e.key === "Enter" ||
+            e.key === "NumpadEnter" ||
+            e.key === "Tab";
+
+        // =====================================================
+        // DEBUG - EVENTO DEL SCANNER
+        // =====================================================
+
+        console.log("⌨️ SCANNER EVENT:", {
+            key: e.key,
+            target: target.tagName,
+            inputFocused: target === qtyInputRef.current,
+            buffer: scanBuffer.current,
+            location: putLocationRef.current?.code ?? null,
+            product: currentLineRef.current?.sku ?? null
+        });
+
+        // =====================================================
+        // 1. IGNORAR INPUTS MANUALES
+        // =====================================================
+
+        if (
+            target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable
+        ) {
+
+            console.log(
+                "⚠️ SCANNER IGNORADO POR FOCO EN:",
+                target.tagName
+            );
+
+            scanBuffer.current = "";
+            return;
+        }
+
+        // =====================================================
+        // 2. ACUMULAR CÓDIGO DEL SCANNER
+        // =====================================================
+
+        if (!isEndKey) {
+
+            if (e.key.length === 1) {
+                scanBuffer.current += e.key;
+            }
+
+            return;
+        }
+
+        e.preventDefault();
+
+        // =====================================================
+        // 3. OBTENER CÓDIGO ESCANEADO
+        // =====================================================
+
+        const scannedValue = scanBuffer.current
+            .replace(/[\r\n]+/g, "")
+            .trim()
+            .toUpperCase();
+
         scanBuffer.current = "";
-        return;
-      }
 
-      const isEndKey =
-        e.key === "Enter" ||
-        e.key === "NumpadEnter" ||
-        e.key === "Tab";
-
-      if (isEndKey) {
-        let scannedValue = scanBuffer.current
-          .replace(/[\r\n]+/g, "")
-          .trim()
-          .toUpperCase();
-
-        console.log("📡 SCAN:", JSON.stringify(scannedValue));
+        console.log(
+            "📡 CÓDIGO ESCANEADO:",
+            scannedValue
+        );
 
         if (!scannedValue) {
-          scanBuffer.current = "";
-          return;
+            console.log("⚠️ SCANNER BUFFER VACÍO");
+            return;
         }
 
         try {
-          // 1️⃣ ¿Es producto pendiente?
-          const cleanScan = scannedValue.trim().toUpperCase();
 
-          const foundLine = pendingLinesRef.current.find(
-            (line) =>
-              line.barcode?.trim().toUpperCase() === cleanScan ||
-              line.sku?.trim().toUpperCase() === cleanScan
-          );
+            // =====================================================
+            // 4. BUSCAR PRODUCTO EN PUTAWAY
+            // =====================================================
 
-          if (putLocationRef.current !== null && !foundLine) {
-            openModal({
-              title: "Producto no válido",
-              message: "Este producto no está en el putaway."
+            const foundLine = pendingLinesRef.current.find(
+                (line) =>
+                    line.barcode?.trim().toUpperCase() === scannedValue ||
+                    line.sku?.trim().toUpperCase() === scannedValue
+            );
+
+            console.log(
+                "\x1b[44m\x1b[37m 📦 VALIDANDO PRODUCTO PUTAWAY \x1b[0m"
+            );
+
+            console.log({
+                scannedValue,
+                foundLine: foundLine ?? null,
+                currentLocation: putLocationRef.current,
+                pendingLinesCount: pendingLinesRef.current.length,
+                pendingProducts: pendingLinesRef.current.map(
+                    line => line.sku
+                )
             });
 
-            scanBuffer.current = "";
-            return;
-          }
+            // =====================================================
+            // 5. PRODUCTO ENCONTRADO
+            // =====================================================
 
-          //console.log("🟥 foundline: ", foundLine);
-          //console.log("🟨 ubicasion actual:: ", putLocationRef.current);
+            if (foundLine) {
 
-          if (foundLine) {
-            console.log("✅ PRODUCTO EN SESSION:", foundLine);
-            setCurrentLine(foundLine);
-            //setQty(String(Math.trunc(+foundLine.picked_qty)));
-            //enfocar y select el input cantidad
-            // 👉 seleccionar el input manualmente
-            setTimeout(() => {
-              qtyInputRef.current?.focus();
-              qtyInputRef.current?.select();
-            }, 0);
-            scanBuffer.current = "";
-            return;
-          }
+                console.log(
+                    "✅ PRODUCTO ENCONTRADO EN PUTAWAY:",
+                    foundLine
+                );
 
-          // 2️⃣ ¿Es ubicación?
-          const result = await verifyPutawayLocation(scannedValue);
+                // Primero debe existir una ubicación
+                if (!putLocationRef.current) {
 
-          if (!result?.location) {
-            openModal({
-              title: "Ubicación no válida",
-              message: "La ubicación escaneada no es correcta. Elija una ubicación en su almacén."
+                    openModal({
+                        title: "⚠️ UBICACIÓN REQUERIDA",
+                        message: "Primero debe escanear una ubicación de destino.",
+                        buttonText: "Entendido",
+                        titleColor: "#d97706"
+                    });
+
+                    return;
+                }
+
+                // Validar cantidad pendiente
+                if (Number(foundLine.pending_qty) <= 0) {
+
+                    openModal({
+                        title: "⚠️ SIN CANTIDAD PENDIENTE",
+                        message: "Este producto no tiene unidades pendientes de ubicar.",
+                        buttonText: "Entendido",
+                        titleColor: "#d97706"
+                    });
+
+                    return;
+                }
+
+                setCurrentLine(foundLine);
+                currentLineRef.current = foundLine;
+
+                setQty("");
+                qtyRef.current = "";
+
+                // Evitar mantener el scanner dentro del input
+                qtyInputRef.current?.blur();
+
+                return;
+            }
+
+            // =====================================================
+            // 6. NO ES PRODUCTO: VERIFICAR SI ES UBICACIÓN
+            // =====================================================
+
+            console.log(
+                "🔍 NO COINCIDE CON PRODUCTO. VERIFICANDO UBICACIÓN:",
+                scannedValue
+            );
+
+            let location = null;
+
+            try {
+
+                const result = await verifyPutawayLocation(
+                    scannedValue
+                );
+
+                console.log(
+                    "📍 RESPUESTA BACKEND LOCATION:",
+                    result
+                );
+
+                location = result?.location ?? null;
+
+            } catch (locationError: any) {
+
+                console.log(
+                    "⚠️ ERROR VERIFICANDO UBICACIÓN:",
+                    locationError?.response?.data ||
+                    locationError
+                );
+
+                const status = locationError?.response?.status;
+
+                // Error de servidor o conexión
+                if (status !== 400 && status !== 404) {
+
+                    openModal({
+                        title: "❌ ERROR DE VERIFICACIÓN",
+                        message: "No se pudo verificar el código escaneado. Intente nuevamente.",
+                        buttonText: "Entendido",
+                        titleColor: "red"
+                    });
+
+                    return;
+                }
+            }
+
+            // =====================================================
+            // 7. UBICACIÓN ENCONTRADA
+            // =====================================================
+
+            if (location) {
+
+                console.log(
+                    "✅ UBICACIÓN VÁLIDA:",
+                    location
+                );
+
+                setPutLocation(location);
+                putLocationRef.current = location;
+
+                setCurrentLine(null);
+                currentLineRef.current = null;
+
+                setQty("");
+                qtyRef.current = "";
+
+                closeModal();
+
+                return;
+            }
+
+            // =====================================================
+            // 8. NO ES PRODUCTO NI UBICACIÓN VÁLIDA
+            // =====================================================
+
+            console.log(
+                "\x1b[43m\x1b[30m ⚠️ CÓDIGO NO ENCONTRADO EN PUTAWAY \x1b[0m"
+            );
+
+            console.log({
+                scannedValue,
+                productFound: false,
+                validLocation: false,
+                currentLocation: putLocationRef.current?.code ?? null
             });
-            scanBuffer.current = "";
+
+            openModal({
+    title: "PRODUCTO NO VALIDO",
+    message: "Este producto no está en el Putaway o el código no corresponde a una ubicación válida.",
+    buttonText: "Entendido",
+    titleColor: "warning"
+});
             return;
-          }
 
-          console.log("📍 UBICACIÓN OK:", result.location);
-          setPutLocation(result.location);
-          setCurrentLine(null);     // 🔥 limpiar producto
-          setQty("");               // 🔥 limpiar cantidad (si existe)
-          closeModal();
+        } catch (error) {
 
-        } catch (err) {
-          console.error("❌ Error procesando scan:", err);
-          openModal({
-            title: "Error de escaneo",
-            message: "No se pudo procesar el código escaneado."
-          });
-        } finally {
-          scanBuffer.current = "";
+            console.error(
+                "❌ ERROR PROCESANDO SCANNER:",
+                error
+            );
+
+            openModal({
+                title: "❌ ERROR DE ESCANEO",
+                message: "Ocurrió un error procesando el código escaneado.",
+                buttonText: "Entendido",
+                titleColor: "red"
+            });
+
         }
 
-      } else {
-        if (e.key.length === 1) {
-          scanBuffer.current += e.key;
-        }
-      }
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
+    return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+    };
+
+}, []);
 
 
   function onExit() {
@@ -266,9 +434,10 @@ export default function PutawayPickPage() {
       await loadPendingPutaway();
 
       openModal({
-        title: "Guardado",
-        message: "Putaway registrado correctamente.",
-        titleColor: "#198754",
+        title: "✅ PUTAWAY REGISTRADO",
+        message: "El Putaway se registró correctamente.",
+        buttonText: "Entendido",
+        titleColor: "green"
       });
 
     } catch (error) {

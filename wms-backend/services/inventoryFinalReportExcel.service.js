@@ -10,10 +10,22 @@ function formatDate(date) {
   });
 }
 
+
+
 export async function getInventoryFinalReportExcelService(client, sessionId) {
+
+  // ============================================================
+  // 1. OBTENER SESIÓN DE INVENTARIO
+  // ============================================================
+
   const sessionResult = await client.query(
     `
-    SELECT id, code, status, start_date, end_date
+    SELECT
+      id,
+      code,
+      status,
+      start_date,
+      end_date
     FROM inventory_sessions
     WHERE id = $1
     LIMIT 1
@@ -31,6 +43,18 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
 
   const session = sessionResult.rows[0];
 
+  // ============================================================
+  // 2. OBTENER TODOS LOS PRODUCTOS DEL REPORTE
+  // ============================================================
+  //
+  // IMPORTANTE:
+  // Se mantienen TODOS los productos, contados y no contados.
+  //
+  // ÚNICO CAMBIO:
+  // Agregamos wms_counted para identificar cuáles
+  // realmente fueron contados físicamente.
+  // ============================================================
+
   const reportResult = await client.query(
     `
     SELECT
@@ -46,7 +70,8 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
       difference,
       status,
       exist_erp,
-      product_no_exist
+      product_no_exist,
+      wms_counted
     FROM inventory_erp_report
     WHERE session_id = $1
     ORDER BY status DESC, erp_name ASC
@@ -60,11 +85,49 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
     return {
       success: false,
       title: "Reporte vacío",
-      message: "No hay datos generados en inventory_erp_report para esta sesión.",
+      message:
+        "No hay datos generados en inventory_erp_report para esta sesión.",
     };
   }
 
+  // ============================================================
+  // 3. OBTENER CANTIDAD REAL DE PRODUCTOS CONTADOS
+  // ============================================================
+  //
+  // wms_counted = true  → producto contado
+  // wms_counted = false → producto no contado
+  //
+  // Ejemplo:
+  //
+  // 166 registros en el reporte
+  //   1 producto contado
+  // 165 productos no contados
+  //
+  // En el resumen aparecerá:
+  // Cantidad de productos contados: 1
+  //
+  // ============================================================
+
+  const totalCountedProducts = rows.filter(
+    (item) => item.wms_counted === true
+  ).length;
+
+  console.log(
+    "📦 TOTAL PRODUCTOS EN EL REPORTE:",
+    rows.length
+  );
+
+  console.log(
+    "✅ PRODUCTOS REALMENTE CONTADOS:",
+    totalCountedProducts
+  );
+
+  // ============================================================
+  // 4. CREAR EXCEL
+  // ============================================================
+
   const workbook = new ExcelJS.Workbook();
+
   const sheet = workbook.addWorksheet("Inventario Fisico");
 
   sheet.pageSetup = {
@@ -74,20 +137,64 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
     fitToHeight: 0,
   };
 
+  // ============================================================
+  // 5. TÍTULO PRINCIPAL
+  // ============================================================
+
   sheet.mergeCells("A1:J1");
-  sheet.getCell("A1").value = "INVENTARIO FISICO GENERAL";
-  sheet.getCell("A1").font = { bold: true, size: 16 };
-  sheet.getCell("A1").alignment = { horizontal: "center" };
+
+  sheet.getCell("A1").value =
+    "INVENTARIO FISICO GENERAL";
+
+  sheet.getCell("A1").font = {
+    bold: true,
+    size: 16
+  };
+
+  sheet.getCell("A1").alignment = {
+    horizontal: "center"
+  };
+
+  // ============================================================
+  // 6. EMPRESA
+  // ============================================================
 
   sheet.mergeCells("A2:J2");
-  sheet.getCell("A2").value = "Garlas Control";
-  sheet.getCell("A2").font = { size: 14 };
-  sheet.getCell("A2").alignment = { horizontal: "center" };
+
+  sheet.getCell("A2").value =
+    "Garlas Control";
+
+  sheet.getCell("A2").font = {
+    size: 14
+  };
+
+  sheet.getCell("A2").alignment = {
+    horizontal: "center"
+  };
+
+  // ============================================================
+  // 7. FECHA DEL INVENTARIO
+  // ============================================================
 
   sheet.mergeCells("A4:J4");
-  sheet.getCell("A4").value = `Fecha: ${formatDate(session.start_date)} a ${formatDate(session.end_date) || formatDate(new Date())}`;
-  sheet.getCell("A4").font = { size: 13 };
-  sheet.getCell("A4").alignment = { horizontal: "center" };
+
+  sheet.getCell("A4").value =
+    `Fecha: ${formatDate(session.start_date)} a ${
+      formatDate(session.end_date) ||
+      formatDate(new Date())
+    }`;
+
+  sheet.getCell("A4").font = {
+    size: 13
+  };
+
+  sheet.getCell("A4").alignment = {
+    horizontal: "center"
+  };
+
+  // ============================================================
+  // 8. CONFIGURAR COLUMNAS
+  // ============================================================
 
   const headerRowNumber = 7;
 
@@ -104,6 +211,10 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
     { key: "positive_value", width: 22 },
     { key: "negative_value", width: 22 },
   ];
+
+  // ============================================================
+  // 9. ENCABEZADOS
+  // ============================================================
 
   const headerRow = sheet.getRow(headerRowNumber);
 
@@ -122,14 +233,19 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
   ];
 
   headerRow.eachCell((cell) => {
+
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "4472C4" },
+      fgColor: {
+        argb: "4472C4"
+      },
     };
 
     cell.font = {
-      color: { argb: "FFFFFF" },
+      color: {
+        argb: "FFFFFF"
+      },
       bold: true,
       size: 10,
     };
@@ -146,76 +262,143 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
       bottom: { style: "thin" },
       right: { style: "thin" },
     };
+
   });
 
   headerRow.height = 45;
+
+  // ============================================================
+  // 10. CONTADORES ORIGINALES
+  // ============================================================
 
   let totalPositive = 0;
   let totalNegative = 0;
   let correctProducts = 0;
   let incorrectProducts = 0;
 
+  // ============================================================
+  // 11. AGREGAR TODOS LOS PRODUCTOS AL EXCEL
+  // ============================================================
+  //
+  // IMPORTANTE:
+  //
+  // Se utiliza rows.forEach().
+  //
+  // No se filtra por wms_counted.
+  //
+  // Esto mantiene los 166 productos en el detalle,
+  // exactamente como en el reporte anterior.
+  //
+  // ============================================================
+
   rows.forEach((item, index) => {
 
-    // Existencia actual registrada en Citrus
+    // Existencia registrada en el ERP
     const erpStock =
       Number(item.erp_stock ?? 0);
 
-    // Cantidad física contada en el WMS
+    // Cantidad física del reporte WMS
     const physicalQty =
       Number(item.total_inventory_qty ?? 0);
 
-    
-    const difference = physicalQty - erpStock;
+    // Diferencia original
+    const difference =
+      physicalQty - erpStock;
 
-
+    // Costo unitario
     const unitCost =
       Number(item.unit_cost ?? 0);
 
-
+    // Diferencia económica
     const valueDifference =
       difference * unitCost;
 
-
+    // Valores positivos
     const positiveValue =
       valueDifference > 0
         ? valueDifference
         : 0;
 
-
+    // Valores negativos
     const negativeValue =
       valueDifference < 0
         ? valueDifference
         : 0;
 
+    // Acumular valores
     totalPositive += positiveValue;
     totalNegative += negativeValue;
 
+    // ========================================================
+    // MANTENER CÁLCULO ORIGINAL DE CORRECTOS / INCORRECTOS
+    // ========================================================
+
     if (difference === 0) {
+
       correctProducts += 1;
+
     } else {
+
       incorrectProducts += 1;
+
     }
 
+    // ========================================================
+    // AGREGAR FILA
+    // ========================================================
+
     const row = sheet.addRow({
-      inventory_date: formatDate(session.start_date),
-      product_code: item.erp_sku || item.erp_id,
-      description: item.description,
-      name: item.erp_name,
-      sku: item.sku,
-      system_qty: erpStock,
-      physical_qty: physicalQty,
-      unit_diff: difference,
-      unit_cost: unitCost,
-      positive_value: positiveValue,
-      negative_value: negativeValue,
+
+      inventory_date:
+        formatDate(session.start_date),
+
+      product_code:
+        item.erp_sku || item.erp_id,
+
+      description:
+        item.description,
+
+      name:
+        item.erp_name,
+
+      sku:
+        item.sku,
+
+      system_qty:
+        erpStock,
+
+      physical_qty:
+        physicalQty,
+
+      unit_diff:
+        difference,
+
+      unit_cost:
+        unitCost,
+
+      positive_value:
+        positiveValue,
+
+      negative_value:
+        negativeValue,
+
     });
 
+    // ========================================================
+    // FORMATO DE FILA
+    // ========================================================
+
     row.eachCell((cell) => {
+
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: index % 2 === 0 ? "D9E1F2" : "EDEFF7" },
+        fgColor: {
+          argb:
+            index % 2 === 0
+              ? "D9E1F2"
+              : "EDEFF7"
+        },
       };
 
       cell.alignment = {
@@ -225,84 +408,243 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
       };
 
       cell.border = {
-        top: { style: "thin", color: { argb: "FFFFFF" } },
-        left: { style: "thin", color: { argb: "FFFFFF" } },
-        bottom: { style: "thin", color: { argb: "FFFFFF" } },
-        right: { style: "thin", color: { argb: "FFFFFF" } },
+        top: {
+          style: "thin",
+          color: {
+            argb: "FFFFFF"
+          }
+        },
+
+        left: {
+          style: "thin",
+          color: {
+            argb: "FFFFFF"
+          }
+        },
+
+        bottom: {
+          style: "thin",
+          color: {
+            argb: "FFFFFF"
+          }
+        },
+
+        right: {
+          style: "thin",
+          color: {
+            argb: "FFFFFF"
+          }
+        },
       };
+
     });
 
-    row.getCell("unit_cost").numFmt = '#,##0.00';
-    row.getCell("positive_value").numFmt = '#,##0.00';
-    row.getCell("negative_value").numFmt = '#,##0.00';
+    // ========================================================
+    // FORMATOS NUMÉRICOS
+    // ========================================================
+
+    row.getCell("unit_cost").numFmt =
+      "#,##0.00";
+
+    row.getCell("positive_value").numFmt =
+      "#,##0.00";
+
+    row.getCell("negative_value").numFmt =
+      "#,##0.00";
+
   });
 
+  // ============================================================
+  // 12. TOTAL DE DIFERENCIAS
+  // ============================================================
+
   const totalRow = sheet.addRow({});
-  totalRow.getCell(9).value = "Total RD$";
-  totalRow.getCell(10).value = totalPositive;
-  totalRow.getCell(11).value = totalNegative;
+
+  totalRow.getCell(9).value =
+    "Total RD$";
+
+  totalRow.getCell(10).value =
+    totalPositive;
+
+  totalRow.getCell(11).value =
+    totalNegative;
 
   totalRow.eachCell((cell) => {
-    cell.font = { bold: true };
+
+    cell.font = {
+      bold: true
+    };
+
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "C8D1E8" },
+      fgColor: {
+        argb: "C8D1E8"
+      },
     };
-    cell.alignment = { horizontal: "center" };
+
+    cell.alignment = {
+      horizontal: "center"
+    };
+
     cell.border = {
       top: { style: "medium" },
       bottom: { style: "thin" },
     };
+
   });
 
-  totalRow.getCell(10).numFmt = '#,##0.00';
-  totalRow.getCell(11).numFmt = '#,##0.00';
+  totalRow.getCell(10).numFmt =
+    "#,##0.00";
+
+  totalRow.getCell(11).numFmt =
+    "#,##0.00";
+
+  // ============================================================
+  // 13. BALANCE GENERAL
+  // ============================================================
 
   const balanceRow = sheet.addRow({});
-  balanceRow.getCell(9).value = "Balance RD$";
-  balanceRow.getCell(10).value = totalPositive + totalNegative;
 
-  balanceRow.getCell(9).font = { bold: true };
-  balanceRow.getCell(10).font = {
-    bold: true,
-    color: { argb: totalPositive + totalNegative < 0 ? "FF0000" : "008000" },
+  balanceRow.getCell(9).value =
+    "Balance RD$";
+
+  balanceRow.getCell(10).value =
+    totalPositive + totalNegative;
+
+  balanceRow.getCell(9).font = {
+    bold: true
   };
 
-  balanceRow.getCell(10).numFmt = '#,##0.00';
+  balanceRow.getCell(10).font = {
+    bold: true,
+    color: {
+      argb:
+        totalPositive + totalNegative < 0
+          ? "FF0000"
+          : "008000"
+    },
+  };
 
-  const summaryStartRow = balanceRow.number + 2;
+  balanceRow.getCell(10).numFmt =
+    "#,##0.00";
+
+  // ============================================================
+  // 14. RESUMEN FINAL
+  // ============================================================
+
+  const summaryStartRow =
+    balanceRow.number + 2;
+
+  // IMPORTANTE:
+  // Conservamos totalProducts para los cálculos originales.
   const totalProducts = rows.length;
+
   const precisionPercent =
-    totalProducts > 0 ? Number(((correctProducts / totalProducts) * 100).toFixed(2)) : 0;
+    totalProducts > 0
+      ? Number(
+          (
+            (correctProducts / totalProducts) * 100
+          ).toFixed(2)
+        )
+      : 0;
 
-  sheet.getCell(`B${summaryStartRow}`).value = "Resumen del inventario fisico general:";
-  sheet.getCell(`B${summaryStartRow}`).font = { bold: true };
+  sheet.getCell(
+    `B${summaryStartRow}`
+  ).value =
+    "Resumen del inventario fisico general:";
 
-  sheet.getCell(`B${summaryStartRow + 1}`).value = `Cantidad de productos contados: ${totalProducts}`;
-  sheet.getCell(`B${summaryStartRow + 2}`).value = `Cantidad de productos incorrectos: ${incorrectProducts}`;
-  sheet.getCell(`B${summaryStartRow + 3}`).value = `Cantidad de productos correctos: ${correctProducts}`;
-  sheet.getCell(`B${summaryStartRow + 4}`).value = `% de precision: ${precisionPercent}%`;
+  sheet.getCell(
+    `B${summaryStartRow}`
+  ).font = {
+    bold: true
+  };
 
-  sheet.views = [{ state: "frozen", ySplit: headerRowNumber }];
+  // ============================================================
+  // ÚNICO CAMBIO EN EL RESUMEN:
+  // UTILIZAR totalCountedProducts
+  // ============================================================
 
-  const buffer = await workbook.xlsx.writeBuffer();
+  sheet.getCell(
+    `B${summaryStartRow + 1}`
+  ).value =
+    `Cantidad de productos contados: ${totalCountedProducts}`;
+
+  // ============================================================
+  // RESTO DEL RESUMEN SIN MODIFICACIONES
+  // ============================================================
+
+  sheet.getCell(
+    `B${summaryStartRow + 2}`
+  ).value =
+    `Cantidad de productos incorrectos: ${incorrectProducts}`;
+
+  sheet.getCell(
+    `B${summaryStartRow + 3}`
+  ).value =
+    `Cantidad de productos correctos: ${correctProducts}`;
+
+  sheet.getCell(
+    `B${summaryStartRow + 4}`
+  ).value =
+    `% de precision: ${precisionPercent}%`;
+
+  // ============================================================
+  // 15. CONGELAR ENCABEZADO
+  // ============================================================
+
+  sheet.views = [
+    {
+      state: "frozen",
+      ySplit: headerRowNumber
+    }
+  ];
+
+  // ============================================================
+  // 16. GENERAR ARCHIVO EXCEL
+  // ============================================================
+
+  const buffer =
+    await workbook.xlsx.writeBuffer();
+
+  console.log("");
+  console.log("🟩 ========================================");
+  console.log("✅ REPORTE FINAL GENERADO");
+  console.log("🆔 SESSION ID:", sessionId);
+  console.log("📦 TOTAL PRODUCTOS:", totalProducts);
+  console.log("✅ PRODUCTOS CONTADOS:", totalCountedProducts);
+  console.log("📦 PRODUCTOS NO CONTADOS:",
+    totalProducts - totalCountedProducts
+  );
+  console.log("🟩 ========================================");
+
+  // ============================================================
+  // 17. DEVOLVER RESULTADO
+  // ============================================================
 
   return {
     success: true,
+
     buffer,
-    fileName: `inventario-fisico-${session.code}.xlsx`,
+
+    fileName:
+      `inventario-fisico-${session.code}.xlsx`,
+
     session,
+
     totals: {
       totalProducts,
+      totalCountedProducts,
       correctProducts,
       incorrectProducts,
       totalPositive,
       totalNegative,
-      balance: totalPositive + totalNegative,
+      balance:
+        totalPositive + totalNegative,
       precisionPercent,
     },
   };
+
 }
 
 
