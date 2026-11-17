@@ -5,7 +5,14 @@ import InventoryLive from "../components/InventoryLive.tsx";
 import InventorySession from "../components/InventorySession.tsx";
 import InventoryReport from "../components/InventoryReport";
 import MobileBlocker from "../components/MobileBlocker.tsx";
-import { BarChart3, Clipboard, Monitor  } from "lucide-react";
+import {
+  BarChart3,
+  Clipboard,
+  Monitor,
+  History
+} from "lucide-react";
+
+import InventoryHistory from "../components/InventoryHistory.tsx";
 
 export default function MonitorInventory() {
     const [isMobile, setIsMobile] = useState(false);
@@ -99,6 +106,17 @@ export default function MonitorInventory() {
                             <Clipboard size={22} />
                             <span>Reportes Finales</span>
                         </button>
+
+
+                        <button
+  type="button"
+  onClick={() => setView("inventory-history")}
+  className="sidebar-button"
+>
+  <History size={22} />
+  <span>Historial de Inventarios</span>
+</button>
+
                     </nav>
                 </div>
             </aside>
@@ -153,11 +171,14 @@ export default function MonitorInventory() {
 
             {/* Main content */}
             <main className="main" aria-label="Contenido principal">
-                {view === "inventory-session" && <InventorySession />}
-                {view === "inventory-posted" && <InventoryLive />}
-                {view === "inventory-report" && <InventoryReport  />}
+  {view === "inventory-session" && <InventorySession />}
 
-            </main>
+  {view === "inventory-posted" && <InventoryLive />}
+
+  {view === "inventory-report" && <InventoryReport />}
+
+  {view === "inventory-history" && <InventoryHistory />}
+</main>
         </div>
     );
 }

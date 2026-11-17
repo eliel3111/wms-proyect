@@ -3259,3 +3259,584 @@ and (
   }
 
 }
+
+
+/* ============================================================
+   SIDIAL WMS
+   INVENTORY MONITOR OPTIONS
+   PAGE HEADER + TYPOGRAPHY UPDATE
+============================================================ */
+
+/* ============================================================
+   PAGE HEADER
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-mode-page-header {
+
+  width: 100%;
+  min-height: 118px;
+
+  display: flex;
+  align-items: center;
+  gap: 17px;
+
+  padding: 20px 24px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce5ef;
+  border-radius: 15px;
+
+  background:
+    radial-gradient(
+      circle at 82% 50%,
+      rgba(59, 130, 246, 0.11) 0%,
+      rgba(59, 130, 246, 0) 36%
+    ),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #f8fbff 62%,
+      #edf5ff 100%
+    );
+
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+/* ============================================================
+   PAGE ICON
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-mode-page-icon {
+
+  width: 64px;
+  height: 64px;
+
+  flex: 0 0 64px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #dbe9fb;
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #edf5ff 0%,
+      #e5efff 100%
+    );
+
+  color: #2878dd;
+}
+
+/* ============================================================
+   PAGE HEADING
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-mode-page-heading {
+
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+}
+
+/* ============================================================
+   EYEBROW
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-mode-eyebrow {
+
+  margin-bottom: 3px;
+
+  color: #718099;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    var(--text-2xs, 11px);
+
+  line-height: 16px;
+
+  font-weight:
+    var(--weight-semibold, 620);
+
+  letter-spacing: 0.105em;
+
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   PAGE TITLE
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-mode-page-title {
+
+  margin: 0;
+  padding: 0;
+
+  color:
+    var(--text-primary, #17233c);
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    var(--text-3xl, 26px);
+
+  line-height:
+    var(--leading-tight, 1.15);
+
+  font-weight:
+    var(--weight-bold, 690);
+
+  letter-spacing:
+    var(
+      --tracking-display,
+      -0.035em
+    );
+}
+
+/* ============================================================
+   PAGE SUBTITLE
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-mode-page-subtitle {
+
+  margin: 5px 0 0;
+
+  color:
+    var(--text-secondary, #52627a);
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    var(--text-md, 14px);
+
+  line-height: 20px;
+
+  font-weight:
+    var(--weight-regular, 430);
+
+  letter-spacing: -0.008em;
+}
+
+/* ============================================================
+   OPTIONS TITLE TYPOGRAPHY
+============================================================ */
+
+.inventory-monitor-container-options
+.option-title-row h4 {
+
+  margin: 0;
+
+  color:
+    var(--text-primary, #17233c);
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 17px;
+  line-height: 23px;
+
+  font-weight: 690;
+  letter-spacing: -0.025em;
+
+}
+
+/* ============================================================
+   OPTIONS DESCRIPTION TYPOGRAPHY
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-monitor-option p {
+
+  color:
+    var(--text-secondary, #52627a);
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 14px;
+  line-height: 1.6;
+
+  font-weight: 440;
+  letter-spacing: -0.008em;
+}
+
+/* ============================================================
+   RECOMMENDED LABEL
+============================================================ */
+
+.inventory-monitor-container-options
+.option-recommended {
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 11px;
+  line-height: 16px;
+
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+/* ============================================================
+   WAREHOUSE LABEL
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-warehouse-select-container label {
+
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+
+  color: #293950;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 14px;
+  line-height: 20px;
+
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.inventory-monitor-container-options
+.inventory-warehouse-select-container label svg {
+
+  color: #3478ea;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   WAREHOUSE SELECT TYPOGRAPHY
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-warehouse-select {
+
+  color: #17233c;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 14px;
+  font-weight: 520;
+
+  letter-spacing: -0.008em;
+}
+
+/* ============================================================
+   ALERT TYPOGRAPHY
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-monitor-alert strong {
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 20px;
+}
+
+.inventory-monitor-container-options
+.inventory-monitor-alert p span {
+
+  font-size: 12px;
+  line-height: 18px;
+
+  font-weight: 430;
+}
+
+/* ============================================================
+   BUTTON TYPOGRAPHY
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-session-action-btn {
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 14px;
+  font-weight: 650;
+
+  letter-spacing: -0.008em;
+}
+
+/* ============================================================
+   LAPTOP
+============================================================ */
+
+@media (max-width: 1366px) {
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-header {
+
+    min-height: 104px;
+    padding: 17px 20px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-icon {
+
+    width: 54px;
+    height: 54px;
+
+    flex-basis: 54px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-title {
+
+    font-size: 24px;
+  }
+}
+
+/* ============================================================
+   MOBILE / PDA
+============================================================ */
+
+@media (max-width: 700px) {
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-header {
+
+    min-height: 0;
+
+    padding: 15px;
+
+    align-items: flex-start;
+    gap: 12px;
+
+    border-radius: 12px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-icon {
+
+    width: 48px;
+    height: 48px;
+
+    flex-basis: 48px;
+
+    border-radius: 11px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-mode-eyebrow {
+
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-title {
+
+    font-size: 20px;
+    line-height: 24px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-mode-page-subtitle {
+
+    margin-top: 3px;
+
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .inventory-monitor-container-options
+  .option-title-row h4 {
+
+    font-size: 15px;
+    line-height: 21px;
+  }
+
+  .inventory-monitor-container-options
+  .inventory-monitor-option p {
+
+    font-size: 13px;
+    line-height: 19px;
+  }
+}
+
+
+/* ============================================================
+   AJUSTE INMEDIATO
+   DISABLED / COMING SOON
+============================================================ */
+
+.inventory-monitor-container-options
+.inventory-monitor-option-disabled {
+
+  opacity: 0.65;
+
+  background: #f3f4f6;
+
+  border: 1px dashed #cbd5e1;
+
+  color: #64748b;
+
+  cursor: not-allowed;
+
+  box-shadow: none;
+
+  text-align: left;
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+
+  appearance: none;
+
+}
+
+/* NO CAMBIAR ASPECTO AL PASAR EL MOUSE */
+
+.inventory-monitor-container-options
+.inventory-monitor-option-disabled:hover {
+
+  background: #f3f4f6;
+
+  border-color: #cbd5e1;
+
+  box-shadow: none;
+
+  transform: none;
+
+}
+
+/* ICONO DESHABILITADO */
+
+.inventory-monitor-container-options
+.inventory-monitor-option-disabled
+.option-icon.flash {
+
+  background: #e2e8f0;
+
+  color: #94a3b8;
+
+}
+
+/* TÍTULO */
+
+.inventory-monitor-container-options
+.inventory-monitor-option-disabled
+.option-title-row h4 {
+
+  color: #64748b;
+
+}
+
+/* DESCRIPCIÓN */
+
+.inventory-monitor-container-options
+.inventory-monitor-option-disabled p {
+
+  color: #94a3b8;
+
+}
+
+/* RADIO */
+
+.inventory-monitor-container-options
+.inventory-monitor-option-disabled
+.option-radio {
+
+  border-color: #cbd5e1;
+
+  background: #e5e7eb;
+
+}
+
+/* ETIQUETA PRÓXIMAMENTE */
+
+.inventory-monitor-container-options
+.option-coming-soon {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  padding: 4px 10px;
+
+  border-radius: 999px;
+
+  background: #e2e8f0;
+
+  color: #64748b;
+
+  font-size: 11px;
+
+  font-weight: 650;
+
+  letter-spacing: -0.005em;
+
+  white-space: nowrap;
+
+}

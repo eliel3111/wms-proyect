@@ -1,0 +1,1445 @@
+
+/* ============================================================
+   SIDIAL WMS
+   INVENTORY HISTORY
+   DESKTOP / RESPONSIVE
+============================================================ */
+
+/* ============================================================
+   MAIN CONTAINER
+============================================================ */
+
+.inventory-history-page {
+  width: 100%;
+  min-height: calc(100dvh - 56px);
+
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  padding: 24px 28px 40px;
+  box-sizing: border-box;
+
+  background: linear-gradient(
+    180deg,
+    #f5f7fa 0%,
+    #f8fafc 100%
+  );
+
+  color: var(--text-primary, #17233c);
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+}
+
+/* ============================================================
+   PAGE HEADER
+============================================================ */
+
+.inventory-history-page-header {
+  width: 100%;
+  min-height: 118px;
+
+  display: flex;
+  align-items: center;
+  gap: 17px;
+
+  padding: 20px 24px;
+  box-sizing: border-box;
+
+  border: 1px solid #dce5ef;
+  border-radius: 15px;
+
+  background:
+    radial-gradient(
+      circle at 82% 50%,
+      rgba(59, 130, 246, 0.11) 0%,
+      rgba(59, 130, 246, 0) 36%
+    ),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #f8fbff 62%,
+      #edf5ff 100%
+    );
+
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.inventory-history-page-icon {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #dbe9fb;
+  border-radius: 14px;
+
+  background: linear-gradient(
+    145deg,
+    #edf5ff 0%,
+    #e5efff 100%
+  );
+
+  color: #2878dd;
+}
+
+.inventory-history-page-heading {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.inventory-history-eyebrow {
+  margin-bottom: 3px;
+
+  color: #718099;
+
+  font-size: var(--text-2xs, 11px);
+  line-height: 16px;
+  font-weight: var(--weight-semibold, 620);
+
+  letter-spacing: 0.105em;
+  text-transform: uppercase;
+}
+
+.inventory-history-title {
+  margin: 0;
+
+  color: var(--text-primary, #17233c);
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+
+  font-size: var(--text-3xl, 26px);
+  line-height: var(--leading-tight, 1.15);
+  font-weight: var(--weight-bold, 690);
+
+  letter-spacing: var(
+    --tracking-display,
+    -0.035em
+  );
+}
+
+.inventory-history-subtitle {
+  margin-top: 5px;
+
+  color: var(--text-secondary, #52627a);
+
+  font-size: var(--text-md, 14px);
+  line-height: 20px;
+  font-weight: var(--weight-regular, 430);
+
+  letter-spacing: -0.008em;
+}
+
+/* ============================================================
+   TABLE CARD
+============================================================ */
+
+.inventory-history-card {
+  width: 100%;
+  min-width: 0;
+
+  overflow: hidden;
+
+  border: 1px solid #dfe6ee;
+  border-radius: 15px;
+
+  background: #ffffff;
+
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.04);
+}
+
+/* ============================================================
+   CARD HEADER
+============================================================ */
+
+.inventory-history-card-header {
+  width: 100%;
+  min-height: 78px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  padding: 16px 22px;
+  box-sizing: border-box;
+
+  border-bottom: 1px solid #e6ebf1;
+
+  background: linear-gradient(
+    90deg,
+    #f6f9fd 0%,
+    #edf5ff 100%
+  );
+}
+
+.inventory-history-card-header-left {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inventory-history-card-icon {
+  width: 39px;
+  height: 39px;
+  flex: 0 0 39px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #2878dd;
+
+  border-radius: 10px;
+  background: #e5efff;
+}
+
+.inventory-history-card-heading h2 {
+  margin: 0;
+
+  color: #17233c;
+  font-size: 18px;
+  font-weight: 690;
+
+  letter-spacing: -0.022em;
+}
+
+.inventory-history-card-heading p {
+  margin: 4px 0 0;
+
+  color: #718099;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.inventory-history-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inventory-history-total {
+  color: #52627a;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-size: 12px;
+  font-weight: 600;
+
+  white-space: nowrap;
+}
+
+.inventory-history-refresh {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #dce5ef;
+  border-radius: 9px;
+
+  color: #3478ea;
+  background: #ffffff;
+
+  cursor: pointer;
+
+  transition: 150ms ease;
+}
+
+.inventory-history-refresh:hover:not(:disabled) {
+  border-color: #b7cdf0;
+  background: #edf4ff;
+}
+
+.inventory-history-refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   TABLE WRAPPER
+============================================================ */
+
+.inventory-history-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* ============================================================
+   TABLE
+============================================================ */
+
+.inventory-history-table {
+  width: 100%;
+  min-width: 1050px;
+
+  border-collapse: collapse;
+  text-align: left;
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+}
+
+.inventory-history-table thead {
+  background: #f8fafc;
+}
+
+.inventory-history-table th {
+  padding: 16px 17px;
+
+  border-bottom: 1px solid #e5ebf1;
+
+  color: #63748c;
+
+  font-size: 11px;
+  line-height: 17px;
+
+  font-weight: 700;
+  letter-spacing: 0.045em;
+
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.inventory-history-table td {
+  padding: 16px 17px;
+
+  border-bottom: 1px solid #edf0f4;
+
+  color: #25344d;
+
+  font-size: 13px;
+  line-height: 20px;
+
+  font-weight: 500;
+
+  vertical-align: middle;
+}
+
+.inventory-history-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.inventory-history-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.inventory-history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ============================================================
+   SESSION CODE
+============================================================ */
+
+.inventory-history-code-cell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.inventory-history-row-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #dbe9fb;
+  border-radius: 10px;
+
+  color: #3478ea;
+  background: #edf5ff;
+}
+
+.inventory-history-code-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inventory-history-code {
+  color: #2865cf;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 700;
+
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-history-secondary {
+  color: #8a98aa;
+
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 450;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   WAREHOUSE / USER CELL
+============================================================ */
+
+.inventory-history-text-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  min-width: 0;
+}
+
+.inventory-history-text-cell span {
+  color: #293950;
+
+  font-size: 13px;
+  font-weight: 540;
+}
+
+.inventory-history-inline-icon {
+  flex-shrink: 0;
+  color: #8493a7;
+}
+
+/* ============================================================
+   STATUS
+============================================================ */
+
+.inventory-history-status {
+  min-height: 28px;
+  width: fit-content;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 5px 10px;
+
+  border: 1px solid transparent;
+  border-radius: 999px;
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+
+  font-size: 11.5px;
+  line-height: 17px;
+  font-weight: 650;
+
+  white-space: nowrap;
+}
+
+/* REVIEW - AMARILLO */
+
+.inventory-history-status.review {
+  color: #946200;
+  background: #fff7dc;
+  border-color: #ebd689;
+}
+
+/* IN PROGRESS - ROJO */
+
+.inventory-history-status.in-progress {
+  color: #c52e39;
+  background: #fff0f0;
+  border-color: #f5c4c8;
+}
+
+/* COMPLETED / POSTED - VERDE */
+
+.inventory-history-status.completed {
+  color: #087443;
+  background: #e7f8ee;
+  border-color: #c8ead7;
+}
+
+/* DRAFT - AZUL */
+
+.inventory-history-status.draft {
+  color: #2865cf;
+  background: #eaf2ff;
+  border-color: #cadcff;
+}
+
+/* DEFAULT */
+
+.inventory-history-status.default {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #dce3eb;
+}
+
+/* ============================================================
+   NUMBER CELLS
+============================================================ */
+
+.inventory-history-number-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #3a5779;
+}
+
+.inventory-history-number-icon {
+  color: #7e91ab;
+}
+
+.inventory-history-number {
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  color: #1c2d49;
+
+  font-size: 14px;
+  font-weight: 680;
+
+  font-variant-numeric: tabular-nums;
+}
+
+/* COUNTED */
+
+.inventory-history-number-cell.counted {
+  color: #168551;
+}
+
+/* NOT COUNTED */
+
+.inventory-history-number-cell.not-counted {
+  color: #d48b16;
+}
+
+/* ============================================================
+   REPORT BUTTON
+============================================================ */
+
+.inventory-history-action-heading,
+.inventory-history-action-cell {
+  text-align: center !important;
+}
+
+.inventory-history-report-button {
+  min-height: 35px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 7px 12px;
+
+  border: 1px solid #cadaff;
+  border-radius: 8px;
+
+  background: #edf4ff;
+
+  color: #2865cf;
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 650;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+
+  transition:
+    background-color 130ms ease,
+    border-color 130ms ease,
+    transform 100ms ease;
+}
+
+.inventory-history-report-button:hover {
+  border-color: #92b5ed;
+  background: #dfeaff;
+}
+
+.inventory-history-report-button:active {
+  transform: translateY(1px);
+}
+
+.inventory-history-report-button:focus-visible {
+  outline: 3px solid rgba(52, 120, 234, 0.2);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   EMPTY / LOADING / ERROR
+============================================================ */
+
+.inventory-history-message {
+  min-height: 200px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+
+  padding: 25px;
+
+  color: #718099;
+  font-size: 14px;
+
+  text-align: center;
+}
+
+.inventory-history-message.error {
+  color: #be3541;
+}
+
+/* ============================================================
+   MODAL BACKDROP
+============================================================ */
+
+.inventory-history-modal-backdrop {
+  position: fixed;
+  inset: 0;
+
+  z-index: 10000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(15, 23, 42, 0.5);
+
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   REPORT SUMMARY MODAL
+============================================================ */
+
+.inventory-history-modal {
+  width: min(100%, 620px);
+  max-height: 90dvh;
+
+  overflow-y: auto;
+
+  border: 1px solid #dce5ef;
+  border-radius: 15px;
+
+  background: #ffffff;
+
+  box-shadow: 0 20px 70px rgba(15, 23, 42, 0.22);
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+}
+
+.inventory-history-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 15px;
+
+  padding: 22px 24px;
+
+  border-bottom: 1px solid #e5ebf1;
+
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #edf5ff 100%
+  );
+}
+
+.inventory-history-modal-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  color: #2878dd;
+}
+
+.inventory-history-modal-heading h2 {
+  margin: 3px 0 0;
+
+  color: #17233c;
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.inventory-history-modal-close {
+  width: 36px;
+  height: 36px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #dce5ef;
+  border-radius: 9px;
+
+  color: #64748b;
+  background: #ffffff;
+
+  cursor: pointer;
+}
+
+.inventory-history-modal-close:hover {
+  color: #b91c1c;
+  background: #fff1f2;
+}
+
+/* ============================================================
+   MODAL BODY
+============================================================ */
+
+.inventory-history-modal-body {
+  padding: 24px;
+}
+
+.inventory-history-modal-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inventory-history-modal-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+
+  padding: 15px;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+
+  background: #f9fbfd;
+
+  color: #3478ea;
+}
+
+.inventory-history-modal-info-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  min-width: 0;
+}
+
+.inventory-history-modal-info-row span {
+  color: #718099;
+  font-size: 12px;
+}
+
+.inventory-history-modal-info-row strong {
+  color: #17233c;
+
+  font-size: 13px;
+  font-weight: 650;
+
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   MODAL STATS
+============================================================ */
+
+.inventory-history-modal-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+
+  margin-top: 20px;
+}
+
+.inventory-history-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  padding: 20px 10px;
+
+  border: 1px solid #dce5ef;
+  border-radius: 11px;
+
+  background: #f8fbff;
+  color: #3478ea;
+
+  text-align: center;
+}
+
+.inventory-history-stat strong {
+  color: #17233c;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-size: 25px;
+  font-weight: 700;
+}
+
+.inventory-history-stat span {
+  color: #63748c;
+  font-size: 12px;
+}
+
+.inventory-history-stat.counted {
+  color: #168551;
+  background: #f2fbf5;
+  border-color: #d4eddc;
+}
+
+.inventory-history-stat.not-counted {
+  color: #d48b16;
+  background: #fffbf2;
+  border-color: #f3e2b9;
+}
+
+.inventory-history-modal-note {
+  margin: 20px 0 0;
+
+  color: #718099;
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   ANIMATION
+============================================================ */
+
+@keyframes inventory-history-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.inventory-history-page .spinning {
+  animation: inventory-history-spin 1s linear infinite;
+}
+
+/* ============================================================
+   LAPTOP
+============================================================ */
+
+@media (max-width: 1366px) {
+
+  .inventory-history-page {
+    padding: 20px 22px 34px;
+    gap: 15px;
+  }
+
+  .inventory-history-page-header {
+    min-height: 104px;
+    padding: 17px 20px;
+  }
+
+  .inventory-history-page-icon {
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px;
+  }
+
+  .inventory-history-title {
+    font-size: 24px;
+  }
+
+  .inventory-history-table th,
+  .inventory-history-table td {
+    padding: 14px 12px;
+  }
+}
+
+/* ============================================================
+   MOBILE / PDA
+============================================================ */
+
+@media (max-width: 700px) {
+
+  .inventory-history-page {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .inventory-history-page-header {
+    min-height: 0;
+    padding: 15px;
+
+    align-items: flex-start;
+    gap: 12px;
+
+    border-radius: 12px;
+  }
+
+  .inventory-history-page-icon {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+
+    border-radius: 11px;
+  }
+
+  .inventory-history-eyebrow {
+    font-size: 10px;
+  }
+
+  .inventory-history-title {
+    font-size: 20px;
+    line-height: 24px;
+  }
+
+  .inventory-history-subtitle {
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .inventory-history-card-header {
+    padding: 14px;
+  }
+
+  .inventory-history-card-heading h2 {
+    font-size: 15px;
+  }
+
+  .inventory-history-card-heading p {
+    font-size: 11px;
+  }
+
+  .inventory-history-total {
+    display: none;
+  }
+
+  .inventory-history-modal-info {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-history-modal-stats {
+    gap: 7px;
+  }
+
+  .inventory-history-stat {
+    padding: 15px 5px;
+  }
+
+  .inventory-history-stat strong {
+    font-size: 20px;
+  }
+
+  .inventory-history-stat span {
+    font-size: 10px;
+  }
+}
+
+
+
+/* ============================================================
+   INVENTORY HISTORY
+   REPORT SUMMARY MODAL - EXTENSION
+============================================================ */
+
+/* ============================================================
+   MODAL WIDTH
+============================================================ */
+
+.inventory-history-page .inventory-history-modal {
+  width: min(1080px, calc(100vw - 40px));
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+
+/* ============================================================
+   REPORT LOADING
+============================================================ */
+
+.inventory-history-report-loading {
+  min-height: 120px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  margin-top: 20px;
+
+  color: #52627a;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  text-align: center;
+}
+
+.inventory-history-report-loading svg {
+  color: #2878dd;
+}
+
+/* ============================================================
+   REPORT ERROR
+============================================================ */
+
+.inventory-history-report-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  margin-top: 20px;
+  padding: 16px;
+
+  border: 1px solid #fecaca;
+  border-radius: 11px;
+
+  background: #fff5f5;
+  color: #b91c1c;
+}
+
+.inventory-history-report-error > svg {
+  flex-shrink: 0;
+}
+
+.inventory-history-report-error > div {
+  flex: 1;
+}
+
+.inventory-history-report-error strong {
+  display: block;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inventory-history-report-error p {
+  margin: 5px 0 0;
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.inventory-history-report-error button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 8px 12px;
+
+  border: 1px solid #f2b6b6;
+  border-radius: 8px;
+
+  background: #ffffff;
+  color: #b91c1c;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+/* ============================================================
+   MODAL STATS
+============================================================ */
+
+.inventory-history-page .inventory-history-modal-stats {
+  margin-top: 24px;
+}
+
+/* ============================================================
+   PRODUCT TABLE HEADER
+============================================================ */
+
+.inventory-history-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  margin-top: 28px;
+  margin-bottom: 14px;
+}
+
+.inventory-history-detail-heading h3 {
+  margin: 0;
+
+  color: #17233c;
+
+  font-size: 17px;
+  font-weight: 690;
+
+  letter-spacing: -0.025em;
+}
+
+.inventory-history-detail-heading p {
+  margin: 5px 0 0;
+
+  color: #718099;
+
+  font-size: 12px;
+}
+
+.inventory-history-detail-heading > span {
+  color: #63748c;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-size: 12px;
+  font-weight: 600;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   PRODUCT TABLE WRAPPER
+============================================================ */
+
+.inventory-history-detail-wrapper {
+  width: 100%;
+  max-height: 360px;
+
+  overflow: auto;
+
+  border: 1px solid #e1e7ef;
+  border-radius: 11px;
+
+  background: #ffffff;
+}
+
+/* ============================================================
+   PRODUCT TABLE
+============================================================ */
+
+.inventory-history-detail-table {
+  width: 100%;
+  min-width: 720px;
+
+  border-collapse: collapse;
+  text-align: left;
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+}
+
+.inventory-history-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  padding: 14px 16px;
+
+  border-bottom: 1px solid #e5ebf1;
+
+  background: #f6f9fd;
+  color: #63748c;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+
+  white-space: nowrap;
+}
+
+.inventory-history-detail-table td {
+  padding: 14px 16px;
+
+  border-bottom: 1px solid #edf0f4;
+
+  color: #25344d;
+
+  font-size: 13px;
+  line-height: 19px;
+
+  vertical-align: middle;
+}
+
+.inventory-history-detail-table tbody tr:hover {
+  background: #f9fbfe;
+}
+
+.inventory-history-detail-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ============================================================
+   PRODUCT INFO
+============================================================ */
+
+.inventory-history-product-info {
+  min-width: 210px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inventory-history-product-info strong {
+  color: #2865cf;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inventory-history-product-info span {
+  color: #52627a;
+
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* ============================================================
+   NUMERIC VALUES
+============================================================ */
+
+.inventory-history-detail-number {
+  color: #17233c;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   DIFFERENCE
+============================================================ */
+
+.inventory-history-difference {
+  display: inline-flex;
+  align-items: center;
+
+  font-family: var(
+    --font-data,
+    "Geist Mono Variable",
+    monospace
+  );
+
+  font-size: 12px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+.inventory-history-difference.loss {
+  color: #dc2626;
+}
+
+.inventory-history-difference.gain {
+  color: #168551;
+}
+
+.inventory-history-difference.match {
+  color: #52627a;
+}
+
+/* ============================================================
+   COUNT BADGES
+============================================================ */
+
+.inventory-history-count-badge {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 5px 10px;
+
+  border: 1px solid transparent;
+  border-radius: 999px;
+
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 650;
+
+  white-space: nowrap;
+}
+
+.inventory-history-count-badge.counted {
+  color: #087443;
+  background: #e7f8ee;
+  border-color: #c8ead7;
+}
+
+.inventory-history-count-badge.not-counted {
+  color: #946200;
+  background: #fff7dc;
+  border-color: #ebd689;
+}
+
+.inventory-history-count-badge.unknown {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #dce3eb;
+}
+
+/* ============================================================
+   MODAL ACTIONS
+============================================================ */
+
+.inventory-history-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 12px;
+
+  margin-top: 24px;
+  padding-top: 20px;
+
+  border-top: 1px solid #e5ebf1;
+}
+
+/* ============================================================
+   DOWNLOAD BUTTON
+============================================================ */
+
+.inventory-history-download-button {
+  min-height: 44px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  padding: 11px 18px;
+
+  border: 1px solid #2869eb;
+  border-radius: 9px;
+
+  background: linear-gradient(
+    180deg,
+    #3f7bf1 0%,
+    #2d68e7 100%
+  );
+
+  color: #ffffff;
+
+  font-family: var(
+    --font-ui,
+    "Geist Variable",
+    sans-serif
+  );
+
+  font-size: 13px;
+  font-weight: 650;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 4px 10px rgba(45, 104, 231, 0.17);
+}
+
+.inventory-history-download-button:hover:not(:disabled) {
+  background: #255fd7;
+}
+
+.inventory-history-download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   MOBILE
+============================================================ */
+
+@media (max-width: 700px) {
+
+  .inventory-history-page .inventory-history-modal {
+    width: calc(100vw - 24px);
+    max-height: 94dvh;
+  }
+
+  .inventory-history-detail-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .inventory-history-detail-heading h3 {
+    font-size: 15px;
+  }
+
+  .inventory-history-detail-wrapper {
+    max-height: 300px;
+  }
+
+  .inventory-history-modal-actions {
+    justify-content: stretch;
+  }
+
+  .inventory-history-download-button {
+    width: 100%;
+  }
+
+  .inventory-history-report-error {
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,2575 @@
+/* =========================================================
+   GARLAS WMS
+   INSPECTION DOCUMENT PAGE
+========================================================= */
+
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+.inspection-document-page {
+  width: 100%;
+
+  min-height: 100%;
+
+  padding: 24px;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 22px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #f8fafc 0%,
+      #eef3f8 52%,
+      #f7f9fc 100%
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+}
+
+
+/* =========================================================
+   TOOLBAR
+========================================================= */
+
+.inspection-document-toolbar {
+  width: 100%;
+
+  min-height: 112px;
+
+  padding:
+    20px
+    22px;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(280px, 0.9fr)
+    minmax(520px, 1.5fr)
+    auto;
+
+  align-items: center;
+
+  gap: 28px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dfe6ee;
+
+  border-radius: 15px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.97
+    );
+
+  box-shadow:
+    0
+    7px
+    22px
+    rgba(
+      15,
+      23,
+      42,
+      0.055
+    );
+}
+
+
+/* =========================================================
+   HEADING
+========================================================= */
+
+.inspection-document-heading {
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 16px;
+}
+
+
+.inspection-document-heading-icon {
+  width: 58px;
+
+  height: 58px;
+
+  flex:
+    0
+    0
+    58px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #e9f3ff 0%,
+      #dcecff 100%
+    );
+
+  color:
+    #216ee8;
+}
+
+
+.inspection-document-heading-content {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+
+.inspection-document-title {
+  max-width: 100%;
+
+  margin: 0;
+
+  color:
+    #121d32;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size: 27px;
+
+  line-height: 34px;
+
+  font-weight:
+    var(
+      --weight-bold,
+      690
+    );
+
+  letter-spacing:
+    -0.035em;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+.inspection-document-subtitle {
+  max-width: 100%;
+
+  margin: 0;
+
+  color:
+    var(
+      --text-secondary,
+      #52627a
+    );
+
+  font-size: 14px;
+
+  line-height: 20px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   SUMMARY
+========================================================= */
+
+.inspection-document-summary {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      5,
+      minmax(0, 1fr)
+    );
+
+  gap: 8px;
+}
+
+
+.inspection-document-summary-item {
+  min-width: 0;
+
+  min-height: 58px;
+
+  padding:
+    8px
+    10px;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+
+  gap: 4px;
+
+  border:
+    1px solid
+    #e2e8ef;
+
+  border-radius: 9px;
+
+  background:
+    #f8fafc;
+}
+
+
+.inspection-document-summary-label {
+  color:
+    #7c899c;
+
+  font-size: 9px;
+
+  line-height: 12px;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.025em;
+}
+
+
+.inspection-document-summary-value {
+  color:
+    #25364e;
+
+  font-size: 11px;
+
+  line-height: 16px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+.inspection-document-summary-mono {
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+}
+
+
+/* =========================================================
+   TYPE
+========================================================= */
+
+.inspection-document-type-pill {
+  width: fit-content;
+
+  min-width: 66px;
+
+  padding:
+    4px
+    9px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  border-radius: 999px;
+
+  font-size: 10px;
+
+  line-height: 14px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+}
+
+
+.inspection-document-type-conduce {
+  color:
+    #194f8a;
+
+  background:
+    #deedff;
+}
+
+
+.inspection-document-type-factura {
+  color:
+    #5443a2;
+
+  background:
+    #eeeaff;
+}
+
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+
+.inspection-document-actions {
+  padding-left: 22px;
+
+  display: flex;
+
+  justify-content: flex-end;
+
+  border-left:
+    1px solid
+    #e1e7ee;
+}
+
+
+.inspection-document-back-button {
+  height: 40px;
+
+  padding:
+    0
+    14px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 7px;
+
+  border:
+    1px solid
+    #d4dee9;
+
+  border-radius: 8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #34445b;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size: 12px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  cursor: pointer;
+
+  transition:
+    background-color
+    120ms
+    ease,
+    border-color
+    120ms
+    ease,
+    transform
+    80ms
+    ease;
+}
+
+
+.inspection-document-back-button:hover {
+  border-color:
+    #aac4e3;
+
+  background:
+    #f5f9fd;
+}
+
+
+.inspection-document-back-button:active {
+  transform:
+    scale(0.97);
+}
+
+
+/* =========================================================
+   TABLE CARD
+========================================================= */
+
+.inspection-document-table-card {
+  width: 100%;
+
+  padding: 18px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dfe6ee;
+
+  border-radius: 15px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0
+    7px
+    22px
+    rgba(
+      15,
+      23,
+      42,
+      0.055
+    );
+}
+
+
+/* =========================================================
+   TABLE TOP
+========================================================= */
+
+.inspection-document-table-header {
+  width: 100%;
+
+  margin-bottom: 14px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+
+.inspection-document-table-title {
+  margin: 0;
+
+  color:
+    #17233c;
+
+  font-size: 17px;
+
+  line-height: 22px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    -0.018em;
+}
+
+
+.inspection-document-table-subtitle {
+  margin:
+    2px
+    0
+    0;
+
+  color:
+    #7c899c;
+
+  font-size: 11px;
+
+  line-height: 16px;
+}
+
+
+.inspection-document-line-count {
+  min-width:
+    fit-content;
+
+  padding:
+    6px
+    10px;
+
+  border-radius:
+    999px;
+
+  background:
+    #edf3f8;
+
+  color:
+    #52627a;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size: 10px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+}
+
+
+/* =========================================================
+   TABLE CONTAINER
+========================================================= */
+
+.inspection-document-table-container {
+  width: 100%;
+
+  overflow-x: auto;
+
+  border-radius: 8px;
+}
+
+
+/* =========================================================
+   TABLE
+========================================================= */
+
+.inspection-document-table {
+  width: 100%;
+
+  min-width: 800px;
+
+  border-collapse:
+    separate;
+
+  border-spacing:
+    0;
+
+  table-layout:
+    fixed;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+}
+
+
+/* =========================================================
+   COLUMN WIDTHS
+
+   5 COLUMNS:
+
+   1. No.
+   2. Código
+   3. Descripción
+   4. Cantidad
+   5. Inspeccionada
+========================================================= */
+
+.inspection-document-table th:nth-child(1),
+.inspection-document-table td:nth-child(1) {
+  width:
+    7%;
+}
+
+
+.inspection-document-table th:nth-child(2),
+.inspection-document-table td:nth-child(2) {
+  width:
+    20%;
+}
+
+
+.inspection-document-table th:nth-child(3),
+.inspection-document-table td:nth-child(3) {
+  width:
+    43%;
+}
+
+
+.inspection-document-table th:nth-child(4),
+.inspection-document-table td:nth-child(4) {
+  width:
+    15%;
+}
+
+
+.inspection-document-table th:nth-child(5),
+.inspection-document-table td:nth-child(5) {
+  width:
+    15%;
+}
+
+
+/* =========================================================
+   TABLE HEAD
+========================================================= */
+
+.inspection-document-table thead {
+  background:
+    linear-gradient(
+      180deg,
+      #f4f6fa 0%,
+      #edf1f6 100%
+    );
+}
+
+
+.inspection-document-table th {
+  height: 44px;
+
+  padding:
+    0
+    12px;
+
+  box-sizing:
+    border-box;
+
+  border-bottom:
+    1px solid
+    #dce4ed;
+
+  color:
+    #2c3950;
+
+  font-size:
+    11px;
+
+  line-height:
+    15px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    0.005em;
+
+  text-align:
+    left;
+
+  text-transform:
+    uppercase;
+
+  white-space:
+    nowrap;
+}
+
+
+.inspection-document-table th:first-child {
+  border-top-left-radius:
+    8px;
+
+  border-bottom-left-radius:
+    8px;
+}
+
+
+.inspection-document-table th:last-child {
+  border-top-right-radius:
+    8px;
+
+  border-bottom-right-radius:
+    8px;
+}
+
+
+/* =========================================================
+   ROW
+========================================================= */
+
+.inspection-document-table-row {
+  cursor:
+    pointer;
+
+  outline:
+    none;
+
+  background:
+    #ffffff;
+
+  transition:
+    background-color
+    120ms
+    ease;
+}
+
+
+.inspection-document-table-row:nth-child(even) {
+  background:
+    #f8fafc;
+}
+
+
+.inspection-document-table-row:hover {
+  background:
+    #eef6ff;
+}
+
+
+.inspection-document-table-row:focus-visible {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  outline:
+    2px solid
+    #4d98ed;
+
+  outline-offset:
+    -2px;
+}
+
+
+/* =========================================================
+   CELL
+========================================================= */
+
+.inspection-document-table td {
+  height:
+    50px;
+
+  padding:
+    0
+    12px;
+
+  box-sizing:
+    border-box;
+
+  border-bottom:
+    1px solid
+    #e8edf2;
+
+  color:
+    #25364e;
+
+  font-size:
+    12px;
+
+  line-height:
+    17px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  vertical-align:
+    middle;
+
+  white-space:
+    nowrap;
+
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+}
+
+
+.inspection-document-table tbody tr:last-child td {
+  border-bottom:
+    none;
+}
+
+
+/* =========================================================
+   NUMBER
+========================================================= */
+
+.inspection-document-line-number {
+  color:
+    #7c899c !important;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   PRODUCT CODE
+========================================================= */
+
+.inspection-document-product-code {
+  color:
+    #1769d2 !important;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+}
+
+
+.inspection-document-product-code-wrapper {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    6px;
+}
+
+
+/* =========================================================
+   DESCRIPTION
+========================================================= */
+
+.inspection-document-description {
+  color:
+    #25364e !important;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+}
+
+
+/* =========================================================
+   QUANTITY
+========================================================= */
+
+.inspection-document-quantity {
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   STATUS PILL
+
+   SOLO SE UTILIZA EN EL RESUMEN SUPERIOR
+   DE DESKTOP / LAPTOP.
+========================================================= */
+
+.inspection-document-status-pill {
+  width:
+    fit-content;
+
+  min-width:
+    96px;
+
+  padding:
+    5px
+    10px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    6px;
+
+  box-sizing:
+    border-box;
+
+  border-radius:
+    999px;
+
+  font-size:
+    10px;
+
+  line-height:
+    14px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+}
+
+
+.inspection-document-status-pendiente {
+  color:
+    #155acb;
+
+  background:
+    #dfeeff;
+}
+
+
+.inspection-document-status-aprobado {
+  color:
+    #087443;
+
+  background:
+    #dcf6e5;
+}
+
+
+.inspection-document-status-rechazado {
+  color:
+    #c02d32;
+
+  background:
+    #ffe1e2;
+}
+
+
+/* =========================================================
+   LARGE DESKTOP / MONITOR
+========================================================= */
+
+@media (min-width: 1600px) {
+
+  .inspection-document-page {
+    padding:
+      30px
+      34px;
+
+    gap:
+      26px;
+  }
+
+
+  .inspection-document-toolbar {
+    min-height:
+      122px;
+
+    padding:
+      22px
+      26px;
+  }
+
+
+  .inspection-document-title {
+    font-size:
+      30px;
+  }
+
+
+  .inspection-document-table-card {
+    padding:
+      20px;
+  }
+
+
+  .inspection-document-table td {
+    height:
+      52px;
+
+    font-size:
+      12.5px;
+  }
+
+}
+
+
+/* =========================================================
+   LAPTOP
+========================================================= */
+
+@media (
+  min-width: 701px
+) and (
+  max-width: 1366px
+) {
+
+  .inspection-document-page {
+    padding:
+      18px;
+
+    gap:
+      16px;
+  }
+
+
+  .inspection-document-toolbar {
+    min-height:
+      98px;
+
+    padding:
+      16px
+      18px;
+
+    grid-template-columns:
+      minmax(250px, 0.9fr)
+      minmax(440px, 1.5fr)
+      auto;
+
+    gap:
+      18px;
+  }
+
+
+  .inspection-document-heading {
+    gap:
+      12px;
+  }
+
+
+  .inspection-document-heading-icon {
+    width:
+      50px;
+
+    height:
+      50px;
+
+    flex-basis:
+      50px;
+  }
+
+
+  .inspection-document-heading-icon svg {
+    width:
+      23px;
+
+    height:
+      23px;
+  }
+
+
+  .inspection-document-title {
+    font-size:
+      23px;
+
+    line-height:
+      28px;
+  }
+
+
+  .inspection-document-subtitle {
+    font-size:
+      12.5px;
+  }
+
+
+  .inspection-document-summary {
+    gap:
+      6px;
+  }
+
+
+  .inspection-document-summary-item {
+    min-height:
+      52px;
+
+    padding:
+      7px
+      8px;
+  }
+
+
+  .inspection-document-table-card {
+    padding:
+      13px;
+  }
+
+
+  .inspection-document-table {
+    min-width:
+      720px;
+  }
+
+
+  .inspection-document-table th {
+    height:
+      39px;
+
+    padding:
+      0
+      9px;
+
+    font-size:
+      10px;
+  }
+
+
+  .inspection-document-table td {
+    height:
+      44px;
+
+    padding:
+      0
+      9px;
+
+    font-size:
+      11px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 700px) {
+
+  .inspection-document-page {
+    padding:
+      10px
+      8px
+      20px;
+
+    gap:
+      10px;
+  }
+
+
+  /* =====================================================
+     TOOLBAR
+  ===================================================== */
+
+  .inspection-document-toolbar {
+    min-height:
+      0;
+
+    padding:
+      14px;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    align-items:
+      stretch;
+
+    gap:
+      13px;
+
+    border-radius:
+      13px;
+  }
+
+
+  /* =====================================================
+     HEADING
+  ===================================================== */
+
+  .inspection-document-heading {
+    gap:
+      11px;
+  }
+
+
+  .inspection-document-heading-icon {
+    width:
+      46px;
+
+    height:
+      46px;
+
+    flex-basis:
+      46px;
+
+    border-radius:
+      10px;
+  }
+
+
+  .inspection-document-heading-icon svg {
+    width:
+      21px;
+
+    height:
+      21px;
+  }
+
+
+  .inspection-document-title {
+    font-size:
+      20px;
+
+    line-height:
+      25px;
+  }
+
+
+  .inspection-document-subtitle {
+    font-size:
+      12px;
+
+    line-height:
+      16px;
+
+    white-space:
+      normal;
+  }
+
+
+  /* =====================================================
+     SUMMARY
+
+     MOBILE:
+
+     OCULTAR COMPLETAMENTE:
+     - TIPO
+     - REFERENCIA
+     - FECHA
+     - UBICACIÓN
+     - ESTATUS
+  ===================================================== */
+
+  .inspection-document-summary {
+    display:
+      none;
+  }
+
+
+  /* =====================================================
+     BACK BUTTON
+  ===================================================== */
+
+  .inspection-document-actions {
+    width:
+      100%;
+
+    padding:
+      11px
+      0
+      0;
+
+    border-left:
+      none;
+
+    border-top:
+      1px solid
+      #e8edf2;
+  }
+
+
+  .inspection-document-back-button {
+    width:
+      100%;
+
+    height:
+      42px;
+  }
+
+
+  /* =====================================================
+     TABLE CARD
+  ===================================================== */
+
+  .inspection-document-table-card {
+    padding:
+      8px;
+
+    border-radius:
+      13px;
+  }
+
+
+  .inspection-document-table-header {
+    padding:
+      4px
+      3px;
+
+    align-items:
+      flex-end;
+
+    gap:
+      10px;
+  }
+
+
+  .inspection-document-table-title {
+    font-size:
+      15px;
+  }
+
+
+  .inspection-document-table-subtitle {
+    font-size:
+      10px;
+  }
+
+
+  /* =====================================================
+     REMOVE HORIZONTAL SCROLL
+  ===================================================== */
+
+  .inspection-document-table-container {
+    width:
+      100%;
+
+    overflow:
+      visible;
+  }
+
+
+  .inspection-document-table {
+    width:
+      100%;
+
+    min-width:
+      0;
+
+    display:
+      block;
+
+    table-layout:
+      auto;
+  }
+
+
+  /* =====================================================
+     HIDE TABLE HEADER
+  ===================================================== */
+
+  .inspection-document-table thead {
+    display:
+      none;
+  }
+
+
+  /* =====================================================
+     BODY
+  ===================================================== */
+
+  .inspection-document-table tbody {
+    width:
+      100%;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    gap:
+      8px;
+  }
+
+
+  /* =====================================================
+     EACH ROW = MOBILE CARD
+
+     SOLO:
+     - Código
+     - Descripción
+     - Cantidad
+     - Inspeccionada
+     - No.
+  ===================================================== */
+
+  .inspection-document-table-row {
+    width:
+      100%;
+
+    padding:
+      12px;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1fr);
+
+    grid-template-areas:
+      "code code"
+      "description description"
+      "quantity inspected"
+      "number number";
+
+    column-gap:
+      10px;
+
+    row-gap:
+      9px;
+
+    box-sizing:
+      border-box;
+
+    border:
+      1px solid
+      #e0e6ed;
+
+    border-radius:
+      11px;
+
+    background:
+      #ffffff !important;
+
+    box-shadow:
+      0
+      2px
+      7px
+      rgba(
+        15,
+        23,
+        42,
+        0.04
+      );
+  }
+
+
+  .inspection-document-table-row:hover {
+    background:
+      #fafdff !important;
+  }
+
+
+  /* =====================================================
+     CELLS
+  ===================================================== */
+
+  .inspection-document-table td {
+    width:
+      auto !important;
+
+    height:
+      auto;
+
+    min-width:
+      0;
+
+    padding:
+      0;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    gap:
+      2px;
+
+    border:
+      none;
+
+    white-space:
+      normal;
+
+    overflow:
+      visible;
+
+    text-overflow:
+      clip;
+  }
+
+
+  /* =====================================================
+     LABEL
+  ===================================================== */
+
+  .inspection-document-table td::before {
+    content:
+      attr(data-label);
+
+    color:
+      #7c899c;
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      8.5px;
+
+    line-height:
+      11px;
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+  }
+
+
+  /* =====================================================
+     NUMBER
+  ===================================================== */
+
+  .inspection-document-table td:nth-child(1) {
+    grid-area:
+      number;
+
+    padding-top:
+      7px;
+
+    flex-direction:
+      row;
+
+    gap:
+      5px;
+
+    border-top:
+      1px solid
+      #edf1f5;
+
+    color:
+      #94a0b1 !important;
+
+    font-size:
+      9px;
+  }
+
+
+  /* =====================================================
+     CODE
+  ===================================================== */
+
+  .inspection-document-table td:nth-child(2) {
+    grid-area:
+      code;
+  }
+
+
+  .inspection-document-table td:nth-child(2)::before {
+    display:
+      none;
+  }
+
+
+  .inspection-document-product-code {
+    font-size:
+      12px !important;
+  }
+
+
+  /* =====================================================
+     DESCRIPTION
+  ===================================================== */
+
+  .inspection-document-table td:nth-child(3) {
+    grid-area:
+      description;
+  }
+
+
+  .inspection-document-description {
+    font-size:
+      11.5px !important;
+
+    line-height:
+      16px;
+  }
+
+
+  /* =====================================================
+     QUANTITY
+  ===================================================== */
+
+  .inspection-document-table td:nth-child(4) {
+    grid-area:
+      quantity;
+
+    min-height:
+      48px;
+
+    padding:
+      7px
+      9px;
+
+    justify-content:
+      center;
+
+    border:
+      1px solid
+      #e3e8ef;
+
+    border-radius:
+      8px;
+
+    background:
+      #f7f9fb;
+  }
+
+
+  /* =====================================================
+     INSPECTED
+  ===================================================== */
+
+  .inspection-document-table td:nth-child(5) {
+    grid-area:
+      inspected;
+
+    min-height:
+      48px;
+
+    padding:
+      7px
+      9px;
+
+    justify-content:
+      center;
+
+    border:
+      1px solid
+      #e3e8ef;
+
+    border-radius:
+      8px;
+
+    background:
+      #f7f9fb;
+  }
+
+}
+
+
+/* =========================================================
+   VERY SMALL MOBILE / PDA
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .inspection-document-page {
+    padding:
+      7px
+      6px
+      16px;
+  }
+
+
+  .inspection-document-toolbar {
+    padding:
+      12px;
+  }
+
+
+  .inspection-document-title {
+    font-size:
+      18px;
+
+    line-height:
+      23px;
+  }
+
+
+  .inspection-document-table-card {
+    padding:
+      6px;
+  }
+
+
+  .inspection-document-table-row {
+    padding:
+      11px;
+
+    column-gap:
+      7px;
+
+    row-gap:
+      8px;
+  }
+
+
+  .inspection-document-table-subtitle {
+    display:
+      none;
+  }
+
+
+  .inspection-document-product-code {
+    font-size:
+      11.5px !important;
+  }
+
+
+  .inspection-document-description {
+    font-size:
+      14px !important;
+  }
+
+
+  .inspection-document-table td:nth-child(4),
+  .inspection-document-table td:nth-child(5) {
+    min-height:
+      45px;
+
+    padding:
+      6px
+      8px;
+  }
+
+}
+
+
+/* ============================================================
+   INSPECTION DOCUMENT PAGE
+   MODAL DE ESCÁNER
+   ============================================================ */
+
+
+/* ============================================================
+   CONTENEDOR DEL MODAL
+   ============================================================ */
+
+.inspection-scan-modal {
+    width: min(100%, 560px);
+    padding: 18px;
+    box-sizing: border-box;
+    color: #242424;
+}
+
+
+/* ============================================================
+   ENCABEZADO DEL MODAL
+   ============================================================ */
+
+.inspection-scan-modal-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.inspection-scan-modal-title h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 750;
+}
+
+.inspection-scan-modal-title p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #666;
+}
+
+
+/* ============================================================
+   PANEL AMARILLO
+   PRODUCTO Y CANTIDAD
+   ============================================================ */
+
+.inspection-scan-yellow-panel {
+    border: 1.5px solid #efc355;
+    border-radius: 12px;
+    background: #fff2bf;
+    padding: 17px;
+    margin: 12px 0;
+}
+
+
+/* ============================================================
+   LABEL
+   ============================================================ */
+
+.inspection-scan-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 750;
+    color: #73520b;
+    margin-bottom: 8px;
+}
+
+
+/* ============================================================
+   PRODUCTO
+   ============================================================ */
+
+.inspection-scan-product-name {
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #392c12;
+    overflow-wrap: anywhere;
+}
+
+.inspection-scan-product-sku {
+    font-size: 14px;
+    font-weight: 650;
+    color: #644914;
+    margin-top: 6px;
+}
+
+.inspection-scan-confirm-state {
+    font-size: 12px;
+    margin-top: 9px;
+    color: #73520b;
+}
+
+
+/* ============================================================
+   INPUT SKU
+   ============================================================ */
+
+.inspection-scan-manual-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.inspection-scan-manual-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #d2aa41;
+    border-radius: 8px;
+    background: #fffdf4;
+    font-size: 14px;
+}
+
+.inspection-scan-manual-row button {
+    border: none;
+    border-radius: 8px;
+    background: #665012;
+    color: white;
+    font-weight: 650;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+
+/* ============================================================
+   CANTIDAD
+   ============================================================ */
+
+.inspection-scan-qty-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.inspection-scan-qty-row > input {
+    width: 55%;
+    min-width: 0;
+    box-sizing: border-box;
+    border-radius: 10px;
+    border: 2px solid #d6a82b;
+    background: #fff9df;
+    color: #42300c;
+    font-size: 30px;
+    font-weight: 750;
+    padding: 10px 14px;
+}
+
+.inspection-scan-qty-row > input:focus {
+    outline: 3px solid #f0c968;
+    outline-offset: 2px;
+}
+
+.inspection-scan-qty-row > input:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+
+/* ============================================================
+   CANTIDAD DEL DOCUMENTO
+   ============================================================ */
+
+.inspection-scan-expected {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    color: #654a0f;
+    font-size: 12px;
+}
+
+.inspection-scan-expected strong {
+    font-size: 22px;
+    line-height: 1.1;
+    color: #382b12;
+}
+
+.inspection-scan-expected small {
+    color: #78632e;
+}
+
+
+/* ============================================================
+   TEXTO DE AYUDA
+   ============================================================ */
+
+.inspection-scan-helper {
+    margin: 9px 0 0;
+    color: #725719;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+
+/* ============================================================
+   ERROR
+   ============================================================ */
+
+.inspection-scan-error {
+    color: #a12020;
+    background: #ffeded;
+    border-radius: 8px;
+    padding: 11px;
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   ADVERTENCIAS
+   ============================================================ */
+
+.inspection-scan-warning,
+.inspection-scanner-notice {
+    color: #77510b;
+    background: #fff2bf;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   NOTIFICACIÓN DEL ESCÁNER
+   ============================================================ */
+
+.inspection-scanner-notice {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 8px 14px;
+}
+
+.inspection-scanner-notice button {
+    border: none;
+    background: transparent;
+    text-decoration: underline;
+    cursor: pointer;
+    color: inherit;
+}
+
+
+/* ============================================================
+   BOTONES DEL MODAL
+   ============================================================ */
+
+.inspection-scan-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.inspection-scan-actions button {
+    padding: 12px 18px;
+    border-radius: 9px;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+
+/* ============================================================
+   BOTÓN SALIR
+   ============================================================ */
+
+.inspection-scan-cancel {
+    background: #eeeeee;
+    color: #333;
+}
+
+
+/* ============================================================
+   BOTÓN CONFIRMAR
+   ============================================================ */
+
+.inspection-scan-save {
+    background: #333333;
+    color: white;
+}
+
+.inspection-scan-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+
+/* ============================================================
+   RESPONSIVE MOBILE
+   ============================================================ */
+
+@media (max-width: 520px) {
+
+    .inspection-scan-modal {
+        padding: 12px;
+    }
+
+    .inspection-scan-qty-row > input {
+        font-size: 24px;
+    }
+
+    .inspection-scan-product-name {
+        font-size: 16px;
+    }
+
+}
+
+
+
+
+/* ============================================================
+   INSPECCIÓN - PRODUCTO CONFIRMADO
+   ============================================================ */
+
+.inspection-scan-green-panel {
+    background: #dcfce7;
+    border-color: #4ade80;
+}
+
+.inspection-scan-green-panel .inspection-scan-label,
+.inspection-scan-green-panel .inspection-scan-product-sku,
+.inspection-scan-green-panel .inspection-scan-confirm-state {
+    color: #166534;
+}
+
+.inspection-scan-green-panel .inspection-scan-product-name {
+    color: #14532d;
+}
+
+
+
+/* ============================================================
+   INSPECCION - CANTIDADES COMPLETAS EN VERDE
+   ============================================================ */
+
+
+/* ============================================================
+   1. MODAL - CANTIDAD COMPLETA
+   ============================================================ */
+
+.inspection-scan-yellow-panel.inspection-scan-qty-complete {
+    background: #dcfce7;
+    border-color: #4ade80;
+}
+
+.inspection-scan-qty-complete .inspection-scan-label,
+.inspection-scan-qty-complete .inspection-scan-expected,
+.inspection-scan-qty-complete .inspection-scan-expected strong,
+.inspection-scan-qty-complete .inspection-scan-expected small,
+.inspection-scan-qty-complete .inspection-scan-helper {
+    color: #166534;
+}
+
+.inspection-scan-qty-complete .inspection-scan-qty-row > input {
+    background: #f0fdf4;
+    border-color: #22c55e;
+    color: #14532d;
+}
+
+.inspection-scan-qty-complete .inspection-scan-qty-row > input:focus {
+    outline-color: #86efac;
+}
+
+
+/* ============================================================
+   2. MENSAJE DE CANTIDAD COMPLETA
+   ============================================================ */
+
+.inspection-scan-qty-success {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 10px 0 0;
+    color: #166534;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   3. TABLA DESKTOP - FILA COMPLETA VERDE
+   ============================================================ */
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-complete,
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-complete > td {
+    background-color: #dcfce7 !important;
+    color: #166534;
+}
+
+
+/* ============================================================
+   4. TEXTOS VERDES EN FILAS COMPLETAS
+   ============================================================ */
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-product-code,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-description,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-quantity,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-line-number,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-product-code-wrapper {
+    color: #166534;
+}
+
+
+/* ============================================================
+   5. ICONO DE CANTIDAD INSPECCIONADA
+   ============================================================ */
+
+.inspection-document-inspected-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.inspection-document-quantity-complete
+.inspection-document-inspected-value {
+    color: #15803d;
+    font-weight: 750;
+}
+
+
+/* ============================================================
+   6. MOBILE / PDA
+   TARJETAS VERDES CUANDO CANTIDADES COINCIDEN
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-complete {
+        background-color: #dcfce7 !important;
+        border: 1px solid #86efac !important;
+        border-left: 4px solid #22c55e !important;
+        border-radius: 10px;
+    }
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-complete > td,
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-complete > td::before {
+        background-color: #dcfce7 !important;
+        color: #166534;
+    }
+
+}
+
+
+
+
+/* ============================================================
+   INSPECCIÓN - COLORES DE CANTIDADES
+
+   0        = SIN FONDO
+   IGUAL    = VERDE
+   DIFERENTE= ROJO
+   ============================================================ */
+
+
+/* ============================================================
+   1. MODAL - CANTIDADES IGUALES (VERDE)
+   ============================================================ */
+
+.inspection-scan-yellow-panel.inspection-scan-qty-complete {
+    background: #dcfce7;
+    border-color: #4ade80;
+}
+
+.inspection-scan-qty-complete .inspection-scan-label,
+.inspection-scan-qty-complete .inspection-scan-expected,
+.inspection-scan-qty-complete .inspection-scan-expected strong,
+.inspection-scan-qty-complete .inspection-scan-expected small,
+.inspection-scan-qty-complete .inspection-scan-helper {
+    color: #166534;
+}
+
+.inspection-scan-qty-complete .inspection-scan-qty-row > input {
+    background: #f0fdf4;
+    border-color: #22c55e;
+    color: #14532d;
+}
+
+.inspection-scan-qty-complete .inspection-scan-qty-row > input:focus {
+    outline-color: #86efac;
+}
+
+.inspection-scan-qty-success {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 10px 0 0;
+    color: #166534;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   2. MODAL - CANTIDADES DIFERENTES (ROJO)
+   ============================================================ */
+
+.inspection-scan-yellow-panel.inspection-scan-qty-mismatch {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+.inspection-scan-qty-mismatch .inspection-scan-label,
+.inspection-scan-qty-mismatch .inspection-scan-expected,
+.inspection-scan-qty-mismatch .inspection-scan-expected strong,
+.inspection-scan-qty-mismatch .inspection-scan-expected small,
+.inspection-scan-qty-mismatch .inspection-scan-helper {
+    color: #991b1b;
+}
+
+.inspection-scan-qty-mismatch .inspection-scan-qty-row > input {
+    background: #fff1f2;
+    border-color: #ef4444;
+    color: #7f1d1d;
+}
+
+.inspection-scan-qty-mismatch .inspection-scan-qty-row > input:focus {
+    outline-color: #fca5a5;
+}
+
+.inspection-scan-qty-error {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 10px 0 0;
+    color: #991b1b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   3. MODAL - CANTIDAD EN CERO (NEUTRO)
+
+   SIN FONDO ROJO NI VERDE.
+   ============================================================ */
+
+.inspection-scan-yellow-panel.inspection-scan-qty-neutral {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: #d1d5db !important;
+}
+
+.inspection-scan-qty-neutral .inspection-scan-qty-row > input {
+    background: transparent !important;
+    border-color: #d1d5db;
+    color: inherit;
+}
+
+.inspection-scan-qty-neutral .inspection-scan-label,
+.inspection-scan-qty-neutral .inspection-scan-expected,
+.inspection-scan-qty-neutral .inspection-scan-expected strong,
+.inspection-scan-qty-neutral .inspection-scan-expected small,
+.inspection-scan-qty-neutral .inspection-scan-helper {
+    color: inherit;
+}
+
+
+/* ============================================================
+   4. TABLA DESKTOP - FILAS VERDES
+   ============================================================ */
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-complete,
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-complete > td {
+    background-color: #dcfce7 !important;
+    color: #166534;
+}
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-product-code,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-description,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-quantity,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-line-number,
+
+.inspection-document-table
+.inspection-document-row-complete
+.inspection-document-product-code-wrapper {
+    color: #166534;
+}
+
+
+/* ============================================================
+   5. TABLA DESKTOP - FILAS ROJAS
+   ============================================================ */
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-mismatch,
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-mismatch > td {
+    background-color: #fee2e2 !important;
+    color: #991b1b;
+}
+
+.inspection-document-table
+.inspection-document-row-mismatch
+.inspection-document-product-code,
+
+.inspection-document-table
+.inspection-document-row-mismatch
+.inspection-document-description,
+
+.inspection-document-table
+.inspection-document-row-mismatch
+.inspection-document-quantity,
+
+.inspection-document-table
+.inspection-document-row-mismatch
+.inspection-document-line-number,
+
+.inspection-document-table
+.inspection-document-row-mismatch
+.inspection-document-product-code-wrapper {
+    color: #991b1b;
+}
+
+
+/* ============================================================
+   6. TABLA DESKTOP - FILAS NEUTRAS
+
+   inspected_quantity = 0
+   NO TIENE BACKGROUND DE ESTADO.
+   ============================================================ */
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-neutral,
+
+.inspection-document-table
+.inspection-document-table-row.inspection-document-row-neutral > td {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+.inspection-document-table
+.inspection-document-row-neutral
+.inspection-document-inspected-value {
+    color: inherit;
+    font-weight: inherit;
+}
+
+
+/* ============================================================
+   7. ICONOS DE CANTIDAD INSPECCIONADA
+   ============================================================ */
+
+.inspection-document-inspected-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.inspection-document-quantity-complete
+.inspection-document-inspected-value {
+    color: #15803d;
+    font-weight: 750;
+}
+
+.inspection-document-quantity-mismatch
+.inspection-document-inspected-value {
+    color: #b91c1c;
+    font-weight: 750;
+}
+
+
+/* ============================================================
+   8. MOBILE / PDA
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    /* ================================================
+       FILA VERDE
+       ================================================ */
+
+       .inspection-document-product-code-wrapper-sku {
+        font-size: 18px;
+       }
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-complete {
+        background-color: #dcfce7 !important;
+        border: 1px solid #86efac !important;
+        border-left: 4px solid #22c55e !important;
+        border-radius: 10px;
+    }
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-complete > td,
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-complete > td::before {
+        background-color: #dcfce7 !important;
+        color: #166534;
+    }
+
+
+    /* ================================================
+       FILA ROJA
+       ================================================ */
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-mismatch {
+        background-color: #fee2e2 !important;
+        border: 1px solid #fca5a5 !important;
+        border-left: 4px solid #dc2626 !important;
+        border-radius: 10px;
+    }
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-mismatch > td,
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-mismatch > td::before {
+        background-color: #fee2e2 !important;
+        color: #991b1b;
+    }
+
+
+    /* ================================================
+       FILA NEUTRA - CANTIDAD CERO
+       ================================================ */
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-neutral,
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-neutral > td,
+
+    .inspection-document-table
+    .inspection-document-table-row.inspection-document-row-neutral > td::before {
+        background: transparent !important;
+        background-color: transparent !important;
+    }
+
+}

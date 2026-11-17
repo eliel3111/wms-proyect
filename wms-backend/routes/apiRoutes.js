@@ -9,6 +9,9 @@ import warehouseTransfer from "./warehouseTransfer.routes.js"
 import pickingWarehouse from "./pickingWarehouse.js"
 import barcodeRoutes from "./barcodeRoutes.js"
 import inventoryCount from "./inventoryCount.js"
+import inspectionRoutes from "./inspectionRoutes.js";
+import returnsRoutes from "./returnsRoutes.js";
+
 
 
 const router = express.Router();
@@ -24,5 +27,13 @@ router.use("/warehouse-transfers", warehouseTransfer);
 router.use("/picking", pickingWarehouse);
 router.use("/barcode", barcodeRoutes);
 router.use("/inventory", inventoryCount);
+router.use(
+    "/inspection",
+    inspectionRoutes
+);
+router.use(
+    "/returns",
+    returnsRoutes
+);
 
 export default router;

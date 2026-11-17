@@ -1821,29 +1821,7 @@ async function verifyLine(job, originalLine) {
 
 
 
-// ============================================================
-// APLICAR RESULTADO FINAL DEL INVENTARIO EN WMS
-// ============================================================
-//
-// Se ejecuta desde markJobCompleted() después de
-// verificar que todas las líneas del job estén success.
-//
-// COUNTED:
-//   - Solo almacén de la sesión.
-//   - Solo conteos de la sesión.
-//   - Solo productos procesados exitosamente por el job.
-//   - qty_on_hand = inventory_quantity.
-//
-// ZERO:
-//   - Se conserva para el ERP legado (Citrus).
-//   - Deshabilitado para ADM Cloud hasta migrar su worker.
-//
-// ============================================================
-
-async function applyCompletedInventoryJobToWms(
-  client,
-  job
-) {
+async function applyCompletedInventoryJobToWms(client, job) {
 
   console.log("");
   console.log("📦📦📦 ========================================");
@@ -1862,7 +1840,11 @@ async function applyCompletedInventoryJobToWms(
 
   const erpWarehouseId = String(
     job?.erp_warehouse_id ?? ""
-  ).trim();
+  ).trim().toLowerCase();
+
+  const jobType = String(
+    job?.job_type ?? ""
+  ).trim().toLowerCase();
 
   if (
     !Number.isSafeInteger(jobId) ||
@@ -1896,7 +1878,7 @@ async function applyCompletedInventoryJobToWms(
 
   console.log("🆔 JOB ID:", jobId);
   console.log("🆔 SESSION ID:", sessionId);
-  console.log("📌 JOB TYPE:", job.job_type);
+  console.log("📌 JOB TYPE:", jobType);
   console.log("🏬 ERP WAREHOUSE:", erpWarehouseId);
   console.log(
     "🌐 ERP:",
@@ -1904,26 +1886,66 @@ async function applyCompletedInventoryJobToWms(
   );
 
   // ==========================================================
-  // 2. SEGURIDAD ADM CLOUD
-  //
-  // No actualizar el stock local mientras el worker
-  // se encuentre en modo PREVIEW.
+  // 2. VALIDAR TODAS LAS LÍNEAS DEL JOB
   // ==========================================================
+
+  const linesResult = await client.query(
+    `
+    SELECT
+
+      COUNT(*)::integer AS total,
+
+      COUNT(*) FILTER (
+        WHERE status = 'success'
+      )::integer AS successful,
+
+      COUNT(*) FILTER (
+        WHERE status <> 'success'
+           OR status IS NULL
+      )::integer AS not_success
+
+    FROM inventory_adjustment_job_lines
+
+    WHERE job_id = $1::bigint
+    `,
+    [jobId]
+  );
+
+  const totalLines = Number(
+    linesResult.rows[0]?.total ?? 0
+  );
+
+  const successfulLines = Number(
+    linesResult.rows[0]?.successful ?? 0
+  );
+
+  const notSuccess = Number(
+    linesResult.rows[0]?.not_success ?? 0
+  );
+
+  console.log("📊 VALIDACIÓN DE LÍNEAS:", {
+    jobId,
+    totalLines,
+    successfulLines,
+    notSuccess
+  });
+
+  if (
+    totalLines === 0 ||
+    successfulLines !== totalLines ||
+    notSuccess !== 0
+  ) {
+    throw new Error(
+      `El job ${jobId} no puede actualizar WMS: ` +
+      `${successfulLines}/${totalLines} líneas están success.`
+    );
+  }
 
   // ==========================================================
   // 3. COUNTED - PRODUCTOS CONTADOS
   // ==========================================================
-  //
-  // Solo se actualizan registros:
-  //
-  // 1. Del almacén asociado a la sesión.
-  // 2. Contados durante esa sesión.
-  // 3. Pertenecientes al job actual.
-  // 4. Con líneas del job en estado success.
-  //
-  // ==========================================================
 
-  if (job.job_type === "counted") {
+  if (jobType === "counted") {
 
     console.log("");
     console.log("🟦 ========================================");
@@ -1931,54 +1953,182 @@ async function applyCompletedInventoryJobToWms(
     console.log("🟦 ========================================");
 
     // ========================================================
-    // VALIDAR JOB COMPLETO ANTES DE MODIFICAR WMS
+    // 3.1. VALIDAR EL ALCANCE DE LA SESIÓN
+    // ========================================================
+    //
+    // Este ajuste supone un inventario físico completo.
+    // Las ubicaciones no contadas del mismo producto
+    // se consideran vacías.
+    //
     // ========================================================
 
-    const linesResult = await client.query(
+    const sessionResult = await client.query(
       `
       SELECT
-        COUNT(*)::integer AS total,
 
-        COUNT(*) FILTER (
-          WHERE status = 'success'
-        )::integer AS successful
+        s.id,
+        s.code,
+        s.status,
+        s.start_date,
+        s.end_date,
 
-      FROM inventory_adjustment_job_lines
+        w.id AS warehouse_id,
+        w.name AS warehouse_name
 
-      WHERE job_id = $1
+      FROM inventory_sessions s
+
+      INNER JOIN warehouses w
+        ON LOWER(w.erp_warehouse_id::text) =
+           LOWER(s.erp_warehouse_id::text)
+
+      WHERE s.id = $1::bigint
+
+        AND s.status = 'review'
+
+        AND LOWER(s.erp_warehouse_id::text) =
+            LOWER($2::text)
+
+        AND s.start_date IS NOT NULL
+
+      LIMIT 2
       `,
-      [jobId]
+      [
+        sessionId,
+        erpWarehouseId
+      ]
     );
 
-    const totalLines =
-      Number(linesResult.rows[0]?.total ?? 0);
+    if (sessionResult.rows.length !== 1) {
+      throw new Error(
+        `No se pudo identificar una sesión y almacén ` +
+        `válidos para el job ${jobId}.`
+      );
+    }
 
-    const successfulLines =
-      Number(linesResult.rows[0]?.successful ?? 0);
+    const session = sessionResult.rows[0];
 
-    console.log("📊 TOTAL LÍNEAS:", totalLines);
-    console.log("✅ LÍNEAS SUCCESS:", successfulLines);
+    const wmsWarehouseId = Number(
+      session.warehouse_id
+    );
 
-    if (
-      totalLines === 0 ||
-      successfulLines !== totalLines
-    ) {
+    console.log("🏬 ALMACÉN COUNTED:", {
+      id: wmsWarehouseId,
+      name: session.warehouse_name,
+      sessionCode: session.code
+    });
+
+    // ========================================================
+    // 3.2. VALIDAR UBICACIONES NO CONTADAS CON RESERVAS
+    // ========================================================
+    //
+    // No eliminar existencias locales automáticamente
+    // si hay reservas pendientes.
+    //
+    // ========================================================
+
+    const reservedLocationsResult = await client.query(
+      `
+      WITH counted_job_products AS (
+
+        SELECT DISTINCT
+
+          ier.sku AS product_sku
+
+        FROM inventory_adjustment_job_lines jal
+
+        INNER JOIN inventory_erp_report ier
+          ON ier.id = jal.report_line_id
+
+        WHERE jal.job_id = $1::bigint
+
+          AND jal.status = 'success'
+
+          AND ier.session_id = $2::bigint
+
+          AND ier.wms_counted = true
+
+          AND ier.sku IS NOT NULL
+
+          AND LOWER(ier.erp_id::text) =
+              LOWER(jal.erp_product_id::text)
+
+          AND LOWER(jal.erp_warehouse_id::text) =
+              LOWER($3::text)
+      )
+
+      SELECT
+
+        ibl.id,
+        ibl.product_sku,
+        ibl.location_id,
+        ibl.qty_on_hand,
+        ibl.qty_reserved
+
+      FROM inventory_by_location ibl
+
+      INNER JOIN counted_job_products cjp
+        ON cjp.product_sku = ibl.product_sku
+
+      WHERE ibl.warehouse_id = $4::bigint
+
+        AND ibl.counted_by IS NULL
+
+        AND ibl.counted_at IS NULL
+
+        AND ibl.inventory_quantity IS NULL
+
+        AND COALESCE(ibl.qty_reserved, 0) <> 0
+
+      LIMIT 20
+      `,
+      [
+        jobId,
+        sessionId,
+        erpWarehouseId,
+        wmsWarehouseId
+      ]
+    );
+
+    if (reservedLocationsResult.rows.length > 0) {
+
+      console.error(
+        "🛑 UBICACIONES CON RESERVAS PENDIENTES:",
+        reservedLocationsResult.rows
+      );
 
       throw new Error(
-        `El job ${jobId} no puede actualizar WMS: ` +
-        `${successfulLines}/${totalLines} líneas están success.`
+        "Existen ubicaciones no contadas con reservas " +
+        "pendientes para productos del job. " +
+        "Es necesario conciliarlas antes de poner " +
+        "esas ubicaciones en cero."
       );
     }
 
     // ========================================================
-    // ACTUALIZAR INVENTARIO
+    // 3.3. ACTUALIZAR UBICACIONES CONTADAS
     // ========================================================
+    //
+    // SE CONSERVA LA LÓGICA ORIGINAL:
+    //
+    // qty_on_hand = inventory_quantity
+    //
+    // Solo:
+    // - Almacén de la sesión
+    // - Conteos de esta sesión
+    // - Productos incluidos en el job COUNTED
+    // - Líneas SUCCESS
+    //
+    // ========================================================
+
+    console.log("");
+    console.log("🟦 ACTUALIZANDO UBICACIONES CONTADAS");
 
     const result = await client.query(
       `
       WITH target_session AS (
 
         SELECT
+
           s.id,
           s.start_date,
           s.end_date,
@@ -1990,7 +2140,7 @@ async function applyCompletedInventoryJobToWms(
           ON LOWER(w.erp_warehouse_id::text) =
              LOWER(s.erp_warehouse_id::text)
 
-        WHERE s.id = $1
+        WHERE s.id = $1::bigint
 
           AND s.status = 'review'
 
@@ -2014,8 +2164,6 @@ async function applyCompletedInventoryJobToWms(
 
       WHERE ibl.warehouse_id = ts.warehouse_id
 
-        -- El conteo tiene que pertenecer
-        -- al período de esta sesión.
         AND ibl.counted_by IS NOT NULL
 
         AND ibl.counted_at IS NOT NULL
@@ -2029,7 +2177,6 @@ async function applyCompletedInventoryJobToWms(
 
         AND ibl.inventory_quantity IS NOT NULL
 
-        -- Solo productos procesados en este job.
         AND EXISTS (
 
           SELECT 1
@@ -2039,7 +2186,7 @@ async function applyCompletedInventoryJobToWms(
           INNER JOIN inventory_erp_report ier
             ON ier.id = jal.report_line_id
 
-          WHERE jal.job_id = $3
+          WHERE jal.job_id = $3::bigint
 
             AND jal.status = 'success'
 
@@ -2049,24 +2196,18 @@ async function applyCompletedInventoryJobToWms(
 
             AND ier.sku = ibl.product_sku
 
-            AND ier.erp_id::text =
-                jal.erp_product_id::text
+            AND LOWER(ier.erp_id::text) =
+                LOWER(jal.erp_product_id::text)
         )
 
       RETURNING
 
         ibl.id,
-
         ibl.warehouse_id,
-
         ibl.location_id,
-
         ibl.product_sku,
-
         ibl.inventory_quantity,
-
         ibl.old_qty_on_hand,
-
         ibl.qty_on_hand
       `,
       [
@@ -2076,170 +2217,758 @@ async function applyCompletedInventoryJobToWms(
       ]
     );
 
-    // ========================================================
-    // VALIDAR ACTUALIZACIÓN
-    // ========================================================
-
     const updatedLines = result.rows.length;
 
     console.log("");
-    console.log("🟩 ========================================");
-    console.log("✅ INVENTARIO WMS ACTUALIZADO");
-    console.log("🆔 JOB:", jobId);
-    console.log("🏬 ERP WAREHOUSE:", erpWarehouseId);
-    console.log("📦 LÍNEAS ACTUALIZADAS:", updatedLines);
-    console.log("🟩 ========================================");
+    console.log("✅ UBICACIONES CONTADAS ACTUALIZADAS:", updatedLines);
 
     if (updatedLines === 0) {
-
       throw new Error(
         `El job ${jobId} terminó sin actualizar ninguna ` +
-        "línea de inventario del almacén seleccionado."
+        "línea contada del almacén seleccionado."
       );
     }
 
-    return {
-      type: "counted",
-      jobId,
-      sessionId,
-      erpWarehouseId,
-      totalProducts: totalLines,
-      updatedLines,
-      updatedInventory: result.rows
-    };
+    // ========================================================
+    // 3.4. NUEVO - UBICACIONES NO CONTADAS DEL MISMO PRODUCTO
+    // ========================================================
+    //
+    // PROBLEMA QUE CORRIGE:
+    //
+    // SKU-00297
+    //
+    // Ubicación 159:
+    //   inventory_quantity = 10
+    //   qty_on_hand = 10
+    //
+    // Ubicación 158:
+    //   inventory_quantity = NULL
+    //   counted_by = NULL
+    //   counted_at = NULL
+    //   qty_on_hand = 15
+    //
+    // NUEVO RESULTADO:
+    //
+    // Ubicación 159 = 10
+    // Ubicación 158 = 0
+    //
+    // IMPORTANTE:
+    //
+    // Solo se procesan productos del job COUNTED.
+    // No se tocan productos de otros jobs.
+    // No se modifica qty_available (columna generada).
+    // No se modifica inventory_quantity.
+    // No se envía un POST adicional a ADM Cloud.
+    //
+    // ========================================================
 
+    console.log("");
+    console.log("🟨 ========================================");
+    console.log("📍 AJUSTANDO UBICACIONES NO CONTADAS");
+    console.log("📌 SOLO PRODUCTOS DEL JOB COUNTED");
+    console.log("🟨 ========================================");
+
+    const zeroLocationsResult = await client.query(
+      `
+      WITH target_session AS (
+
+        SELECT
+
+          s.id,
+          s.start_date,
+          s.end_date,
+          w.id AS warehouse_id
+
+        FROM inventory_sessions s
+
+        INNER JOIN warehouses w
+          ON LOWER(w.erp_warehouse_id::text) =
+             LOWER(s.erp_warehouse_id::text)
+
+        WHERE s.id = $1::bigint
+
+          AND s.status = 'review'
+
+          AND LOWER(s.erp_warehouse_id::text) =
+              LOWER($2::text)
+
+          AND s.start_date IS NOT NULL
+
+      ),
+
+      counted_job_products AS (
+
+        SELECT DISTINCT
+
+          ier.sku AS product_sku
+
+        FROM inventory_adjustment_job_lines jal
+
+        INNER JOIN inventory_erp_report ier
+          ON ier.id = jal.report_line_id
+
+        INNER JOIN target_session ts
+          ON ier.session_id = ts.id
+
+        WHERE jal.job_id = $3::bigint
+
+          AND jal.status = 'success'
+
+          AND ier.wms_counted = true
+
+          AND ier.sku IS NOT NULL
+
+          AND LOWER(ier.erp_id::text) =
+              LOWER(jal.erp_product_id::text)
+
+          AND LOWER(jal.erp_warehouse_id::text) =
+              LOWER($2::text)
+
+      )
+
+      UPDATE inventory_by_location AS ibl
+
+      SET
+
+        old_qty_on_hand = ibl.qty_on_hand,
+
+        qty_on_hand = 0.000,
+
+        updated_at = NOW()
+
+      FROM target_session ts,
+           counted_job_products cjp
+
+      WHERE ibl.warehouse_id = ts.warehouse_id
+
+        AND ibl.product_sku = cjp.product_sku
+
+        -- Solo ubicaciones con cantidad pendiente.
+        AND COALESCE(ibl.qty_on_hand, 0) <> 0
+
+        -- Solo ubicaciones no contadas.
+        AND ibl.counted_by IS NULL
+
+        AND ibl.counted_at IS NULL
+
+        AND ibl.inventory_quantity IS NULL
+
+        -- No modificar ubicaciones con reservas.
+        AND COALESCE(ibl.qty_reserved, 0) = 0
+
+      RETURNING
+
+        ibl.id,
+        ibl.warehouse_id,
+        ibl.location_id,
+        ibl.product_sku,
+        ibl.old_qty_on_hand,
+        ibl.qty_on_hand,
+        ibl.qty_reserved,
+        ibl.qty_available
+      `,
+      [
+        sessionId,
+        erpWarehouseId,
+        jobId
+      ]
+    );
+
+    const zeroLocations =
+      zeroLocationsResult.rows;
+
+    console.log("");
+    console.log("🟩 ========================================");
+    console.log("✅ UBICACIONES NO CONTADAS AJUSTADAS");
+    console.log("🆔 JOB ID:", jobId);
+    console.log("📍 TOTAL UBICACIONES:", zeroLocations.length);
+
+    zeroLocations.forEach(item => {
+
+      console.log("📦 UBICACIÓN PUESTA EN CERO:", {
+        id: item.id,
+        sku: item.product_sku,
+        warehouseId: item.warehouse_id,
+        locationId: item.location_id,
+        previousQty: item.old_qty_on_hand,
+        newQty: item.qty_on_hand
+      });
+
+    });
+
+    console.log("🟩 ========================================");
+
+    // ========================================================
+    // 3.5. RESUMEN FINAL COUNTED
+    // ========================================================
+
+    const totalUpdatedLocations =
+      updatedLines + zeroLocations.length;
+
+    console.log("");
+    console.log("🟩🟩🟩 ========================================");
+    console.log("✅ INVENTARIO COUNTED CONCILIADO EN WMS");
+    console.log("🆔 JOB:", jobId);
+    console.log("🆔 SESIÓN:", sessionId);
+    console.log("🏬 ALMACÉN:", session.warehouse_name);
+    console.log("📦 PRODUCTOS JOB:", totalLines);
+    console.log("✅ UBICACIONES CONTADAS:", updatedLines);
+    console.log("🟨 UBICACIONES NO CONTADAS A CERO:", zeroLocations.length);
+    console.log("📍 TOTAL UBICACIONES ACTUALIZADAS:", totalUpdatedLocations);
+    console.log("🟩🟩🟩 ========================================");
+
+    return {
+
+      type: "counted",
+
+      jobId,
+
+      sessionId,
+
+      erpWarehouseId,
+
+      wmsWarehouseId,
+
+      totalProducts: totalLines,
+
+      updatedLines: totalUpdatedLocations,
+
+      updatedCountedLocations: updatedLines,
+
+      updatedZeroLocations: zeroLocations.length,
+
+      updatedInventory: [
+        ...result.rows,
+        ...zeroLocations
+      ]
+    };
   }
 
   // ==========================================================
   // 4. ZERO - PRODUCTOS NO CONTADOS
   // ==========================================================
-  //
-  // IMPORTANTE:
-  //
-  // El controlador ZERO del ERP legado todavía
-  // necesita migrarse a GUID para ADM Cloud.
-  //
-  // Para evitar poner existencias en cero por error,
-  // no se permite ejecutar ZERO con ADM Cloud.
-  // ==========================================================
 
-  if (job.job_type === "zero") {
+  if (jobType === "zero") {
 
     console.log("");
     console.log("🟨 ========================================");
     console.log("📦 PROCESANDO JOB ZERO");
     console.log("🟨 ========================================");
 
-    if (isAdmCloud) {
+    // ========================================================
+    // 4.1. ERP LEGADO
+    // ========================================================
 
-      console.error(
-        "🛑 ZERO ADM CLOUD NO ESTÁ HABILITADO"
+    if (!isAdmCloud) {
+
+      console.log(
+        "📌 APLICANDO LÓGICA ZERO ERP LEGADO"
       );
 
-      throw new Error(
-        "El ajuste ZERO de ADM Cloud está deshabilitado. " +
-        "Debe migrarse y verificarse su controller y worker " +
-        "antes de modificar existencias en cero."
+      const result = await client.query(
+        `
+        UPDATE inventory_by_location AS ibl
+
+        SET
+
+          qty_on_hand = 0.000,
+
+          qty_reserved = 0.000,
+
+          updated_at = NOW()
+
+        FROM warehouses w
+
+        WHERE w.id = ibl.warehouse_id
+
+          AND w.erp_warehouse_id::text = $1::text
+
+          AND ibl.counted_by IS NULL
+
+          AND ibl.counted_at IS NULL
+
+          AND (
+            COALESCE(ibl.qty_on_hand, 0) <> 0
+
+            OR
+
+            COALESCE(ibl.qty_reserved, 0) <> 0
+          )
+
+        RETURNING
+
+          ibl.id,
+          ibl.warehouse_id,
+          ibl.product_sku,
+          ibl.location_id,
+          ibl.qty_on_hand,
+          ibl.qty_reserved
+        `,
+        [erpWarehouseId]
       );
+
+      return {
+        type: "zero",
+        jobId,
+        sessionId,
+        erpWarehouseId,
+        totalProducts: totalLines,
+        updatedLines: result.rows.length,
+        updatedInventory: result.rows
+      };
     }
 
     // ========================================================
-    // VALIDAR QUE TODAS LAS LÍNEAS ESTÉN SUCCESS
+    // 4.2. ZERO ADM CLOUD
     // ========================================================
 
-    const linesResult = await client.query(
+    console.log("");
+    console.log("🟦 ========================================");
+    console.log("🌐 AJUSTE ZERO ADM CLOUD");
+    console.log("🆔 JOB:", jobId);
+    console.log("🆔 SESIÓN:", sessionId);
+    console.log("🏬 ERP LOCATION:", erpWarehouseId);
+    console.log("🟦 ========================================");
+
+    // ========================================================
+    // 4.3. VALIDAR SESIÓN Y ALMACÉN
+    // ========================================================
+
+    const sessionResult = await client.query(
       `
       SELECT
+
+        s.id,
+        s.code,
+        s.status,
+        s.start_date,
+        s.end_date,
+        s.erp_warehouse_id,
+
+        w.id AS wms_warehouse_id,
+        w.name AS warehouse_name
+
+      FROM inventory_sessions s
+
+      INNER JOIN warehouses w
+        ON LOWER(w.erp_warehouse_id::text) =
+           LOWER(s.erp_warehouse_id::text)
+
+      WHERE s.id = $1::bigint
+
+        AND LOWER(s.erp_warehouse_id::text) =
+            LOWER($2::text)
+
+      LIMIT 2
+      `,
+      [
+        sessionId,
+        erpWarehouseId
+      ]
+    );
+
+    if (sessionResult.rows.length !== 1) {
+
+      throw new Error(
+        `No se pudo identificar un único almacén ` +
+        `para la sesión ${sessionId}.`
+      );
+    }
+
+    const session = sessionResult.rows[0];
+
+    const wmsWarehouseId = Number(
+      session.wms_warehouse_id
+    );
+
+    if (
+      !Number.isSafeInteger(wmsWarehouseId) ||
+      wmsWarehouseId <= 0
+    ) {
+      throw new Error(
+        "El almacén interno WMS es inválido."
+      );
+    }
+
+    if (session.status !== "review") {
+
+      throw new Error(
+        `La sesión ${session.code} no está en review.`
+      );
+    }
+
+    if (!session.start_date) {
+
+      throw new Error(
+        "La sesión no tiene fecha de inicio."
+      );
+    }
+
+    console.log("✅ SESIÓN Y ALMACÉN VALIDADOS:", {
+      sessionId,
+      code: session.code,
+      wmsWarehouseId,
+      warehouseName: session.warehouse_name
+    });
+
+    // ========================================================
+    // 4.4. VALIDAR LÍNEAS ZERO
+    // ========================================================
+
+    const validationResult = await client.query(
+      `
+      SELECT
+
         COUNT(*)::integer AS total,
 
         COUNT(*) FILTER (
-          WHERE status = 'success'
-        )::integer AS successful
 
-      FROM inventory_adjustment_job_lines
+          WHERE jal.status <> 'success'
+             OR jal.status IS NULL
 
-      WHERE job_id = $1
+             OR jal.desired_qty IS DISTINCT FROM 0
+
+             OR LOWER(jal.erp_warehouse_id::text)
+                IS DISTINCT FROM LOWER($2::text)
+
+             OR ier.id IS NULL
+
+             OR ier.session_id IS DISTINCT FROM $3::bigint
+
+             OR ier.wms_counted IS DISTINCT FROM false
+
+             OR LOWER(ier.erp_id::text)
+                IS DISTINCT FROM
+                LOWER(jal.erp_product_id::text)
+
+        )::integer AS invalid_lines
+
+      FROM inventory_adjustment_job_lines jal
+
+      LEFT JOIN inventory_erp_report ier
+        ON ier.id = jal.report_line_id
+
+      WHERE jal.job_id = $1::bigint
       `,
-      [jobId]
+      [
+        jobId,
+        erpWarehouseId,
+        sessionId
+      ]
     );
 
-    const totalLines =
-      Number(linesResult.rows[0]?.total ?? 0);
-
-    const successfulLines =
-      Number(linesResult.rows[0]?.successful ?? 0);
+    const invalidLines = Number(
+      validationResult.rows[0]?.invalid_lines ?? 0
+    );
 
     if (
-      totalLines === 0 ||
-      successfulLines !== totalLines
+      Number(validationResult.rows[0]?.total ?? 0) !== totalLines ||
+      invalidLines > 0
     ) {
 
       throw new Error(
-        `El job ZERO ${jobId} no está completamente procesado.`
+        `El job ZERO ${jobId} contiene ` +
+        `${invalidLines} líneas inválidas.`
       );
     }
 
+    console.log(
+      "✅ TODAS LAS LÍNEAS ZERO SON VÁLIDAS"
+    );
+
     // ========================================================
-    // ACTUALIZAR SOLO EL ALMACÉN DEL JOB
-    //
-    // Se conserva el comportamiento original para Citrus.
+    // 4.5. OBTENER PRODUCTOS DEL JOB
     // ========================================================
 
-    const result = await client.query(
+    const productsResult = await client.query(
       `
-      UPDATE inventory_by_location AS ibl
+      SELECT DISTINCT
 
-      SET
+        jal.erp_product_id::text AS erp_product_id,
 
-        qty_on_hand = 0.000,
+        p.sku
 
-        qty_reserved = 0.000,
+      FROM inventory_adjustment_job_lines jal
 
-        updated_at = NOW()
+      INNER JOIN inventory_erp_report ier
+        ON ier.id = jal.report_line_id
 
-      FROM warehouses w
+      LEFT JOIN products p
+        ON LOWER(p.erp_id::text) =
+           LOWER(jal.erp_product_id::text)
 
-      WHERE w.id = ibl.warehouse_id
+      WHERE jal.job_id = $1::bigint
 
-        AND w.erp_warehouse_id::text = $1::text
+        AND jal.status = 'success'
 
-        AND ibl.counted_by IS NULL
+        AND jal.desired_qty = 0
 
-        AND ibl.counted_at IS NULL
+        AND ier.session_id = $2::bigint
 
-        AND (
-          COALESCE(ibl.qty_on_hand, 0) <> 0
+        AND ier.wms_counted = false
 
-          OR
+      ORDER BY
+        jal.erp_product_id::text,
+        p.sku
+      `,
+      [
+        jobId,
+        sessionId
+      ]
+    );
 
-          COALESCE(ibl.qty_reserved, 0) <> 0
-        )
+    const products = productsResult.rows;
 
-      RETURNING
+    const mappedProducts = products.filter(
+      item => item.sku
+    );
 
-        ibl.id,
+    console.log("📦 PRODUCTOS DEL JOB:", products.length);
+    console.log(
+      "📦 PRODUCTOS CON SKU EN WMS:",
+      mappedProducts.length
+    );
 
-        ibl.warehouse_id,
+    // ========================================================
+    // 4.6. VALIDAR CONFLICTOS CON PRODUCTOS CONTADOS
+    // ========================================================
+
+    const countedConflictResult = await client.query(
+      `
+      SELECT DISTINCT
 
         ibl.product_sku,
 
         ibl.location_id,
 
-        ibl.qty_on_hand,
+        ibl.inventory_quantity,
 
+        ibl.counted_at
+
+      FROM inventory_by_location ibl
+
+      INNER JOIN products p
+        ON p.sku = ibl.product_sku
+
+      INNER JOIN inventory_adjustment_job_lines jal
+        ON LOWER(jal.erp_product_id::text) =
+           LOWER(p.erp_id::text)
+
+      WHERE jal.job_id = $1::bigint
+
+        AND ibl.warehouse_id = $2::bigint
+
+        AND ibl.counted_by IS NOT NULL
+
+        AND ibl.counted_at IS NOT NULL
+
+        AND ibl.inventory_quantity IS NOT NULL
+
+        AND ibl.counted_at >= $3::timestamptz
+
+        AND (
+          $4::timestamptz IS NULL
+          OR ibl.counted_at <= $4::timestamptz
+        )
+
+      LIMIT 10
+      `,
+      [
+        jobId,
+        wmsWarehouseId,
+        session.start_date,
+        session.end_date
+      ]
+    );
+
+    if (countedConflictResult.rows.length > 0) {
+
+      console.error(
+        "🛑 PRODUCTOS CONTADOS EN JOB ZERO:",
+        countedConflictResult.rows
+      );
+
+      throw new Error(
+        "El job ZERO contiene productos que fueron " +
+        "contados físicamente durante esta sesión."
+      );
+    }
+
+    console.log(
+      "✅ NO EXISTEN CONFLICTOS CON PRODUCTOS CONTADOS"
+    );
+
+    // ========================================================
+    // 4.7. VALIDAR RESERVAS DE PRODUCTOS ZERO
+    // ========================================================
+
+    const reservedZeroResult = await client.query(
+      `
+      SELECT
+
+        ibl.id,
+        ibl.product_sku,
+        ibl.location_id,
+        ibl.qty_reserved
+
+      FROM inventory_by_location ibl
+
+      INNER JOIN products p
+        ON p.sku = ibl.product_sku
+
+      INNER JOIN inventory_adjustment_job_lines jal
+        ON LOWER(jal.erp_product_id::text) =
+           LOWER(p.erp_id::text)
+
+      WHERE jal.job_id = $1::bigint
+
+        AND ibl.warehouse_id = $2::bigint
+
+        AND COALESCE(ibl.qty_reserved, 0) <> 0
+
+      LIMIT 20
+      `,
+      [
+        jobId,
+        wmsWarehouseId
+      ]
+    );
+
+    if (reservedZeroResult.rows.length > 0) {
+
+      console.error(
+        "🛑 RESERVAS PENDIENTES EN JOB ZERO:",
+        reservedZeroResult.rows
+      );
+
+      throw new Error(
+        "Existen reservas pendientes para productos " +
+        "del job ZERO. Deben conciliarse antes " +
+        "de actualizar sus existencias locales."
+      );
+    }
+
+    // ========================================================
+    // 4.8. ACTUALIZAR EXISTENCIAS LOCALES WMS
+    // ========================================================
+    //
+    // qty_available ES UNA COLUMNA GENERATED.
+    // NO SE ACTUALIZA DIRECTAMENTE.
+    //
+    // ========================================================
+
+    console.log("");
+    console.log("🟨 ACTUALIZANDO EXISTENCIAS LOCALES");
+
+    const result = await client.query(
+      `
+      WITH job_products AS (
+
+        SELECT DISTINCT
+
+          p.sku AS product_sku
+
+        FROM inventory_adjustment_job_lines jal
+
+        INNER JOIN inventory_erp_report ier
+          ON ier.id = jal.report_line_id
+
+        INNER JOIN products p
+          ON LOWER(p.erp_id::text) =
+             LOWER(jal.erp_product_id::text)
+
+        WHERE jal.job_id = $1::bigint
+
+          AND jal.status = 'success'
+
+          AND jal.desired_qty = 0
+
+          AND LOWER(jal.erp_warehouse_id::text) =
+              LOWER($2::text)
+
+          AND ier.session_id = $3::bigint
+
+          AND ier.wms_counted = false
+
+          AND LOWER(ier.erp_id::text) =
+              LOWER(jal.erp_product_id::text)
+      )
+
+      UPDATE inventory_by_location AS ibl
+
+      SET
+
+        old_qty_on_hand = ibl.qty_on_hand,
+
+        qty_on_hand = 0.000,
+
+        updated_at = NOW()
+
+      FROM job_products jp
+
+      WHERE ibl.warehouse_id = $4::bigint
+
+        AND ibl.product_sku = jp.product_sku
+
+        AND COALESCE(ibl.qty_on_hand, 0) <> 0
+
+        AND COALESCE(ibl.qty_reserved, 0) = 0
+
+        AND NOT EXISTS (
+
+          SELECT 1
+
+          FROM inventory_by_location counted
+
+          WHERE counted.warehouse_id = ibl.warehouse_id
+
+            AND counted.product_sku = ibl.product_sku
+
+            AND counted.counted_by IS NOT NULL
+
+            AND counted.counted_at IS NOT NULL
+
+            AND counted.inventory_quantity IS NOT NULL
+
+            AND counted.counted_at >= $5::timestamptz
+
+            AND (
+              $6::timestamptz IS NULL
+              OR counted.counted_at <= $6::timestamptz
+            )
+        )
+
+      RETURNING
+
+        ibl.id,
+        ibl.warehouse_id,
+        ibl.location_id,
+        ibl.product_sku,
+        ibl.old_qty_on_hand,
+        ibl.qty_on_hand,
+        ibl.qty_available,
         ibl.qty_reserved
       `,
-      [erpWarehouseId]
+      [
+        jobId,
+        erpWarehouseId,
+        sessionId,
+        wmsWarehouseId,
+        session.start_date,
+        session.end_date
+      ]
     );
 
     const updatedLines = result.rows.length;
 
     console.log("");
     console.log("🟩 ========================================");
-    console.log("✅ JOB ZERO COMPLETADO EN WMS");
-    console.log("🆔 JOB:", jobId);
-    console.log("🏬 ALMACÉN:", erpWarehouseId);
-    console.log("📦 LÍNEAS ACTUALIZADAS:", updatedLines);
+    console.log("✅ JOB ZERO CONCILIADO EN WMS");
+    console.log("🆔 JOB ID:", jobId);
+    console.log("🆔 SESSION ID:", sessionId);
+    console.log("🏬 ALMACÉN:", session.warehouse_name);
+    console.log("📦 PRODUCTOS JOB:", totalLines);
+    console.log("📍 UBICACIONES ACTUALIZADAS:", updatedLines);
     console.log("🟩 ========================================");
 
     return {
@@ -2247,9 +2976,11 @@ async function applyCompletedInventoryJobToWms(
       jobId,
       sessionId,
       erpWarehouseId,
-      updatedLines
+      wmsWarehouseId,
+      totalProducts: totalLines,
+      updatedLines,
+      updatedInventory: result.rows
     };
-
   }
 
   // ==========================================================
@@ -2257,11 +2988,9 @@ async function applyCompletedInventoryJobToWms(
   // ==========================================================
 
   throw new Error(
-    `Job type no soportado para actualizar WMS: ${job.job_type}`
+    `Job type no soportado para actualizar WMS: ${jobType}`
   );
-
 }
-
 
 
 

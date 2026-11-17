@@ -1,5 +1,6 @@
 import express from "express";
-import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession, finalizeInventorySession, adjustInventoryByLocation, addLocationStock } from "../controllers/inventoryController.js";
+import { inventoryScan, applyInventoryCount, getInventorySessionStatus, updateInventoryAdjustmentMode, createInventorySession, startInventorySession, cancelInventorySession, completeInventorySession, getInventoryLiveSummary, getInventoryFinalReport, getInventoryLocationsReport, getActiveWarehouses, startInventoryAdjustment, startInventoryAdjustmentZero, resumeInventorySession, finalizeInventorySession, adjustInventoryByLocation, addLocationStock, getInventorySessionsHistory, getInventoryReportSessionDetails,
+  downloadInventoryReportSessionExcel } from "../controllers/inventoryController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 
@@ -38,6 +39,45 @@ router.post("/session/cancel", authMiddleware, cancelInventorySession);
 
 // Finaliza una sesión de inventario y la mueve a estado review.
 router.post("/session/complete", authMiddleware, completeInventorySession);
+
+
+// ============================================================
+// OBTENER HISTORIAL DE SESIONES DE INVENTARIO
+//
+// - Excluye sesiones canceladas.
+// - Obtiene nombre del usuario responsable.
+// - Obtiene nombre del almacén activo.
+// - Obtiene cantidad total de productos.
+// - Obtiene cantidad de productos contados.
+// - Obtiene cantidad de productos no contados.
+// ============================================================
+
+router.get(
+  "/sessions/history",
+  authMiddleware,
+  getInventorySessionsHistory
+);
+
+
+// ============================================================
+// CONSULTAR REPORTE DE UNA SESIÓN
+// ============================================================
+
+router.post(
+  "/report/session/details",
+  authMiddleware,
+  getInventoryReportSessionDetails
+);
+
+// ============================================================
+// DESCARGAR EXCEL DE UNA SESIÓN
+// ============================================================
+
+router.get(
+  "/report/session/:sessionId/excel",
+  authMiddleware,
+  downloadInventoryReportSessionExcel
+);
 
 
 //obtener summary

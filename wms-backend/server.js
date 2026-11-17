@@ -96,6 +96,19 @@ import {
   crearAjusteInventarioAdmCloud
 } from "./integrations/admcloud/admcloud.adjustmentStock.js";
 
+import {
+
+    syncAdmCloudCurrentMonthDispatches,
+    syncAdmCloudCurrentYearDispatches,
+
+    syncAdmCloudCurrentMonthCreditInvoices,
+    syncAdmCloudCurrentYearCreditInvoices,
+
+    getAdmCloudCreditInvoiceById,
+
+} from "./integrations/admcloud/admcloud_inspeccion.js";
+
+
 const app = express();
 
 
@@ -127,11 +140,280 @@ console.log(resultado);
 }
 app.use(express.json());
 
-//startAdmCloudCron();
+startAdmCloudCron();
 
 
 
 
+
+
+
+
+
+
+
+// ============================================================
+// TEST
+// OBTENER FACTURA A CRÉDITO COMPLETA POR GUID
+//
+// GET:
+//
+// /test-admcloud-credit-invoice/:id
+//
+// EJEMPLO:
+//
+// /test-admcloud-credit-invoice/
+// d85133b5-6c22-4934-8212-012345678901
+// ============================================================
+
+app.get(
+    "/test-admcloud-credit-invoice/:id",
+    async (
+        req,
+        res
+    ) => {
+
+        try {
+
+            // =================================================
+            // 1. GET GUID
+            // =================================================
+
+            const {
+                id
+            } =
+                req.params;
+
+
+            console.log("");
+
+            console.log(
+                "🟪🟪🟪 ========================================"
+            );
+
+            console.log(
+                "🧪 TEST ADM CLOUD CREDIT INVOICE BY GUID"
+            );
+
+            console.log(
+                "🆔 GUID:",
+                id
+            );
+
+            console.log(
+                "🟪🟪🟪 ========================================"
+            );
+
+
+            // =================================================
+            // 2. CALL SERVICE
+            // =================================================
+
+            const result =
+                await getAdmCloudCreditInvoiceById(
+                    id
+                );
+
+
+            // =================================================
+            // 3. RESPONSE
+            // =================================================
+
+            return res
+                .status(
+                    200
+                )
+                .json(
+                    result
+                );
+
+
+        } catch (
+            error
+        ) {
+
+            console.error(
+                "❌ ERROR TEST CREDIT INVOICE:",
+                error
+            );
+
+
+            // =================================================
+            // STATUS
+            // =================================================
+
+            const statusCode =
+                error.statusCode ??
+                error.response?.status ??
+                500;
+
+
+            // =================================================
+            // RESPONSE
+            // =================================================
+
+            return res
+                .status(
+                    statusCode
+                )
+                .json(
+                    {
+
+                        success:
+                            false,
+
+                        message:
+                            error.message ||
+                            "Error obteniendo la factura desde Adm Cloud.",
+
+                        admCloudError:
+                            error.response?.data ??
+                            null,
+
+                    }
+                );
+
+        }
+
+    }
+);
+
+// ============================================================
+// TEST - FACTURAS A CRÉDITO ADM CLOUD
+// DISPONIBLES SOLO EN DESARROLLO
+// ============================================================
+
+
+
+    // ========================================================
+    // 1. GET - FACTURAS DEL MES (SIN GUARDAR)
+    // ========================================================
+
+    app.get(
+        "/test-admcloud-credit-invoices-month",
+        async (req, res) => {
+
+            try {
+
+                const result =
+                    await getAdmCloudCurrentMonthCreditInvoices();
+
+                return res.status(200).json({
+                    success: true,
+                    dateFrom: result.dateFrom,
+                    dateTo: result.dateTo,
+                    total: result.total,
+                    pages: result.pages,
+
+                    // ?details=true devuelve todas las facturas.
+                    // Sin details devuelve solamente el resumen.
+
+                    ...(req.query.details === "true"
+                        ? { invoices: result.invoices }
+                        : {})
+                });
+
+            } catch (error) {
+
+                return res.status(500).json({
+                    success: false,
+                    message: error.message
+                });
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // 2. GET - FACTURAS DEL AÑO (SIN GUARDAR)
+    // ========================================================
+
+    app.get(
+        "/test-admcloud-credit-invoices-year",
+        async (req, res) => {
+
+            try {
+
+                const result =
+                    await getAdmCloudCurrentYearCreditInvoices();
+
+                return res.status(200).json({
+                    success: true,
+                    dateFrom: result.dateFrom,
+                    dateTo: result.dateTo,
+                    total: result.total,
+                    pages: result.pages,
+
+                    ...(req.query.details === "true"
+                        ? { invoices: result.invoices }
+                        : {})
+                });
+
+            } catch (error) {
+
+                return res.status(500).json({
+                    success: false,
+                    message: error.message
+                });
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // 3. POST - SINCRONIZAR FACTURAS DEL MES
+    // ========================================================
+
+    app.post(
+        "/test-admcloud-credit-invoices-month-sync",
+        async (req, res) => {
+
+            try {
+
+                const result =
+                    await syncAdmCloudCurrentMonthCreditInvoices();
+
+                return res.status(200).json(result);
+
+            } catch (error) {
+
+                return res.status(500).json({
+                    success: false,
+                    message: error.message
+                });
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // 4. POST - SINCRONIZAR FACTURAS DEL AÑO
+    // ========================================================
+
+    app.post(
+        "/test-admcloud-credit-invoices-year-sync",
+        async (req, res) => {
+
+            try {
+
+                const result =
+                    await syncAdmCloudCurrentYearCreditInvoices();
+
+                return res.status(200).json(result);
+
+            } catch (error) {
+
+                return res.status(500).json({
+                    success: false,
+                    message: error.message
+                });
+            }
+
+        }
+    );
 
 
 

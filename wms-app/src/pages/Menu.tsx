@@ -181,8 +181,8 @@ export default function Menu() {
 
         {can("inventory.count_full") && (
           <MenuButton
-            title="Despacho"
-            route="/shipping"
+            title="Inspeccion"
+            route="/inspection"
             icon={
              <svg
   version="1.1"
@@ -284,6 +284,152 @@ export default function Menu() {
           />
         )}
 
+
+{can("returns.start_return") && (
+  <MenuButton
+    title="Devolucion"
+    route="/returns"
+    icon={
+      <svg
+        viewBox="0 0 512 512"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{
+          width: "75px",
+          height: "75px"
+        }}
+      >
+        {/* =========================================
+            FLECHA SUPERIOR
+        ========================================= */}
+        <path
+          d="
+            M145 137
+            C190 86 257 59 326 69
+            C408 81 468 148 468 232
+          "
+          fill="none"
+          stroke="#3693F8"
+          strokeWidth="30"
+          strokeLinecap="round"
+        />
+
+        {/* Punta flecha superior izquierda */}
+        <path
+          d="
+            M145 137
+            L102 96
+            L102 157
+            L163 157
+            Z
+          "
+          fill="#3693F8"
+          stroke="#3693F8"
+          strokeLinejoin="round"
+        />
+
+
+        {/* =========================================
+            FLECHA INFERIOR
+        ========================================= */}
+        <path
+          d="
+            M367 375
+            C321 426 254 451 185 440
+            C104 427 45 360 45 278
+          "
+          fill="none"
+          stroke="#3693F8"
+          strokeWidth="30"
+          strokeLinecap="round"
+        />
+
+        {/* Punta flecha inferior derecha */}
+        <path
+          d="
+            M367 375
+            L410 416
+            L410 355
+            L349 355
+            Z
+          "
+          fill="#3693F8"
+          stroke="#3693F8"
+          strokeLinejoin="round"
+        />
+
+
+        {/* =========================================
+            CAJA - CARA SUPERIOR
+        ========================================= */}
+        <polygon
+          points="
+            256,167
+            342,217
+            256,268
+            170,217
+          "
+          fill="#FFA714"
+        />
+
+
+        {/* =========================================
+            CAJA - LADO IZQUIERDO
+        ========================================= */}
+        <polygon
+          points="
+            170,217
+            256,268
+            256,369
+            170,318
+          "
+          fill="#FFD000"
+        />
+
+
+        {/* =========================================
+            CAJA - LADO DERECHO
+        ========================================= */}
+        <polygon
+          points="
+            256,268
+            342,217
+            342,318
+            256,369
+          "
+          fill="#FFC107"
+        />
+
+
+        {/* =========================================
+            CINTA ROJA SUPERIOR
+        ========================================= */}
+        <polygon
+          points="
+            231,182
+            251,170
+            337,220
+            316,232
+          "
+          fill="#FF3B3B"
+        />
+
+
+        {/* =========================================
+            CINTA ROJA FRONTAL
+        ========================================= */}
+        <polygon
+          points="
+            231,182
+            252,194
+            252,265
+            231,253
+          "
+          fill="#FF3B3B"
+        />
+      </svg>
+    }
+  />
+)}
 
       </div>
 

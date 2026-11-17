@@ -162,7 +162,7 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
   sheet.mergeCells("A2:J2");
 
   sheet.getCell("A2").value =
-    "Garlas Control";
+    "Senor Vino";
 
   sheet.getCell("A2").font = {
     size: 14
@@ -224,7 +224,7 @@ export async function getInventoryFinalReportExcelService(client, sessionId) {
     "Descripcion",
     "Nombre",
     "Sku",
-    "Cantidad del sistema Citrus",
+    "Cantidad en Adm Cloud",
     "Inventario fisico",
     "Diferencias en unidades",
     "Costo unitario RD$",
@@ -728,8 +728,8 @@ export async function getInventoryLocationReportExcelService(reportData) {
 
     const workbook = new ExcelJS.Workbook();
 
-    workbook.creator = "Garlas Control";
-    workbook.lastModifiedBy = "Garlas Control";
+    workbook.creator = "Senor Vino";
+    workbook.lastModifiedBy = "Senor Vino";
     workbook.created = new Date();
     workbook.modified = new Date();
 

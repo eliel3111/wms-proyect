@@ -1,1819 +1,1006 @@
+
+import { useEffect, useState } from "react";
+
 import {
-    ClipboardCheck,
-    FileText,
-    Info,
-    CheckSquare,
+  ClipboardCheck,
+  FileSpreadsheet,
+  MapPin,
+  ChevronRight,
+  Info,
+  CheckSquare,
+  Settings2,
+  PackageCheck,
+  PackageX,
+  AlertCircle,
 } from "lucide-react";
-import {
-    useEffect,
-    useState
-} from "react";
+
 import { useModal } from "../context/ModalContext";
-import "../styles/InventoryReport.css";
-import apiClient from "../services/apiClient";
 import ConfirmationModal from "../components/ConfirmationModal";
-interface ReportOption {
-    id: number;
-    title: string;
-    description: string;
-}
+import apiClient from "../services/apiClient";
 import socket from "../services/socket";
+
 import type {
-    InventoryAdjustmentProgress
+  InventoryAdjustmentProgress,
 } from "../types/inventoryAdjustment";
 
+import "../styles/InventoryReport.css";
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface ReportOption {
+  id: number;
+  title: string;
+  description: string;
+}
+
+interface ConfirmationData {
+  title: string;
+  message: string;
+  confirmText: string;
+  action: () => Promise<void>;
+}
+
+// ============================================================
+// REPORT OPTIONS
+// ============================================================
+
 const reports: ReportOption[] = [
-    {
-        id: 1,
-        title: "Reporte Final del Inventario",
-        description:
-            "Este reporte muestra los productos contados en el WMS, comparando la cantidad física contra la existencia registrada en Citrus.",
-    },
-    {
-        id: 2,
-        title: "Reporte del Inventario Fisico con Ubicacion",
-        description:
-            "Este reporte muestra los productos que existen en Citrus con balance, pero que no fueron encontrados o contados en el WMS.",
-    },
-   
+  {
+    id: 1,
+    title: "Reporte Final del Inventario",
+    description:
+      "Compara las cantidades físicas registradas en el WMS " +
+      "con las existencias del sistema ADM Cloud.",
+  },
+  {
+    id: 2,
+    title: "Inventario Físico por Ubicación",
+    description:
+      "Consulta el inventario físico organizado por las " +
+      "ubicaciones registradas dentro de cada almacén.",
+  },
 ];
+
+// ============================================================
+// SOCKET HOOK
+// ============================================================
+
+function useInventoryJobProgress(
+  jobId: number | null,
+  onProgress: (data: InventoryAdjustmentProgress) => void
+) {
+  useEffect(() => {
+    if (!jobId) return;
+
+    const joinRoom = () => {
+      socket.emit("inventory_adjustment:join", { jobId });
+    };
+
+    const handleProgress = (
+      data: InventoryAdjustmentProgress
+    ) => {
+      if (Number(data.jobId) !== Number(jobId)) {
+        return;
+      }
+
+      console.log("📡 INVENTORY PROGRESS:", data);
+      onProgress(data);
+    };
+
+    socket.on(
+      "inventory_adjustment:progress",
+      handleProgress
+    );
+
+    socket.on("connect", joinRoom);
+
+    if (socket.connected) {
+      joinRoom();
+    }
+
+    return () => {
+      socket.off(
+        "inventory_adjustment:progress",
+        handleProgress
+      );
+
+      socket.off("connect", joinRoom);
+
+      if (socket.connected) {
+        socket.emit("inventory_adjustment:leave", {
+          jobId,
+        });
+      }
+    };
+  }, [jobId, onProgress]);
+}
+
+// ============================================================
+// PROGRESS CARD
+// ============================================================
+
+function InventoryProgressCard({
+  progress,
+  zero = false,
+}: {
+  progress: InventoryAdjustmentProgress;
+  zero?: boolean;
+}) {
+  const current = progress.currentProduct;
+
+  const stats = [
+    {
+      label: "Procesados",
+      value: progress.processedProducts,
+    },
+    {
+      label: "Total",
+      value: progress.totalProducts,
+    },
+    {
+      label: "Correctos",
+      value: progress.successfulProducts,
+    },
+    {
+      label: "Errores",
+      value: progress.failedProducts,
+    },
+  ];
+
+  return (
+    <section className="inventory-adjustment-progress-card">
+
+      {/* HEADER */}
+
+      <div className="inventory-adjustment-progress-header">
+
+        <div className="inventory-adjustment-progress-title-group">
+
+          <div className="inventory-adjustment-progress-icon">
+            {zero ? (
+              <PackageX size={22} />
+            ) : (
+              <Settings2 size={22} />
+            )}
+          </div>
+
+          <div>
+            <h3>
+              {zero
+                ? "Ajuste de Productos No Contados"
+                : "Ajuste de Inventario"}
+            </h3>
+
+            <span>
+              Job #{progress.jobId}
+            </span>
+          </div>
+
+        </div>
+
+        <span
+          className={
+            `inventory-adjustment-status status-${progress.status}`
+          }
+        >
+          {progress.status}
+        </span>
+
+      </div>
+
+      {/* PROGRESS BAR */}
+
+      <div className="inventory-adjustment-progress-section">
+
+        <div className="inventory-adjustment-progress-labels">
+          <span>
+            {zero
+              ? "Ajustando existencias a cero"
+              : "Progreso del ajuste"}
+          </span>
+
+          <strong>{progress.percentage}%</strong>
+        </div>
+
+        <div className="inventory-adjustment-progress-track">
+          <div
+            className="inventory-adjustment-progress-fill"
+            style={{
+              width: `${Math.max(
+                0,
+                Math.min(100, Number(progress.percentage) || 0)
+              )}%`,
+            }}
+          />
+        </div>
+
+      </div>
+
+      {/* STATS */}
+
+      <div className="inventory-adjustment-progress-stats">
+        {stats.map((stat) => (
+          <div
+            className="inventory-adjustment-stat"
+            key={stat.label}
+          >
+            <span className="inventory-adjustment-stat-label">
+              {stat.label}
+            </span>
+
+            <strong>{stat.value}</strong>
+          </div>
+        ))}
+      </div>
+
+      {/* CURRENT PRODUCT */}
+
+      {current && (
+        <div className="inventory-adjustment-current">
+
+          <div className="inventory-adjustment-current-label">
+            Producto actual
+          </div>
+
+          <div className="inventory-adjustment-current-info">
+
+            <span>
+              ERP ID:{" "}
+              <strong>{current.erpProductId}</strong>
+            </span>
+
+            {current.citrusQtyBefore !== undefined &&
+              current.citrusQtyBefore !== null && (
+                <span>
+                  Existencia ERP:{" "}
+                  <strong>{current.citrusQtyBefore}</strong>
+                </span>
+              )}
+
+            {current.desiredQty !== undefined &&
+              current.desiredQty !== null && (
+                <span>
+                  Cantidad deseada:{" "}
+                  <strong>{current.desiredQty}</strong>
+                </span>
+              )}
+
+          </div>
+
+        </div>
+      )}
+
+      {/* MESSAGE */}
+
+      <div className="inventory-adjustment-progress-message">
+        <span className="inventory-adjustment-progress-message-dot" />
+
+        <span>
+          {progress.message || "Procesando inventario..."}
+        </span>
+      </div>
+
+      {progress.errorMessage && (
+        <div className="inventory-adjustment-error">
+          <AlertCircle size={17} />
+          <span>{progress.errorMessage}</span>
+        </div>
+      )}
+
+    </section>
+  );
+}
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
 
 export default function InventoryReport() {
 
-    const [hoveredReport, setHoveredReport] = useState<ReportOption | null>(null);
-    const { openModal } = useModal();
-    const [showConfirmation, setShowConfirmation] =
-        useState(false);
+  const { openModal } = useModal();
 
-    const [confirmationTitle, setConfirmationTitle] =
-        useState("");
+  const [hoveredReport, setHoveredReport] =
+    useState<ReportOption | null>(null);
 
-    const [confirmationMessage, setConfirmationMessage] =
-        useState("");
+  const [showConfirmation, setShowConfirmation] =
+    useState(false);
 
-    const [confirmationText, setConfirmationText] =
-        useState("Confirmar");
+  const [confirmationTitle, setConfirmationTitle] =
+    useState("");
 
-    const [confirmationAction, setConfirmationAction] =
-        useState<(() => Promise<void>) | null>(null);
+  const [confirmationMessage, setConfirmationMessage] =
+    useState("");
 
-    const [confirmationLoading, setConfirmationLoading] =
-        useState(false);
+  const [confirmationText, setConfirmationText] =
+    useState("Confirmar");
 
-    const [
-        adjustmentJobId,
-        setAdjustmentJobId
-    ] =
-        useState<number | null>(
-            null
-        );
+  const [confirmationAction, setConfirmationAction] =
+    useState<(() => Promise<void>) | null>(null);
 
+  const [confirmationLoading, setConfirmationLoading] =
+    useState(false);
 
-    const [
-        adjustmentProgress,
-        setAdjustmentProgress
-    ] =
-        useState<InventoryAdjustmentProgress | null>(
-            null
-        );
+  // ==========================================================
+  // COUNTED JOB
+  // ==========================================================
 
+  const [adjustmentJobId, setAdjustmentJobId] =
+    useState<number | null>(null);
 
-    const [
-        adjustmentStarting,
-        setAdjustmentStarting
-    ] =
-        useState(false);
+  const [adjustmentProgress, setAdjustmentProgress] =
+    useState<InventoryAdjustmentProgress | null>(null);
 
+  const [adjustmentStarting, setAdjustmentStarting] =
+    useState(false);
 
-    const [
-        zeroAdjustmentJobId,
-        setZeroAdjustmentJobId
-    ] = useState<number | null>(null);
+  // ==========================================================
+  // ZERO JOB
+  // ==========================================================
 
+  const [zeroAdjustmentJobId, setZeroAdjustmentJobId] =
+    useState<number | null>(null);
 
-    const [
-        zeroAdjustmentProgress,
-        setZeroAdjustmentProgress
-    ] = useState<InventoryAdjustmentProgress | null>(null);
+  const [zeroAdjustmentProgress, setZeroAdjustmentProgress] =
+    useState<InventoryAdjustmentProgress | null>(null);
 
+  const [zeroAdjustmentStarting, setZeroAdjustmentStarting] =
+    useState(false);
 
-    const [
-        zeroAdjustmentStarting,
-        setZeroAdjustmentStarting
-    ] = useState(false);
+  // ==========================================================
+  // SOCKET LISTENERS
+  // ==========================================================
 
-
-    useEffect(
-        () => {
-
-            if (
-                !adjustmentJobId
-            ) {
-                return;
-            }
-
-
-            console.log(
-                "🟨 CONFIGURANDO SOCKET PARA JOB:",
-                adjustmentJobId
-            );
-
-
-            // ========================================================
-            // FUNCIÓN PARA ENTRAR AL ROOM
-            // ========================================================
-
-            const joinRoom =
-                () => {
-
-                    console.log(
-                        "📡 ENTRANDO AL ROOM DEL JOB:",
-                        adjustmentJobId
-                    );
-
-
-                    socket.emit(
-                        "inventory_adjustment:join",
-                        {
-                            jobId:
-                                adjustmentJobId
-                        }
-                    );
-
-                };
-
-
-            // ========================================================
-            // RECIBIR PROGRESO
-            // ========================================================
-
-            const handleProgress =
-                (
-                    data:
-                        InventoryAdjustmentProgress
-                ) => {
-
-                    console.log(
-                        "📡 PROGRESO RECIBIDO:",
-                        data
-                    );
-
-
-                    // Protección:
-                    // solamente procesamos eventos
-                    // pertenecientes al job actual.
-
-                    if (
-                        Number(data.jobId) !==
-                        Number(adjustmentJobId)
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    setAdjustmentProgress(
-                        data
-                    );
-
-                };
-
-
-            // ========================================================
-            // PRIMERO REGISTRAMOS LISTENER
-            // ========================================================
-
-            socket.on(
-                "inventory_adjustment:progress",
-                handleProgress
-            );
-
-
-            // ========================================================
-            // IMPORTANTE:
-            // SI SOCKET YA ESTÁ CONECTADO, JOIN AHORA
-            // ========================================================
-
-            if (
-                socket.connected
-            ) {
-
-                joinRoom();
-
-            }
-
-
-            // ========================================================
-            // SI SOCKET SE RECONECTA, VOLVER A ENTRAR AL ROOM
-            // ========================================================
-
-            socket.on(
-                "connect",
-                joinRoom
-            );
-
-
-            // ========================================================
-            // CLEANUP
-            // ========================================================
-
-            return () => {
-
-                console.log(
-                    "📴 LIMPIANDO SOCKET JOB:",
-                    adjustmentJobId
-                );
-
-
-                socket.off(
-                    "inventory_adjustment:progress",
-                    handleProgress
-                );
-
-
-                socket.off(
-                    "connect",
-                    joinRoom
-                );
-
-
-                if (
-                    socket.connected
-                ) {
-
-                    socket.emit(
-                        "inventory_adjustment:leave",
-                        {
-                            jobId:
-                                adjustmentJobId
-                        }
-                    );
-
-                }
-
-            };
-
-        },
-        [
-            adjustmentJobId
-        ]
-    );
-
-    useEffect(
-        () => {
-
-            if (
-                !zeroAdjustmentJobId
-            ) {
-                return;
-            }
-
-
-            console.log(
-                "🟨 CONFIGURANDO SOCKET ZERO JOB:",
-                zeroAdjustmentJobId
-            );
-
-
-            // =====================================================
-            // ENTRAR AL ROOM
-            // =====================================================
-
-            const joinZeroRoom =
-                () => {
-
-                    console.log(
-                        "📡 ENTRANDO AL ZERO JOB:",
-                        zeroAdjustmentJobId
-                    );
-
-
-                    socket.emit(
-                        "inventory_adjustment:join",
-                        {
-                            jobId:
-                                zeroAdjustmentJobId
-                        }
-                    );
-
-                };
-
-
-            // =====================================================
-            // RECIBIR PROGRESO
-            // =====================================================
-
-            const handleZeroProgress =
-                (
-                    data:
-                        InventoryAdjustmentProgress
-                ) => {
-
-                    // Solamente nos interesa
-                    // este Job Zero.
-
-                    if (
-                        Number(data.jobId) !==
-                        Number(zeroAdjustmentJobId)
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    console.log(
-                        "📡 ZERO PROGRESS:",
-                        data
-                    );
-
-
-                    setZeroAdjustmentProgress(
-                        data
-                    );
-
-                };
-
-
-            // =====================================================
-            // LISTENER
-            // =====================================================
-
-            socket.on(
-                "inventory_adjustment:progress",
-                handleZeroProgress
-            );
-
-
-            // =====================================================
-            // SOCKET YA CONECTADO
-            // =====================================================
-
-            if (
-                socket.connected
-            ) {
-
-                joinZeroRoom();
-
-            }
-
-
-            // =====================================================
-            // RECONEXIÓN
-            // =====================================================
-
-            socket.on(
-                "connect",
-                joinZeroRoom
-            );
-
-
-            // =====================================================
-            // CLEANUP
-            // =====================================================
-
-            return () => {
-
-                socket.off(
-                    "inventory_adjustment:progress",
-                    handleZeroProgress
-                );
-
-
-                socket.off(
-                    "connect",
-                    joinZeroRoom
-                );
-
-
-                if (
-                    socket.connected
-                ) {
-
-                    socket.emit(
-                        "inventory_adjustment:leave",
-                        {
-                            jobId:
-                                zeroAdjustmentJobId
-                        }
-                    );
-
-                }
-
-            };
-
-        },
-        [
-            zeroAdjustmentJobId
-        ]
-    );
-
-    
-async function handleReporteFinalInventario() {
-
-  console.log(
-    "📄 GENERANDO REPORTE FINAL DEL INVENTARIO"
+  useInventoryJobProgress(
+    adjustmentJobId,
+    setAdjustmentProgress
   );
 
-  try {
+  useInventoryJobProgress(
+    zeroAdjustmentJobId,
+    setZeroAdjustmentProgress
+  );
 
-    // =====================================================
-    // 1. SOLICITAR REPORTE AL BACKEND
-    // =====================================================
+  // ==========================================================
+  // ERROR MODAL
+  // ==========================================================
 
-    const response = await apiClient.get(
-      "/inventory/report/final",
-      {
-        responseType: "blob"
-      }
-    );
+  const showError = (
+    title: string,
+    message: string
+  ) => {
+    openModal({
+      title,
+      message,
+      buttonText: "Entendido",
+      titleColor: "red",
+    });
+  };
 
-    console.log(
-      "✅ RESPUESTA REPORTE:",
-      response.status
-    );
+  // ==========================================================
+  // DOWNLOAD EXCEL
+  // ==========================================================
 
-    const contentType =
-      response.headers["content-type"] || "";
+  async function downloadExcel(
+    endpoint: string,
+    fileName: string
+  ) {
+    try {
+      console.log("📄 DESCARGANDO EXCEL:", endpoint);
 
-    // =====================================================
-    // 2. VALIDAR RESPUESTA JSON
-    // =====================================================
-
-    if (contentType.includes("application/json")) {
-
-      const text = await response.data.text();
-
-      const data = JSON.parse(text);
-
-      openModal({
-        title:
-          data.title ||
-          "❌ ERROR GENERANDO REPORTE",
-
-        message:
-          data.message ||
-          "El backend no pudo generar el reporte.",
-
-        buttonText: "Entendido",
-        titleColor: "red"
+      const response = await apiClient.get(endpoint, {
+        responseType: "blob",
       });
 
-      return;
-    }
+      const contentType = String(
+        response.headers["content-type"] || ""
+      );
 
-    // =====================================================
-    // 3. GENERAR DESCARGA EXCEL
-    // =====================================================
+      // El backend puede devolver JSON aunque
+      // responseType sea blob.
 
-    const blob = new Blob(
-      [response.data],
-      {
-        type:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      }
-    );
+      if (contentType.includes("application/json")) {
+        const raw =
+          response.data instanceof Blob
+            ? await response.data.text()
+            : String(response.data);
 
-    const url =
-      window.URL.createObjectURL(blob);
+        const data = JSON.parse(raw);
 
-    const link =
-      document.createElement("a");
-
-    link.href = url;
-
-    link.download =
-      "inventario-fisico.xlsx";
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-    window.URL.revokeObjectURL(url);
-
-    console.log(
-      "✅ REPORTE FINAL DESCARGADO CORRECTAMENTE"
-    );
-
-  } catch (error: any) {
-
-    // =====================================================
-    // 4. OBTENER ERROR REAL DEL BACKEND
-    // =====================================================
-
-    console.error(
-      "❌ ERROR GENERANDO REPORTE FINAL:",
-      error
-    );
-
-    const status =
-      error?.response?.status;
-
-    const errorData =
-      error?.response?.data;
-
-    let backendMessage =
-      "No se pudo generar el reporte final del inventario.";
-
-    let backendTitle =
-      "❌ ERROR GENERANDO REPORTE";
-
-    // =====================================================
-    // 5. SI EL ERROR LLEGA COMO BLOB
-    // =====================================================
-
-    if (errorData instanceof Blob) {
-
-      try {
-
-        const text =
-          await errorData.text();
-
-        console.error(
-          "📄 ERROR BACKEND RAW:",
-          text
+        showError(
+          data.title || "Error generando reporte",
+          data.message || "No se pudo generar el reporte."
         );
 
-        const parsed =
-          JSON.parse(text);
+        return;
+      }
 
-        backendMessage =
-          parsed.message ||
-          parsed.error ||
-          backendMessage;
+      const blob = new Blob([response.data], {
+        type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
 
-        backendTitle =
-          parsed.title ||
-          backendTitle;
+      const url = URL.createObjectURL(blob);
 
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
+
+      console.log("✅ EXCEL DESCARGADO:", fileName);
+
+    } catch (error: any) {
+      console.error("❌ ERROR DESCARGANDO EXCEL:", error);
+
+      let message =
+        "No se pudo descargar el reporte de inventario.";
+
+      const backendData = error?.response?.data;
+
+      try {
+        if (backendData instanceof Blob) {
+          const text = await backendData.text();
+          const parsed = JSON.parse(text);
+
+          message =
+            parsed.message ||
+            parsed.error ||
+            message;
+        } else if (backendData) {
+          message =
+            backendData.message ||
+            backendData.error ||
+            message;
+        }
       } catch (parseError) {
-
         console.error(
-          "❌ No se pudo interpretar el error JSON:",
+          "❌ ERROR LEYENDO RESPUESTA:",
           parseError
         );
       }
 
-    } else if (errorData) {
-
-      // =====================================================
-      // 6. SI EL ERROR LLEGA COMO JSON NORMAL
-      // =====================================================
-
-      backendMessage =
-        errorData.message ||
-        errorData.error ||
-        backendMessage;
-
-      backendTitle =
-        errorData.title ||
-        backendTitle;
-
+      showError("Error generando reporte", message);
     }
-
-    console.error(
-      "🟥 STATUS HTTP:",
-      status
-    );
-
-    console.error(
-      "🟥 MENSAJE BACKEND:",
-      backendMessage
-    );
-
-    // =====================================================
-    // 7. MOSTRAR MODAL ROJO
-    // =====================================================
-
-    openModal({
-
-      title: backendTitle,
-
-      message:
-        status
-          ? `Error ${status}: ${backendMessage}`
-          : backendMessage,
-
-      buttonText: "Entendido",
-
-      titleColor: "red"
-
-    });
-
   }
-}
 
+  // ==========================================================
+  // REPORT ACTIONS
+  // ==========================================================
 
-    //REPORTE DE INVENTARIO POR UBICACIONES
-    async function handleReporteInventarioFisicoUbicacion() {
-        console.log("📍 Ejecutando Reporte del Inventario Físico con Ubicación");
+  async function handleReporteFinalInventario() {
+    await downloadExcel(
+      "/inventory/report/final",
+      "inventario-fisico.xlsx"
+    );
+  }
 
-        try {
-            const response = await apiClient.get(
-                "/inventory/report/locations",
-                {
-                    responseType: "blob",
-                }
-            );
+  async function handleReporteInventarioFisicoUbicacion() {
+    await downloadExcel(
+      "/inventory/report/locations",
+      "inventario-fisico-ubicaciones.xlsx"
+    );
+  }
 
-            const contentType =
-                response.headers["content-type"];
-
-            // El backend puede devolver JSON si ocurre una validación
-            if (contentType?.includes("application/json")) {
-                const text = await response.data.text();
-                const data = JSON.parse(text);
-
-                openModal({
-                    title: data.title || "Error",
-                    message:
-                        data.message ||
-                        "No se pudo generar el reporte.",
-                });
-
-                return;
-            }
-
-            const blob = new Blob([response.data], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            });
-
-            const url =
-                window.URL.createObjectURL(blob);
-
-            const link =
-                document.createElement("a");
-
-            link.href = url;
-            link.download =
-                "inventario-fisico-ubicaciones.xlsx";
-
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-
-            window.URL.revokeObjectURL(url);
-
-            console.log(
-                "✅ Reporte de ubicaciones descargado"
-            );
-        } catch (error) {
-            console.error(
-                "❌ Error descargando reporte:",
-                error
-            );
-
-            openModal({
-                title: "Error generando reporte",
-                message:
-                    "No se pudo descargar el reporte de inventario con ubicaciones.",
-            });
-        }
+  function handleReportClick(reportId: number) {
+    if (reportId === 1) {
+      void handleReporteFinalInventario();
+      return;
     }
 
-    //APLICAR AJUSTE DE INVENTARIO
-    const handleApplyInventory =
-        async () => {
+    if (reportId === 2) {
+      void handleReporteInventarioFisicoUbicacion();
+      return;
+    }
 
-            try {
+    console.warn("⚠️ REPORTE NO RECONOCIDO:", reportId);
+  }
 
-                setAdjustmentStarting(
-                    true
-                );
+  // ==========================================================
+  // INITIAL JOB PROGRESS
+  // ==========================================================
 
+  function createInitialProgress(
+    job: any,
+    message: string
+  ): InventoryAdjustmentProgress {
 
-                const response =
-                    await apiClient.post(
-                        "/inventory/start-adjustment"
-                    );
+    const jobId = Number(job?.jobId);
+    const totalProducts = Number(job?.totalProducts) || 0;
+    const processedProducts =
+      Number(job?.processedProducts) || 0;
 
+    return {
+      jobId,
 
-                console.log(
-                    "🟨 RESPUESTA APPLY INVENTORY:",
-                    response.data
-                );
+      sessionId: job?.sessionId
+        ? Number(job.sessionId)
+        : undefined,
 
+      status: job?.status || "pending",
+      phase: "starting",
 
-                if (
-                    !response.data.success
-                ) {
+      totalProducts,
+      processedProducts,
 
-                    openModal({
+      successfulProducts:
+        Number(job?.successfulProducts) || 0,
 
-                        title:
-                            response.data.title ||
-                            "Error",
+      failedProducts:
+        Number(job?.failedProducts) || 0,
 
-                        message:
-                            response.data.message ||
-                            "No se pudo iniciar el ajuste."
-                    });
+      percentage: totalProducts > 0
+        ? Math.round(
+            (processedProducts / totalProducts) * 100
+          )
+        : 0,
 
+      currentLineId: job?.currentLineId ?? null,
+      errorMessage: job?.errorMessage ?? null,
+      message,
+    };
+  }
 
-                    return;
+  // ==========================================================
+  // APPLY COUNTED INVENTORY
+  // ==========================================================
 
-                }
+  async function handleApplyInventory() {
 
+    try {
+      setAdjustmentStarting(true);
 
-                const job =
-                    response.data.data;
+      const response = await apiClient.post(
+        "/inventory/start-adjustment"
+      );
 
+      const data = response.data;
 
-                const jobId =
-                    Number(
-                        job.jobId
-                    );
+      console.log("📦 COUNTED JOB:", data);
 
-
-                if (
-                    !Number.isInteger(jobId) ||
-                    jobId <= 0
-                ) {
-
-                    throw new Error(
-                        "El backend no devolvió un jobId válido."
-                    );
-
-                }
-
-
-                console.log(
-                    "🆔 JOB RECIBIDO:",
-                    jobId
-                );
-
-
-                // ==========================================
-                // GUARDAR JOB ID
-                // ==========================================
-
-                setAdjustmentJobId(
-                    jobId
-                );
-
-
-                // ==========================================
-                // CREAR ESTADO INICIAL
-                // ==========================================
-
-                const totalProducts =
-                    Number(
-                        job.totalProducts
-                    ) || 0;
-
-
-                const processedProducts =
-                    Number(
-                        job.processedProducts
-                    ) || 0;
-
-
-                setAdjustmentProgress({
-
-                    jobId,
-
-                    sessionId:
-                        job.sessionId
-                            ? Number(job.sessionId)
-                            : undefined,
-
-                    status:
-                        job.status ||
-                        "pending",
-
-                    phase:
-                        "starting",
-
-                    totalProducts,
-
-                    processedProducts,
-
-                    successfulProducts:
-                        Number(
-                            job.successfulProducts
-                        ) || 0,
-
-                    failedProducts:
-                        Number(
-                            job.failedProducts
-                        ) || 0,
-
-                    percentage:
-                        totalProducts > 0
-                            ? Math.round(
-                                (
-                                    processedProducts /
-                                    totalProducts
-                                ) * 100
-                            )
-                            : 0,
-
-                    currentLineId:
-                        job.currentLineId ??
-                        null,
-
-                    errorMessage:
-                        job.errorMessage ??
-                        null,
-
-                    message:
-                        "Preparando ajuste de inventario..."
-
-                });
-
-
-            } catch (error) {
-
-                console.error(
-                    "❌ ERROR APPLY INVENTORY:",
-                    error
-                );
-
-
-                openModal({
-                    title:
-                        "Error",
-
-                    message:
-                        "No se pudo iniciar el ajuste de inventario."
-                });
-
-
-            } finally {
-
-                setAdjustmentStarting(
-                    false
-                );
-
-            }
-
-        };
-
-
-    // ============================================================
-    // APLICAR AJUSTE DE INVENTARIO A CERO
-    // ============================================================
-
-    async function handleApplyInventoryZero() {
-
-        console.log(
-            "📦 Ejecutando ajuste de inventario ZERO"
+      if (!data.success) {
+        showError(
+          data.title || "Error",
+          data.message ||
+            "No se pudo iniciar el ajuste."
         );
-
-
-        try {
-
-            setZeroAdjustmentStarting(
-                true
-            );
-
-
-            const response =
-                await apiClient.post(
-                    "/inventory/start-adjustment-zero"
-                );
-
-
-            const data =
-                response.data;
-
-
-            console.log(
-                "📦 RESPUESTA ZERO:",
-                data
-            );
-
-
-            // =====================================================
-            // ERROR DEL BACKEND
-            // =====================================================
-
-            if (!data.success) {
-
-                openModal({
-                    title:
-                        data.title ||
-                        "Error",
-
-                    message:
-                        data.message ||
-                        "No se pudo iniciar el ajuste de inventario."
-                });
-
-
-                return;
-
-            }
-
-            // =====================================================
-            // NO FUE NECESARIO CREAR JOB EN CITRUS
-            // =====================================================
-
-            if (
-                data.data?.citrusAdjustmentRequired === false
-            ) {
-
-                console.log(
-                    "✅ NO SE REQUIRIÓ JOB ZERO EN CITRUS:",
-                    data.data
-                );
-
-
-                setZeroAdjustmentJobId(
-                    null
-                );
-
-
-                setZeroAdjustmentProgress(
-                    null
-                );
-
-
-                openModal({
-                    title:
-                        data.title ||
-                        "Inventario actualizado",
-
-                    message:
-                        data.message ||
-                        "No había productos pendientes para ajustar a cero en Citrus."
-
-                });
-
-
-                return;
-            }
-
-
-            // =====================================================
-            // OBTENER JOB
-            // =====================================================
-
-            const job =
-                data.data;
-
-
-            const jobId =
-                Number(
-                    job.jobId
-                );
-
-
-            if (
-                !Number.isInteger(jobId) ||
-                jobId <= 0
-            ) {
-
-                throw new Error(
-                    "El backend no devolvió un jobId válido."
-                );
-
-            }
-
-
-            console.log(
-                "🆔 ZERO JOB RECIBIDO:",
-                jobId
-            );
-
-
-            // =====================================================
-            // GUARDAR JOB ID
-            // =====================================================
-
-            setZeroAdjustmentJobId(
-                jobId
-            );
-
-
-            // =====================================================
-            // CREAR PROGRESO INICIAL
-            // =====================================================
-
-            const totalProducts =
-                Number(
-                    job.totalProducts
-                ) || 0;
-
-
-            const processedProducts =
-                Number(
-                    job.processedProducts
-                ) || 0;
-
-
-            const successfulProducts =
-                Number(
-                    job.successfulProducts
-                ) || 0;
-
-
-            const failedProducts =
-                Number(
-                    job.failedProducts
-                ) || 0;
-
-
-            setZeroAdjustmentProgress({
-
-                jobId,
-
-                sessionId:
-                    job.sessionId
-                        ? Number(job.sessionId)
-                        : undefined,
-
-                status:
-                    job.status ||
-                    "pending",
-
-                phase:
-                    "starting",
-
-                totalProducts,
-
-                processedProducts,
-
-                successfulProducts,
-
-                failedProducts,
-
-                percentage:
-                    totalProducts > 0
-                        ? Math.round(
-                            (
-                                processedProducts /
-                                totalProducts
-                            ) * 100
-                        )
-                        : 0,
-
-                currentLineId:
-                    job.currentLineId ??
-                    null,
-
-                errorMessage:
-                    job.errorMessage ??
-                    null,
-
-                message:
-                    "Preparando productos para ajustar a cero..."
-
-            });
-
-
-        } catch (error: any) {
-
-            console.error(
-                "❌ Error iniciando ajuste ZERO:",
-                error
-            );
-
-
-            openModal({
-                title:
-                    "Error aplicando inventario",
-
-                message:
-                    error?.response?.data?.message ||
-                    "No se pudo iniciar el ajuste de inventario."
-            });
-
-
-        } finally {
-
-            setZeroAdjustmentStarting(
-                false
-            );
-
-        }
-
-    }
-
-    function handleReporteAuditoria() {
-        console.log("🧾 Ejecutando Reporte de Auditoría");
-
-        // Aquí luego puedes llamar tu API
-        // apiClient.get("/inventory/report/audit")
-    }
-
-    function handleReportClick(reportId: number) {
-        if (reportId === 1) {
-            handleReporteFinalInventario();
-            return;
-        }
-
-        if (reportId === 2) {
-            handleReporteInventarioFisicoUbicacion();
-            return;
-        }
-
-        if (reportId === 3) {
-            handleReporteAuditoria();
-            return;
-        }
-
-        console.log("⚠️ Reporte no reconocido:", reportId);
-    }
-
-    //FUNCION PARA ABRIR EL MODAL
-    function openConfirmation({
-        title,
-        message,
-        confirmText,
-        action
-    }: {
-        title: string;
-        message: string;
-        confirmText: string;
-        action: () => Promise<void>;
-    }) {
-
-        setConfirmationTitle(title);
-
-        setConfirmationMessage(message);
-
-        setConfirmationText(confirmText);
-
-        // IMPORTANTE:
-        // guardamos una función dentro del state
-        setConfirmationAction(
-            () => action
+        return;
+      }
+
+      const job = data.data;
+      const jobId = Number(job?.jobId);
+
+      if (!Number.isSafeInteger(jobId) || jobId <= 0) {
+        throw new Error(
+          "El backend no devolvió un jobId válido."
         );
+      }
 
-        setShowConfirmation(true);
+      setAdjustmentJobId(jobId);
+
+      setAdjustmentProgress(
+        createInitialProgress(
+          job,
+          "Preparando ajuste de inventario..."
+        )
+      );
+
+    } catch (error: any) {
+      console.error("❌ ERROR COUNTED:", error);
+
+      showError(
+        "Error aplicando inventario",
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudo iniciar el ajuste de inventario."
+      );
+
+    } finally {
+      setAdjustmentStarting(false);
     }
-
-
-    return (
-        <div className="inventory-report-container">
-            {/* 1. TITLE */}
-            <div className="inventory-report-title">
-                <div className="inventory-report-title-content">
-                    <div className="inventory-report-title-icon">
-                        <ClipboardCheck size={34} />
-                    </div>
-
-                    <div className="inventory-report-title-text">
-                        Reportes de Inventario
-                    </div>
-                </div>
-            </div>
-
-            {adjustmentProgress && (
-
-                <div className="inventory-adjustment-progress-card">
-
-                    {/* HEADER */}
-                    <div className="inventory-adjustment-progress-header">
-
-                        <div className="inventory-adjustment-progress-title-group">
-
-                            <div className="inventory-adjustment-progress-icon">
-                                ⚙️
-                            </div>
-
-                            <div>
-                                <h3>
-                                    Ajuste de Inventario
-                                </h3>
-
-                                <span>
-                                    Job #{adjustmentProgress.jobId}
-                                </span>
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            className={`
-          inventory-adjustment-status
-          status-${adjustmentProgress.status}
-        `}
-                        >
-                            {adjustmentProgress.status}
-                        </div>
-
-                    </div>
-
-
-                    {/* PROGRESO */}
-                    <div className="inventory-adjustment-progress-section">
-
-                        <div className="inventory-adjustment-progress-labels">
-
-                            <span>
-                                Progreso del ajuste
-                            </span>
-
-                            <strong>
-                                {adjustmentProgress.percentage}%
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-progress-track">
-
-                            <div
-                                className="inventory-adjustment-progress-fill"
-                                style={{
-                                    width:
-                                        `${adjustmentProgress.percentage}%`
-                                }}
-                            />
-
-                        </div>
-
-                    </div>
-
-
-                    {/* STATS */}
-                    <div className="inventory-adjustment-progress-stats">
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Procesados
-                            </span>
-
-                            <strong>
-                                {adjustmentProgress.processedProducts}
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Total
-                            </span>
-
-                            <strong>
-                                {adjustmentProgress.totalProducts}
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Correctos
-                            </span>
-
-                            <strong>
-                                {adjustmentProgress.successfulProducts}
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Errores
-                            </span>
-
-                            <strong>
-                                {adjustmentProgress.failedProducts}
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* PRODUCTO ACTUAL */}
-                    {adjustmentProgress.currentProduct && (
-
-                        <div className="inventory-adjustment-current">
-
-                            <div className="inventory-adjustment-current-label">
-                                Producto actual
-                            </div>
-
-                            <div className="inventory-adjustment-current-info">
-
-                                <span>
-                                    ERP ID:
-                                    {" "}
-                                    <strong>
-                                        {
-                                            adjustmentProgress
-                                                .currentProduct
-                                                .erpProductId
-                                        }
-                                    </strong>
-                                </span>
-
-
-                                {
-                                    adjustmentProgress
-                                        .currentProduct
-                                        .citrusQtyBefore !== undefined && (
-
-                                        <span>
-                                            Citrus:
-                                            {" "}
-                                            <strong>
-                                                {
-                                                    adjustmentProgress
-                                                        .currentProduct
-                                                        .citrusQtyBefore
-                                                }
-                                            </strong>
-                                        </span>
-
-                                    )
-                                }
-
-
-                                {
-                                    adjustmentProgress
-                                        .currentProduct
-                                        .desiredQty !== undefined && (
-
-                                        <span>
-                                            Físico:
-                                            {" "}
-                                            <strong>
-                                                {
-                                                    adjustmentProgress
-                                                        .currentProduct
-                                                        .desiredQty
-                                                }
-                                            </strong>
-                                        </span>
-
-                                    )
-                                }
-
-                            </div>
-
-                        </div>
-
-                    )}
-
-
-                    {/* MENSAJE */}
-                    <div className="inventory-adjustment-progress-message">
-
-                        <div className="inventory-adjustment-progress-message-dot" />
-
-                        <span>
-                            {
-                                adjustmentProgress.message ||
-                                "Procesando inventario..."
-                            }
-                        </span>
-
-                    </div>
-
-                </div>
-
-            )}
-
-
-            {zeroAdjustmentProgress && (
-
-                <div className="inventory-adjustment-progress-card">
-
-                    {/* HEADER */}
-                    <div className="inventory-adjustment-progress-header">
-
-                        <div className="inventory-adjustment-progress-title-group">
-
-                            <div className="inventory-adjustment-progress-icon">
-                                0
-                            </div>
-
-                            <div>
-
-                                <h3>
-                                    Ajuste de Productos No Contados
-                                </h3>
-
-                                <span>
-                                    Job #{zeroAdjustmentProgress.jobId}
-                                </span>
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            className={`
-                    inventory-adjustment-status
-                    status-${zeroAdjustmentProgress.status}
-                `}
-                        >
-                            {zeroAdjustmentProgress.status}
-                        </div>
-
-                    </div>
-
-
-                    {/* PROGRESS */}
-                    <div className="inventory-adjustment-progress-section">
-
-                        <div className="inventory-adjustment-progress-labels">
-
-                            <span>
-                                Ajustando existencias a cero
-                            </span>
-
-                            <strong>
-                                {zeroAdjustmentProgress.percentage}%
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-progress-track">
-
-                            <div
-                                className="inventory-adjustment-progress-fill"
-                                style={{
-                                    width:
-                                        `${zeroAdjustmentProgress.percentage}%`
-                                }}
-                            />
-
-                        </div>
-
-                    </div>
-
-
-                    {/* STATS */}
-                    <div className="inventory-adjustment-progress-stats">
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Procesados
-                            </span>
-
-                            <strong>
-                                {
-                                    zeroAdjustmentProgress
-                                        .processedProducts
-                                }
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Total
-                            </span>
-
-                            <strong>
-                                {
-                                    zeroAdjustmentProgress
-                                        .totalProducts
-                                }
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Correctos
-                            </span>
-
-                            <strong>
-                                {
-                                    zeroAdjustmentProgress
-                                        .successfulProducts
-                                }
-                            </strong>
-
-                        </div>
-
-
-                        <div className="inventory-adjustment-stat">
-
-                            <span className="inventory-adjustment-stat-label">
-                                Errores
-                            </span>
-
-                            <strong>
-                                {
-                                    zeroAdjustmentProgress
-                                        .failedProducts
-                                }
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* PRODUCTO ACTUAL */}
-                    {zeroAdjustmentProgress.currentProduct && (
-
-                        <div className="inventory-adjustment-current">
-
-                            <div className="inventory-adjustment-current-label">
-                                Producto actual
-                            </div>
-
-
-                            <div className="inventory-adjustment-current-info">
-
-                                <span>
-                                    ERP ID:{" "}
-
-                                    <strong>
-                                        {
-                                            zeroAdjustmentProgress
-                                                .currentProduct
-                                                .erpProductId
-                                        }
-                                    </strong>
-                                </span>
-
-
-                                {
-                                    zeroAdjustmentProgress
-                                        .currentProduct
-                                        .citrusQtyBefore !== undefined && (
-
-                                        <span>
-                                            Existencia Citrus:{" "}
-
-                                            <strong>
-                                                {
-                                                    zeroAdjustmentProgress
-                                                        .currentProduct
-                                                        .citrusQtyBefore
-                                                }
-                                            </strong>
-                                        </span>
-
-                                    )
-                                }
-
-
-                                {
-                                    zeroAdjustmentProgress
-                                        .currentProduct
-                                        .desiredQty !== undefined && (
-
-                                        <span>
-                                            Nueva cantidad:{" "}
-
-                                            <strong>
-                                                {
-                                                    zeroAdjustmentProgress
-                                                        .currentProduct
-                                                        .desiredQty
-                                                }
-                                            </strong>
-                                        </span>
-
-                                    )
-                                }
-
-                            </div>
-
-                        </div>
-
-                    )}
-
-
-                    {/* MESSAGE */}
-                    <div className="inventory-adjustment-progress-message">
-
-                        <div className="inventory-adjustment-progress-message-dot" />
-
-                        <span>
-                            {
-                                zeroAdjustmentProgress.message ||
-                                "Procesando productos..."
-                            }
-                        </span>
-
-                    </div>
-
-                </div>
-
-            )}
-
-
-            {/* 2. CENTER */}
-            <div className="inventory-report-center">
-                {/* 2.1 LEFT */}
-                <div className="inventory-report-center-left">
-                    {reports.map((report) => (
-                        <div
-                            key={report.id}
-                            className="inventory-report-option"
-                            onMouseEnter={() => setHoveredReport(report)}
-                            onMouseLeave={() => setHoveredReport(null)}
-                            onClick={() => handleReportClick(report.id)}
-                        >
-                            <div className="inventory-report-option-icon">
-                                <FileText size={34} />
-                            </div>
-
-                            <div className="inventory-report-option-text">
-                                {report.title}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* 2.2 RIGHT */}
-                <div className="inventory-report-center-right">
-                    <div className="inventory-report-description-box">
-                        <div className="inventory-report-description-icon">
-                            <Info size={34} />
-                        </div>
-
-                        <div className="inventory-report-description-text">
-                            {hoveredReport
-                                ? hoveredReport.description
-                                : "Pasa el mouse sobre un reporte para ver una explicación breve de su contenido y su función dentro del inventario."}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-
-
-{/* 3. BUTTON */}
-<div className="inventory-report-button">
-
-    {/* ==========================================
-        APLICAR INVENTARIO EN CERO - DISABLED
-    ========================================== */}
-
-    <div
-    className={`
-        inventory-report-button-action
-        zero-adjustment
-        disabled
-        ${zeroAdjustmentStarting ? "disabled" : ""}
-    `}
-    aria-disabled="true"
-    style={{
-        pointerEvents: "none",
-        opacity: 0.5,
-        cursor: "not-allowed"
-    }}
-    onClick={() => {
-
-        if (zeroAdjustmentStarting) {
-            return;
-        }
-
-        openConfirmation({
-            title:
-                "Aplicar inventario en cero",
-
-            message:
-                "¿Está seguro de que desea ajustar a cero en ADM Cloud los productos no encontrados durante este inventario?",
-
-            confirmText:
-                "Aplicar CERO",
-
-            action:
-                handleApplyInventoryZero
+  }
+
+  // ==========================================================
+  // APPLY ZERO INVENTORY
+  // ==========================================================
+
+  async function handleApplyInventoryZero() {
+
+    try {
+      setZeroAdjustmentStarting(true);
+
+      const response = await apiClient.post(
+        "/inventory/start-adjustment-zero"
+      );
+
+      const data = response.data;
+
+      console.log("📦 ZERO JOB:", data);
+
+      if (!data.success) {
+        showError(
+          data.title || "Error",
+          data.message ||
+            "No se pudo iniciar el ajuste ZERO."
+        );
+        return;
+      }
+
+      // No hay productos pendientes para ajustar.
+
+      if (data.data?.citrusAdjustmentRequired === false) {
+        setZeroAdjustmentJobId(null);
+        setZeroAdjustmentProgress(null);
+
+        openModal({
+          title: data.title || "Inventario actualizado",
+          message:
+            data.message ||
+            "No existen productos pendientes para ajustar a cero.",
+          buttonText: "Entendido",
+          titleColor: "green",
         });
 
-    }}
->
-    <CheckSquare size={24} />
+        return;
+      }
 
-    <span>
-        {
-            zeroAdjustmentStarting
-                ? "Iniciando ajuste..."
-                : "Aplicar Inventario en CERO (0.000)"
-        }
-    </span>
-</div>
+      const job = data.data;
+      const jobId = Number(job?.jobId);
 
-    {/* ==========================================
-        APLICAR INVENTARIO CONTADO - ACTIVE
-    ========================================== */}
+      if (!Number.isSafeInteger(jobId) || jobId <= 0) {
+        throw new Error(
+          "El backend no devolvió un jobId válido."
+        );
+      }
 
-    <div
-        className={`
-            inventory-report-button-action
-            ${adjustmentStarting ? "disabled" : ""}
-        `}
+      setZeroAdjustmentJobId(jobId);
 
-        onClick={() => {
+      setZeroAdjustmentProgress(
+        createInitialProgress(
+          job,
+          "Preparando productos para ajustar a cero..."
+        )
+      );
 
-            if (adjustmentStarting) {
-                return;
-            }
+    } catch (error: any) {
+      console.error("❌ ERROR ZERO:", error);
 
-            openConfirmation({
-                title:
-                    "Aplicar inventario contado",
+      showError(
+        "Error aplicando inventario",
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudo iniciar el ajuste ZERO."
+      );
 
-                message:
-                    "¿Está seguro de que desea aplicar en ADM Cloud las cantidades físicas contadas durante este inventario?",
+    } finally {
+      setZeroAdjustmentStarting(false);
+    }
+  }
 
-                confirmText:
-                    "Aplicar CONTADO",
+  // ==========================================================
+  // CONFIRMATION MODAL
+  // ==========================================================
 
-                action:
-                    handleApplyInventory
-            });
+  function openConfirmation({
+    title,
+    message,
+    confirmText,
+    action,
+  }: ConfirmationData) {
 
-        }}
-    >
-        <CheckSquare size={24} />
+    setConfirmationTitle(title);
+    setConfirmationMessage(message);
+    setConfirmationText(confirmText);
 
-        <span>
-            {
-                adjustmentStarting
-                    ? "Iniciando ajuste..."
-                    : "Aplicar Inventario CONTADO"
-            }
-        </span>
-    </div>
+    setConfirmationAction(() => action);
+    setShowConfirmation(true);
+  }
 
-</div>
+  function confirmZeroAdjustment() {
+    openConfirmation({
+      title: "Aplicar inventario en cero",
+      message:
+        "¿Está seguro de que desea ajustar a cero " +
+        "en ADM Cloud los productos no encontrados " +
+        "durante este inventario?",
+      confirmText: "Aplicar CERO",
+      action: handleApplyInventoryZero,
+    });
+  }
 
+  function confirmCountedAdjustment() {
+    openConfirmation({
+      title: "Aplicar inventario contado",
+      message:
+        "¿Está seguro de que desea aplicar en ADM Cloud " +
+        "las cantidades físicas contadas durante este inventario?",
+      confirmText: "Aplicar CONTADO",
+      action: handleApplyInventory,
+    });
+  }
 
-            <ConfirmationModal
+  async function handleConfirm() {
+    if (!confirmationAction || confirmationLoading) {
+      return;
+    }
 
-                isOpen={
-                    showConfirmation
-                }
+    try {
+      setConfirmationLoading(true);
 
-                title={
-                    confirmationTitle
-                }
+      await confirmationAction();
 
-                message={
-                    confirmationMessage
-                }
+      setShowConfirmation(false);
+      setConfirmationAction(null);
 
-                confirmText={
-                    confirmationText
-                }
+    } catch (error) {
+      console.error("❌ ERROR CONFIRMANDO:", error);
 
-                cancelText="Cancelar"
+      showError(
+        "Error de confirmación",
+        "No se pudo completar la operación."
+      );
 
-                loading={
-                    confirmationLoading
-                }
+    } finally {
+      setConfirmationLoading(false);
+    }
+  }
 
-                onClose={() => {
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
-                    if (confirmationLoading) {
-                        return;
-                    }
+  return (
+    <div className="inventory-report-container">
 
-                    setShowConfirmation(false);
+      {/* =====================================================
+          PAGE HEADER
+      ===================================================== */}
 
-                    setConfirmationAction(null);
-                }}
+      <header className="inventory-report-page-header">
 
-                onConfirm={async () => {
+        <div className="inventory-report-page-icon">
+          <ClipboardCheck
+            size={29}
+            strokeWidth={2}
+          />
+        </div>
 
-                    if (!confirmationAction) {
-                        return;
-                    }
+        <div className="inventory-report-page-heading">
 
-                    try {
+          <span className="inventory-report-eyebrow">
+            INVENTARIO
+          </span>
 
-                        setConfirmationLoading(true);
+          <h1 className="inventory-report-page-title">
+            Reportes de Inventario
+          </h1>
 
-                        await confirmationAction();
-
-                        setShowConfirmation(false);
-
-                        setConfirmationAction(null);
-
-                    } finally {
-
-                        setConfirmationLoading(false);
-
-                    }
-
-                }}
-
-            />
-
+          <p className="inventory-report-page-subtitle">
+            Consulta los reportes físicos y administra
+            los ajustes de inventario.
+          </p>
 
         </div>
-    );
+
+      </header>
+
+      {/* =====================================================
+          COUNTED PROGRESS
+      ===================================================== */}
+
+      {adjustmentProgress && (
+        <InventoryProgressCard
+          progress={adjustmentProgress}
+        />
+      )}
+
+      {/* =====================================================
+          ZERO PROGRESS
+      ===================================================== */}
+
+      {zeroAdjustmentProgress && (
+        <InventoryProgressCard
+          progress={zeroAdjustmentProgress}
+          zero
+        />
+      )}
+
+      {/* =====================================================
+          REPORTS SECTION
+      ===================================================== */}
+
+      <section className="inventory-report-center">
+
+        {/* LEFT */}
+
+        <div className="inventory-report-center-left">
+
+          <div className="inventory-report-section-heading">
+
+            <span className="inventory-report-section-eyebrow">
+              CONSULTAS
+            </span>
+
+            <h2>Reportes disponibles</h2>
+
+            <p>
+              Selecciona el reporte que deseas consultar.
+            </p>
+
+          </div>
+
+          {reports.map((report) => (
+
+            <button
+              type="button"
+              key={report.id}
+              className="inventory-report-option"
+              onMouseEnter={() => setHoveredReport(report)}
+              onMouseLeave={() => setHoveredReport(null)}
+              onFocus={() => setHoveredReport(report)}
+              onBlur={() => setHoveredReport(null)}
+              onClick={() => handleReportClick(report.id)}
+            >
+
+              <span className="inventory-report-option-icon">
+                {report.id === 1 ? (
+                  <FileSpreadsheet
+                    size={25}
+                    strokeWidth={1.9}
+                  />
+                ) : (
+                  <MapPin
+                    size={25}
+                    strokeWidth={1.9}
+                  />
+                )}
+              </span>
+
+              <span className="inventory-report-option-body">
+
+                <span className="inventory-report-option-meta">
+                  REPORTE {String(report.id).padStart(2, "0")} · EXCEL
+                </span>
+
+                <span className="inventory-report-option-text">
+                  {report.title}
+                </span>
+
+              </span>
+
+              <ChevronRight
+                className="inventory-report-option-chevron"
+                size={18}
+              />
+
+            </button>
+
+          ))}
+
+        </div>
+
+        {/* RIGHT */}
+
+        <aside className="inventory-report-center-right">
+
+          <div className="inventory-report-description-box">
+
+            <div className="inventory-report-description-icon">
+              <Info
+                size={25}
+                strokeWidth={1.9}
+              />
+            </div>
+
+            <div className="inventory-report-description-content">
+
+              <span className="inventory-report-description-eyebrow">
+                INFORMACIÓN DEL REPORTE
+              </span>
+
+              <h3>
+                {hoveredReport
+                  ? hoveredReport.title
+                  : "¿Qué incluye cada reporte?"}
+              </h3>
+
+              <p className="inventory-report-description-text">
+
+                {hoveredReport
+                  ? hoveredReport.description
+                  : "Coloca el cursor sobre una opción o " +
+                    "selecciónala con el teclado para conocer " +
+                    "su contenido antes de descargarla."}
+
+              </p>
+
+            </div>
+
+          </div>
+
+        </aside>
+
+      </section>
+
+      {/* =====================================================
+          ACTION BUTTONS
+      ===================================================== */}
+
+      <div className="inventory-report-button">
+
+        {/* ZERO */}
+
+        <button
+          type="button"
+          className="inventory-report-button-action zero-adjustment"
+          disabled={
+            zeroAdjustmentStarting ||
+            adjustmentStarting ||
+            confirmationLoading
+          }
+          onClick={confirmZeroAdjustment}
+        >
+          <PackageX size={20} />
+
+          <span>
+            {zeroAdjustmentStarting
+              ? "Iniciando ajuste..."
+              : "Aplicar Inventario en CERO (0.000)"}
+          </span>
+        </button>
+
+        {/* COUNTED */}
+
+        <button
+          type="button"
+          className="inventory-report-button-action"
+          disabled={
+            adjustmentStarting ||
+            zeroAdjustmentStarting ||
+            confirmationLoading
+          }
+          onClick={confirmCountedAdjustment}
+        >
+          <PackageCheck size={20} />
+
+          <span>
+            {adjustmentStarting
+              ? "Iniciando ajuste..."
+              : "Aplicar Inventario CONTADO"}
+          </span>
+
+          <CheckSquare size={17} />
+        </button>
+
+      </div>
+
+      {/* =====================================================
+          CONFIRMATION MODAL
+      ===================================================== */}
+
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        title={confirmationTitle}
+        message={confirmationMessage}
+        confirmText={confirmationText}
+        cancelText="Cancelar"
+        loading={confirmationLoading}
+        onClose={() => {
+          if (confirmationLoading) return;
+
+          setShowConfirmation(false);
+          setConfirmationAction(null);
+        }}
+        onConfirm={handleConfirm}
+      />
+
+    </div>
+  );
 }

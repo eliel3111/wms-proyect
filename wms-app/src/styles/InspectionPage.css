@@ -1,0 +1,2205 @@
+/* =========================================================
+   GARLAS WMS
+   INSPECTION PAGE
+========================================================= */
+
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+.inspection-page {
+  width: 100%;
+
+  min-height: 100%;
+
+  padding:
+    24px;
+
+  box-sizing: border-box;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 22px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #f8fafc 0%,
+      #eef3f8 52%,
+      #f7f9fc 100%
+    );
+
+  color:
+    var(
+      --text-primary,
+      #17233c
+    );
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+}
+
+
+/* =========================================================
+   TOP TOOLBAR
+========================================================= */
+
+.inspection-toolbar {
+  width: 100%;
+
+  min-height: 112px;
+
+  padding:
+    20px
+    22px;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(300px, 1fr)
+    minmax(360px, 0.9fr)
+    auto;
+
+  align-items: center;
+
+  gap: 28px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dfe6ee;
+
+  border-radius:
+    15px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.97
+    );
+
+  box-shadow:
+    0
+    7px
+    22px
+    rgba(
+      15,
+      23,
+      42,
+      0.055
+    );
+}
+
+
+/* =========================================================
+   HEADING
+========================================================= */
+
+.inspection-heading {
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 16px;
+}
+
+
+.inspection-heading-icon {
+  width: 58px;
+
+  height: 58px;
+
+  flex:
+    0
+    0
+    58px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius:
+    12px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #e9f3ff 0%,
+      #dcecff 100%
+    );
+
+  color:
+    #216ee8;
+}
+
+
+.inspection-heading-content {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 1px;
+}
+
+
+.inspection-title {
+  margin: 0;
+
+  color:
+    #121d32;
+
+  font-size:
+    29px;
+
+  line-height:
+    34px;
+
+  font-weight:
+    var(
+      --weight-bold,
+      690
+    );
+
+  letter-spacing:
+    var(
+      --tracking-display,
+      -0.035em
+    );
+}
+
+
+.inspection-subtitle {
+  margin: 0;
+
+  color:
+    var(
+      --text-secondary,
+      #52627a
+    );
+
+  font-size:
+    14px;
+
+  line-height:
+    20px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  letter-spacing:
+    var(
+      --tracking-ui,
+      -0.008em
+    );
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+.inspection-search {
+  width: 100%;
+
+  height: 46px;
+
+  position: relative;
+
+  display: flex;
+
+  align-items: center;
+}
+
+
+.inspection-search-icon {
+  position: absolute;
+
+  left: 15px;
+
+  color:
+    #62738a;
+
+  pointer-events: none;
+}
+
+
+.inspection-search-input {
+  width: 100%;
+
+  height: 46px;
+
+  padding:
+    0
+    15px
+    0
+    45px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #cbd6e2;
+
+  border-radius:
+    9px;
+
+  outline: none;
+
+  background:
+    #ffffff;
+
+  color:
+    #17233c;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+
+  font-size:
+    13px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  box-shadow:
+    0
+    1px
+    3px
+    rgba(
+      15,
+      23,
+      42,
+      0.025
+    );
+
+  transition:
+    border-color
+    150ms
+    ease,
+    box-shadow
+    150ms
+    ease;
+}
+
+
+.inspection-search-input::placeholder {
+  color:
+    var(
+      --text-placeholder,
+      #94a0b1
+    );
+}
+
+
+.inspection-search-input:focus {
+  border-color:
+    #4b91eb;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    rgba(
+      45,
+      104,
+      231,
+      0.1
+    );
+}
+
+
+/* =========================================================
+   PAGINATION
+========================================================= */
+
+.inspection-pagination {
+  padding-left:
+    24px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: flex-end;
+
+  gap: 13px;
+
+  border-left:
+    1px solid
+    #e1e7ee;
+
+  white-space: nowrap;
+}
+
+
+.inspection-pagination-button {
+  width: 38px;
+
+  height: 38px;
+
+  padding: 0;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border:
+    1px solid
+    #d4dee9;
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #40516a;
+
+  cursor: pointer;
+
+  transition:
+    background-color
+    120ms
+    ease,
+    border-color
+    120ms
+    ease,
+    transform
+    80ms
+    ease;
+}
+
+
+.inspection-pagination-button:hover:not(:disabled) {
+  border-color:
+    #aac4e3;
+
+  background:
+    #f5f9fd;
+}
+
+
+.inspection-pagination-button:active:not(:disabled) {
+  transform:
+    scale(0.96);
+}
+
+
+.inspection-pagination-button:disabled {
+  opacity:
+    0.35;
+
+  cursor:
+    not-allowed;
+}
+
+
+.inspection-pagination-counter {
+  min-width: 72px;
+
+  color:
+    #17233c;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    13px;
+
+  line-height:
+    18px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  text-align:
+    center;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   TABLE CARD
+========================================================= */
+
+.inspection-table-card {
+  width: 100%;
+
+  padding:
+    18px;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid
+    #dfe6ee;
+
+  border-radius:
+    15px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0
+    7px
+    22px
+    rgba(
+      15,
+      23,
+      42,
+      0.055
+    );
+}
+
+
+/* =========================================================
+   TABLE CONTAINER
+========================================================= */
+
+.inspection-table-container {
+  width: 100%;
+
+  overflow-x: auto;
+
+  border-radius:
+    8px;
+}
+
+
+/* =========================================================
+   TABLE
+========================================================= */
+
+.inspection-table {
+  width: 100%;
+
+  min-width: 1050px;
+
+  border-collapse:
+    separate;
+
+  border-spacing:
+    0;
+
+  table-layout:
+    fixed;
+
+  font-family:
+    var(
+      --font-ui,
+      "Geist Variable",
+      sans-serif
+    );
+}
+
+
+/* =========================================================
+   COLUMN WIDTHS
+
+   ERP ID DOES NOT EXIST VISUALLY
+========================================================= */
+
+.inspection-table th:nth-child(1),
+.inspection-table td:nth-child(1) {
+  width:
+    5%;
+}
+
+
+.inspection-table th:nth-child(2),
+.inspection-table td:nth-child(2) {
+  width:
+    9%;
+}
+
+
+.inspection-table th:nth-child(3),
+.inspection-table td:nth-child(3) {
+  width:
+    14%;
+}
+
+
+.inspection-table th:nth-child(4),
+.inspection-table td:nth-child(4) {
+  width:
+    10%;
+}
+
+
+.inspection-table th:nth-child(5),
+.inspection-table td:nth-child(5) {
+  width:
+    24%;
+}
+
+
+.inspection-table th:nth-child(6),
+.inspection-table td:nth-child(6) {
+  width:
+    15%;
+}
+
+
+.inspection-table th:nth-child(7),
+.inspection-table td:nth-child(7) {
+  width:
+    14%;
+}
+
+
+.inspection-table th:nth-child(8),
+.inspection-table td:nth-child(8) {
+  width:
+    12%;
+}
+
+
+/* =========================================================
+   TABLE HEAD
+========================================================= */
+
+.inspection-table thead {
+  background:
+    linear-gradient(
+      180deg,
+      #f4f6fa 0%,
+      #edf1f6 100%
+    );
+}
+
+
+.inspection-table th {
+  height:
+    44px;
+
+  padding:
+    0
+    12px;
+
+  box-sizing:
+    border-box;
+
+  border-bottom:
+    1px solid
+    #dce4ed;
+
+  color:
+    #2c3950;
+
+  font-size:
+    11px;
+
+  line-height:
+    15px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+
+  letter-spacing:
+    0.005em;
+
+  text-align:
+    left;
+
+  text-transform:
+    uppercase;
+
+  white-space:
+    nowrap;
+}
+
+
+.inspection-table th:first-child {
+  border-top-left-radius:
+    8px;
+
+  border-bottom-left-radius:
+    8px;
+}
+
+
+.inspection-table th:last-child {
+  border-top-right-radius:
+    8px;
+
+  border-bottom-right-radius:
+    8px;
+}
+
+
+/* =========================================================
+   ROW
+========================================================= */
+
+.inspection-table-row {
+  cursor:
+    pointer;
+
+  outline:
+    none;
+
+  background:
+    #ffffff;
+
+  transition:
+    background-color
+    120ms
+    ease,
+    box-shadow
+    120ms
+    ease;
+}
+
+
+.inspection-table-row:nth-child(even) {
+  background:
+    #f8fafc;
+}
+
+
+.inspection-table-row:hover {
+  background:
+    #eef6ff;
+}
+
+
+.inspection-table-row:focus-visible {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  outline:
+    2px solid
+    #4d98ed;
+
+  outline-offset:
+    -2px;
+}
+
+
+/* =========================================================
+   CELLS
+========================================================= */
+
+.inspection-table td {
+  height:
+    48px;
+
+  padding:
+    0
+    12px;
+
+  box-sizing:
+    border-box;
+
+  border-bottom:
+    1px solid
+    #e8edf2;
+
+  color:
+    #25364e;
+
+  font-size:
+    12px;
+
+  line-height:
+    17px;
+
+  font-weight:
+    var(
+      --weight-regular,
+      430
+    );
+
+  vertical-align:
+    middle;
+
+  white-space:
+    nowrap;
+
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+}
+
+
+.inspection-table tbody tr:last-child td {
+  border-bottom:
+    none;
+}
+
+
+/* =========================================================
+   ID
+========================================================= */
+
+.inspection-id {
+  color:
+    #536278 !important;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   NUMBER
+========================================================= */
+
+.inspection-document-number {
+  color:
+    #182b4c !important;
+
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    ) !important;
+
+  letter-spacing:
+    -0.018em;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   DATE
+========================================================= */
+
+.inspection-date {
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   REFERENCE
+========================================================= */
+
+.inspection-reference {
+  font-family:
+    var(
+      --font-data,
+      "Geist Mono Variable",
+      monospace
+    );
+
+  font-size:
+    11.5px !important;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+/* =========================================================
+   TYPE PILL
+========================================================= */
+
+.inspection-type-pill {
+  width:
+    fit-content;
+
+  min-width:
+    67px;
+
+  padding:
+    4px
+    9px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  box-sizing:
+    border-box;
+
+  border-radius:
+    999px;
+
+  font-size:
+    10.5px;
+
+  line-height:
+    14px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+}
+
+
+.inspection-type-conduce {
+  color:
+    #194f8a;
+
+  background:
+    #deedff;
+}
+
+
+.inspection-type-factura {
+  color:
+    #5443a2;
+
+  background:
+    #eeeaff;
+}
+
+
+/* =========================================================
+   STATUS
+========================================================= */
+
+.inspection-status-cell {
+  overflow:
+    visible !important;
+}
+
+
+.inspection-status-pill {
+  width:
+    fit-content;
+
+  min-width:
+    98px;
+
+  padding:
+    5px
+    10px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    6px;
+
+  box-sizing:
+    border-box;
+
+  border-radius:
+    999px;
+
+  font-size:
+    10.5px;
+
+  line-height:
+    14px;
+
+  font-weight:
+    var(
+      --weight-semibold,
+      620
+    );
+}
+
+
+/* PENDING */
+
+.inspection-status-pendiente {
+  color:
+    #155acb;
+
+  background:
+    #dfeeff;
+}
+
+
+/* APPROVED */
+
+.inspection-status-aprobado {
+  color:
+    #087443;
+
+  background:
+    #dcf6e5;
+}
+
+
+/* REJECTED */
+
+.inspection-status-rechazado {
+  color:
+    #c02d32;
+
+  background:
+    #ffe1e2;
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.inspection-empty {
+  min-height:
+    240px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  color:
+    var(
+      --text-muted,
+      #7c899c
+    );
+
+  font-size:
+    14px;
+
+  font-weight:
+    var(
+      --weight-medium,
+      510
+    );
+}
+
+
+/* =========================================================
+   LARGE DESKTOP / MONITOR
+========================================================= */
+
+@media (min-width: 1600px) {
+
+  .inspection-page {
+    padding:
+      30px
+      34px;
+
+    gap:
+      26px;
+  }
+
+
+  .inspection-toolbar {
+    min-height:
+      122px;
+
+    padding:
+      22px
+      26px;
+
+    grid-template-columns:
+      minmax(340px, 1fr)
+      minmax(480px, 0.95fr)
+      auto;
+  }
+
+
+  .inspection-heading-icon {
+    width:
+      62px;
+
+    height:
+      62px;
+
+    flex-basis:
+      62px;
+  }
+
+
+  .inspection-title {
+    font-size:
+      31px;
+
+    line-height:
+      36px;
+  }
+
+
+  .inspection-table-card {
+    padding:
+      20px;
+  }
+
+
+  .inspection-table td {
+    height:
+      52px;
+
+    font-size:
+      12.5px;
+  }
+
+}
+
+
+/* =========================================================
+   LAPTOP
+========================================================= */
+
+@media (
+  min-width: 701px
+) and (
+  max-width: 1366px
+) {
+
+  .inspection-page {
+    padding:
+      18px;
+
+    gap:
+      16px;
+  }
+
+
+  .inspection-toolbar {
+    min-height:
+      96px;
+
+    padding:
+      16px
+      18px;
+
+    gap:
+      18px;
+
+    grid-template-columns:
+      minmax(260px, 0.9fr)
+      minmax(300px, 1fr)
+      auto;
+  }
+
+
+  .inspection-heading {
+    gap:
+      12px;
+  }
+
+
+  .inspection-heading-icon {
+    width:
+      50px;
+
+    height:
+      50px;
+
+    flex-basis:
+      50px;
+  }
+
+
+  .inspection-heading-icon svg {
+    width:
+      23px;
+
+    height:
+      23px;
+  }
+
+
+  .inspection-title {
+    font-size:
+      25px;
+
+    line-height:
+      30px;
+  }
+
+
+  .inspection-subtitle {
+    font-size:
+      12.5px;
+  }
+
+
+  .inspection-search-input {
+    height:
+      42px;
+
+    font-size:
+      12px;
+  }
+
+
+  .inspection-pagination {
+    padding-left:
+      16px;
+
+    gap:
+      9px;
+  }
+
+
+  .inspection-pagination-button {
+    width:
+      34px;
+
+    height:
+      34px;
+  }
+
+
+  .inspection-table-card {
+    padding:
+      13px;
+  }
+
+
+  .inspection-table {
+    min-width:
+      980px;
+  }
+
+
+  .inspection-table th {
+    height:
+      39px;
+
+    padding:
+      0
+      9px;
+
+    font-size:
+      10px;
+  }
+
+
+  .inspection-table td {
+    height:
+      43px;
+
+    padding:
+      0
+      9px;
+
+    font-size:
+      11px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   SAME HTML → CARD DESIGN
+========================================================= */
+
+@media (max-width: 700px) {
+
+  .inspection-page {
+    padding:
+      10px
+      8px
+      20px;
+
+    gap:
+      10px;
+  }
+
+
+  /* =====================================================
+     TOOLBAR
+  ===================================================== */
+
+  .inspection-toolbar {
+    min-height:
+      0;
+
+    padding:
+      14px;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    align-items:
+      stretch;
+
+    gap:
+      13px;
+
+    border-radius:
+      13px;
+  }
+
+
+  /* =====================================================
+     HEADING
+  ===================================================== */
+
+  .inspection-heading {
+    gap:
+      11px;
+  }
+
+
+  .inspection-heading-icon {
+    width:
+      46px;
+
+    height:
+      46px;
+
+    flex-basis:
+      46px;
+
+    border-radius:
+      10px;
+  }
+
+
+  .inspection-heading-icon svg {
+    width:
+      21px;
+
+    height:
+      21px;
+  }
+
+
+  .inspection-title {
+    font-size:
+      22px;
+
+    line-height:
+      27px;
+  }
+
+
+  .inspection-subtitle {
+    font-size:
+      12px;
+
+    line-height:
+      16px;
+  }
+
+
+  /* =====================================================
+     SEARCH
+  ===================================================== */
+
+  .inspection-search,
+  .inspection-search-input {
+    height:
+      44px;
+  }
+
+
+  .inspection-search-input {
+    padding-left:
+      42px;
+
+    border-radius:
+      9px;
+
+    font-size:
+      12.5px;
+  }
+
+
+  .inspection-search-icon {
+    left:
+      13px;
+
+    width:
+      18px;
+
+    height:
+      18px;
+  }
+
+
+  /* =====================================================
+     PAGINATION
+  ===================================================== */
+
+  .inspection-pagination {
+    width:
+      100%;
+
+    padding:
+      0;
+
+    justify-content:
+      flex-end;
+
+    border-left:
+      none;
+  }
+
+
+  .inspection-pagination-button {
+    width:
+      36px;
+
+    height:
+      36px;
+  }
+
+
+  .inspection-pagination-counter {
+    min-width:
+      70px;
+
+    font-size:
+      12px;
+  }
+
+
+  /* =====================================================
+     TABLE CARD
+  ===================================================== */
+
+  .inspection-table-card {
+    padding:
+      8px;
+
+    border-radius:
+      13px;
+  }
+
+
+  /* =====================================================
+     REMOVE HORIZONTAL SCROLL
+  ===================================================== */
+
+  .inspection-table-container {
+    width:
+      100%;
+
+    overflow:
+      visible;
+  }
+
+
+  .inspection-table {
+    width:
+      100%;
+
+    min-width:
+      0;
+
+    display:
+      block;
+
+    table-layout:
+      auto;
+  }
+
+
+  /* =====================================================
+     HIDE TABLE HEADER
+  ===================================================== */
+
+  .inspection-table thead {
+    display:
+      none;
+  }
+
+
+  /* =====================================================
+     BODY
+  ===================================================== */
+
+  .inspection-table tbody {
+    width:
+      100%;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    gap:
+      8px;
+  }
+
+
+  /* =====================================================
+     EACH ROW = MOBILE CARD
+  ===================================================== */
+
+  .inspection-table-row {
+    width:
+      100%;
+
+    padding:
+      12px;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+
+    grid-template-areas:
+      "type status"
+      "number number"
+      "client client"
+      "date location"
+      "reference reference"
+      "id id";
+
+    column-gap:
+      10px;
+
+    row-gap:
+      8px;
+
+    box-sizing:
+      border-box;
+
+    border:
+      1px solid
+      #e0e6ed;
+
+    border-radius:
+      11px;
+
+    background:
+      #ffffff !important;
+
+    box-shadow:
+      0
+      2px
+      7px
+      rgba(
+        15,
+        23,
+        42,
+        0.04
+      );
+  }
+
+
+  .inspection-table-row:hover {
+    background:
+      #fafdff !important;
+  }
+
+
+  .inspection-table td {
+    width:
+      auto !important;
+
+    height:
+      auto;
+
+    min-width:
+      0;
+
+    padding:
+      0;
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    gap:
+      2px;
+
+    border:
+      none;
+
+    white-space:
+      normal;
+
+    overflow:
+      visible;
+
+    text-overflow:
+      clip;
+  }
+
+
+  /* LABELS */
+
+  .inspection-table td::before {
+    content:
+      attr(data-label);
+
+    color:
+      var(
+        --text-muted,
+        #7c899c
+      );
+
+    font-family:
+      var(
+        --font-ui,
+        "Geist Variable",
+        sans-serif
+      );
+
+    font-size:
+      9px;
+
+    line-height:
+      12px;
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      );
+  }
+
+
+  /* =====================================================
+     ID
+  ===================================================== */
+
+  .inspection-table td:nth-child(1) {
+    grid-area:
+      id;
+
+    flex-direction:
+      row;
+
+    gap:
+      4px;
+
+    color:
+      #94a0b1 !important;
+
+    font-size:
+      9px;
+  }
+
+
+  .inspection-table td:nth-child(1)::before {
+    content:
+      "Registro";
+  }
+
+
+  /* =====================================================
+     TYPE
+  ===================================================== */
+
+  .inspection-table td:nth-child(2) {
+    grid-area:
+      type;
+
+    align-items:
+      flex-start;
+  }
+
+
+  .inspection-table td:nth-child(2)::before {
+    display:
+      none;
+  }
+
+
+  /* =====================================================
+     NUMBER
+  ===================================================== */
+
+  .inspection-table td:nth-child(3) {
+    grid-area:
+      number;
+  }
+
+
+  .inspection-document-number {
+    font-size:
+      15px !important;
+
+    line-height:
+      20px;
+
+    font-weight:
+      var(
+        --weight-semibold,
+        620
+      ) !important;
+  }
+
+
+  /* =====================================================
+     DATE
+  ===================================================== */
+
+  .inspection-table td:nth-child(4) {
+    grid-area:
+      date;
+  }
+
+
+  /* =====================================================
+     CLIENT
+  ===================================================== */
+
+  .inspection-table td:nth-child(5) {
+    grid-area:
+      client;
+  }
+
+
+  .inspection-client {
+    color:
+      #17233c !important;
+
+    font-size:
+      12px !important;
+
+    line-height:
+      17px;
+
+    font-weight:
+      var(
+        --weight-medium,
+        510
+      ) !important;
+  }
+
+
+  /* =====================================================
+     LOCATION
+  ===================================================== */
+
+  .inspection-table td:nth-child(6) {
+    grid-area:
+      location;
+  }
+
+
+  /* =====================================================
+     REFERENCE
+  ===================================================== */
+
+  .inspection-table td:nth-child(7) {
+    grid-area:
+      reference;
+
+    padding-top:
+      7px;
+
+    border-top:
+      1px solid
+      #edf1f5;
+  }
+
+
+  /* =====================================================
+     STATUS
+  ===================================================== */
+
+  .inspection-table td:nth-child(8) {
+    grid-area:
+      status;
+
+    align-items:
+      flex-end;
+  }
+
+
+  .inspection-table td:nth-child(8)::before {
+    display:
+      none;
+  }
+
+
+  /* TYPE */
+
+  .inspection-type-pill {
+    min-width:
+      62px;
+
+    padding:
+      4px
+      8px;
+
+    font-size:
+      9.5px;
+  }
+
+
+  /* STATUS */
+
+  .inspection-status-pill {
+    min-width:
+      88px;
+
+    padding:
+      5px
+      9px;
+
+    font-size:
+      9.5px;
+  }
+
+}
+
+
+/* =========================================================
+   VERY SMALL MOBILE / PDA
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .inspection-page {
+    padding:
+      7px
+      6px
+      16px;
+  }
+
+
+  .inspection-toolbar {
+    padding:
+      12px;
+  }
+
+
+  .inspection-title {
+    font-size:
+      20px;
+
+    line-height:
+      24px;
+  }
+
+
+  .inspection-table-card {
+    padding:
+      6px;
+  }
+
+
+  .inspection-table-row {
+    padding:
+      11px;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+
+    column-gap:
+      7px;
+
+    row-gap:
+      7px;
+  }
+
+
+  .inspection-document-number {
+    font-size:
+      14px !important;
+  }
+
+
+  .inspection-status-pill {
+    min-width:
+      82px;
+
+    padding:
+      4px
+      7px;
+
+    font-size:
+      9px;
+  }
+
+}
+
+
+/* =========================================================
+   DEVOLUCION - EMPTY STATE
+========================================================= */
+
+.returns-empty-state {
+    width: 100%;
+    min-height: 390px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+
+    padding: 40px 24px;
+
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   ICON
+========================================================= */
+
+.returns-empty-icon-wrapper {
+    width: 82px;
+    height: 82px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 20px;
+
+    border-radius: 24px;
+
+    color: #3b82f6;
+
+    background:
+        linear-gradient(
+            135deg,
+            #eff6ff,
+            #dbeafe
+        );
+
+    border: 1px solid #bfdbfe;
+
+    box-shadow:
+        0 10px 30px rgba(59, 130, 246, 0.12);
+}
+
+
+/* ERROR */
+
+.returns-empty-icon-wrapper.returns-empty-error {
+    color: #dc2626;
+
+    background:
+        linear-gradient(
+            135deg,
+            #fff1f2,
+            #fee2e2
+        );
+
+    border-color: #fecaca;
+}
+
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.returns-empty-title {
+    margin: 0 0 9px;
+
+    font-size: 21px;
+    font-weight: 750;
+
+    color: #1f2937;
+
+    letter-spacing: -0.2px;
+}
+
+
+/* =========================================================
+   DESCRIPTION
+========================================================= */
+
+.returns-empty-description {
+    width: 100%;
+    max-width: 500px;
+
+    margin: 0;
+
+    font-size: 14px;
+    font-weight: 450;
+
+    line-height: 1.65;
+
+    color: #64748b;
+}
+
+
+.returns-empty-description strong {
+    color: #334155;
+
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   HINT
+========================================================= */
+
+.returns-empty-search-hint {
+    margin-top: 22px;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 9px 14px;
+
+    border-radius: 999px;
+
+    background: #f8fafc;
+
+    border: 1px solid #e2e8f0;
+
+    color: #64748b;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+.returns-empty-secondary {
+    margin-top: 12px;
+
+    font-size: 12px;
+
+    color: #94a3b8;
+}
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+.returns-loading-circle {
+    width: 70px;
+    height: 70px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 20px;
+
+    border-radius: 50%;
+
+    color: #2563eb;
+
+    background: #eff6ff;
+}
+
+
+.returns-loading-circle svg {
+    animation:
+        returns-spin
+        1s
+        linear
+        infinite;
+}
+
+
+@keyframes returns-spin {
+
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(-360deg);
+    }
+
+}
+
+
+/* =========================================================
+   STATUS BASE
+========================================================= */
+
+.inspection-status-pill {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 6px;
+
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    white-space: nowrap;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    line-height: 1;
+}
+
+
+/* =========================================================
+   DESPACHADO
+
+   BLUE
+========================================================= */
+
+.inspection-status-despachado {
+    color: #1d4ed8;
+
+    background-color: #dbeafe;
+
+    border: 1px solid #bfdbfe;
+}
+
+
+/* =========================================================
+   DEVUELTO PARCIALMENTE
+
+   YELLOW
+========================================================= */
+
+.inspection-status-devuelto-parcialmente {
+    color: #a16207;
+
+    background-color: #fef3c7;
+
+    border: 1px solid #fde68a;
+}
+
+
+/* =========================================================
+   DEVUELTO COMPLETAMENTE
+
+   GREEN
+========================================================= */
+
+.inspection-status-devuelto-completamente {
+    color: #15803d;
+
+    background-color: #dcfce7;
+
+    border: 1px solid #bbf7d0;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .returns-empty-state {
+        min-height: 330px;
+
+        padding: 30px 18px;
+    }
+
+
+    .returns-empty-icon-wrapper {
+        width: 72px;
+        height: 72px;
+
+        border-radius: 20px;
+
+        margin-bottom: 17px;
+    }
+
+
+    .returns-empty-title {
+        font-size: 19px;
+    }
+
+
+    .returns-empty-description {
+        max-width: 320px;
+
+        font-size: 13px;
+
+        line-height: 1.55;
+    }
+
+
+    .inspection-status-pill {
+        padding: 6px 9px;
+
+        font-size: 11px;
+    }
+
+}

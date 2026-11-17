@@ -1,9 +1,13 @@
+/* =========================================================
+   MAIN MENU
+========================================================= */
+
 .menu-page {
   width: 100%;
-  min-height: 100%;
+  min-height: 100vh;
 
-  padding: 12px;
   margin: 0;
+  padding: 16px;
 
   box-sizing: border-box;
 
@@ -28,86 +32,511 @@
   position: relative;
 }
 
+
+/* =========================================================
+   HEADER
+========================================================= */
+
 .menu-header {
+  width: 100%;
+
   text-align: center;
-  margin-bottom: 10px;
+
+  margin-bottom: 20px;
 }
 
-/* Texto pequeño arriba */
+
+/* Texto pequeño */
+
 .menu-subtitle {
   display: block;
+
   font-size: 13px;
   font-weight: 600;
+
   letter-spacing: 1px;
+
   color: #6b7a90;
+
+  margin-bottom: 2px;
 }
 
-/* Título principal */
+
+/* Título */
+
 .menu-title {
-  font-size: 36px;
-  font-weight: 800;
-  color: #1f2d3d;
   margin: 0;
+
+  font-size: clamp(26px, 4vw, 36px);
+  font-weight: 800;
+
+  line-height: 1.15;
+
+  color: #1f2d3d;
 }
 
-/* Línea decorativa */
+
+/* Línea azul */
+
 .menu-underline {
   width: 40px;
   height: 4px;
-  background: #1e88e5;
-  border-radius: 4px;
+
   margin: 10px auto 0;
+
+  border-radius: 999px;
+
+  background-color: #1e88e5;
 }
+
+
+/* =========================================================
+   IMAGE
+========================================================= */
 
 .menu-image-container {
   width: 100%;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   padding-bottom: 15px;
-}
 
-.menu-image {
-  max-width: 80%;
-  max-height: 80%;
-  object-fit: contain;
-}
-
-/* GRID */
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 📱 móvil */
-  gap: 12px;
-  padding: 4px;
-  justify-items: center;
   box-sizing: border-box;
 }
 
-/* 📲 Tablet */
-@media (min-width: 768px) {
-  .menu-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-    .menu-image {
-  width: 30%;
-}
+
+.menu-image {
+  width: 100%;
+  max-width: 300px;
+
+  height: auto;
+
+  object-fit: contain;
 }
 
-/* 🖥️ Desktop */
-@media (min-width: 1024px) {
-  .menu-page {
-    padding-left: 100px;
-    padding-right: 100px;
-  }
 
-  .menu-image {
-  width: 30%;
-}
-  .menu-grid {
+/* =========================================================
+   GRID
+========================================================= */
+
+.menu-grid {
+  width: 100%;
+  max-width: 1500px;
+
+  margin: 0 auto;
+
   display: grid;
-  justify-content: center;
-  align-items: center;
-  grid-template-columns: repeat(4, max-content);
+
+  /*
+    MOBILE DEFAULT:
+    2 COLUMNAS
+  */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  /*
+    TODAS LAS FILAS TIENEN
+    EXACTAMENTE LA MISMA ALTURA
+  */
+  grid-auto-rows: 150px;
+
+  gap: 12px;
+
+  padding: 4px;
+
+  box-sizing: border-box;
+
+  align-items: stretch;
+  justify-items: stretch;
 }
+
+
+/* =========================================================
+   TODOS LOS HIJOS DEL GRID
+   MISMO TAMAÑO
+========================================================= */
+
+.menu-grid > * {
+  width: 100% !important;
+
+  height: 150px !important;
+  min-height: 150px !important;
+  max-height: 150px !important;
+
+  box-sizing: border-box;
 }
- 
+
+
+/* =========================================================
+   CONTENIDO DEL MENU BUTTON
+========================================================= */
+
+/*
+  Esto fuerza que cualquier botón/enlace directo
+  dentro del grid ocupe completamente su celda.
+*/
+
+.menu-grid > a,
+.menu-grid > button,
+.menu-grid > div {
+  width: 100% !important;
+  height: 100% !important;
+
+  min-width: 0;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   NORMALIZAR SVG
+========================================================= */
+
+/*
+  Aunque algunos SVG tengan 70px y otros 80px,
+  aquí los normalizamos visualmente.
+*/
+
+.menu-grid svg {
+  width: 64px !important;
+  height: 64px !important;
+
+  max-width: 64px;
+  max-height: 64px;
+
+  display: block;
+
+  flex-shrink: 0;
+}
+
+
+/* =========================================================
+   MOBILE PEQUEÑO
+   0px - 399px
+========================================================= */
+
+@media (max-width: 399px) {
+
+  .menu-page {
+    padding: 10px;
+  }
+
+
+  .menu-header {
+    margin-bottom: 14px;
+  }
+
+
+  .menu-title {
+    font-size: 25px;
+  }
+
+
+  .menu-subtitle {
+    font-size: 11px;
+  }
+
+
+  .menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    grid-auto-rows: 142px;
+
+    gap: 9px;
+
+    padding: 2px;
+  }
+
+
+  .menu-grid > * {
+    height: 142px !important;
+    min-height: 142px !important;
+    max-height: 142px !important;
+  }
+
+
+  .menu-grid svg {
+    width: 58px !important;
+    height: 58px !important;
+
+    max-width: 58px;
+    max-height: 58px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE NORMAL
+   400px - 599px
+========================================================= */
+
+@media (min-width: 400px) and (max-width: 599px) {
+
+  .menu-page {
+    padding: 12px;
+  }
+
+
+  .menu-grid {
+    max-width: 500px;
+
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    grid-auto-rows: 150px;
+
+    gap: 12px;
+  }
+
+
+  .menu-grid > * {
+    height: 150px !important;
+    min-height: 150px !important;
+    max-height: 150px !important;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE GRANDE / PDA HORIZONTAL
+   600px - 767px
+========================================================= */
+
+@media (min-width: 600px) and (max-width: 767px) {
+
+  .menu-page {
+    padding: 16px;
+  }
+
+
+  .menu-grid {
+    max-width: 620px;
+
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    grid-auto-rows: 150px;
+
+    gap: 14px;
+  }
+
+
+  .menu-grid > * {
+    height: 150px !important;
+    min-height: 150px !important;
+    max-height: 150px !important;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET
+   768px - 899px
+========================================================= */
+
+@media (min-width: 768px) and (max-width: 899px) {
+
+  .menu-page {
+    padding: 20px;
+  }
+
+
+  .menu-grid {
+    max-width: 720px;
+
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    grid-auto-rows: 155px;
+
+    gap: 16px;
+  }
+
+
+  .menu-grid > * {
+    height: 155px !important;
+    min-height: 155px !important;
+    max-height: 155px !important;
+  }
+
+
+  .menu-grid svg {
+    width: 68px !important;
+    height: 68px !important;
+
+    max-width: 68px;
+    max-height: 68px;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET GRANDE / LAPTOP PEQUEÑA
+   900px - 1199px
+========================================================= */
+
+@media (min-width: 900px) and (max-width: 1199px) {
+
+  .menu-page {
+    padding: 22px;
+  }
+
+
+  .menu-grid {
+    max-width: 900px;
+
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+
+    grid-auto-rows: 155px;
+
+    gap: 16px;
+  }
+
+
+  .menu-grid > * {
+    height: 155px !important;
+    min-height: 155px !important;
+    max-height: 155px !important;
+  }
+
+
+  .menu-grid svg {
+    width: 68px !important;
+    height: 68px !important;
+
+    max-width: 68px;
+    max-height: 68px;
+  }
+
+}
+
+
+/* =========================================================
+   LAPTOP
+   1200px - 1439px
+========================================================= */
+
+@media (min-width: 1200px) and (max-width: 1439px) {
+
+  .menu-page {
+    padding: 25px 40px;
+  }
+
+
+  .menu-grid {
+    max-width: 900px;
+
+    grid-template-columns: repeat(4, 165px);
+
+    grid-auto-rows: 155px;
+
+    justify-content: center;
+
+    gap: 18px;
+  }
+
+
+  .menu-grid > * {
+    height: 155px !important;
+    min-height: 155px !important;
+    max-height: 155px !important;
+  }
+
+
+  .menu-grid svg {
+    width: 68px !important;
+    height: 68px !important;
+
+    max-width: 68px;
+    max-height: 68px;
+  }
+
+}
+
+
+/* =========================================================
+   DESKTOP
+   1440px - 1799px
+========================================================= */
+
+@media (min-width: 1440px) and (max-width: 1799px) {
+
+  .menu-page {
+    padding: 28px 50px;
+  }
+
+
+  .menu-grid {
+    max-width: 1100px;
+
+    grid-template-columns: repeat(5, 165px);
+
+    grid-auto-rows: 155px;
+
+    justify-content: center;
+
+    gap: 20px;
+  }
+
+
+  .menu-grid > * {
+    height: 155px !important;
+    min-height: 155px !important;
+    max-height: 155px !important;
+  }
+
+
+  .menu-grid svg {
+    width: 70px !important;
+    height: 70px !important;
+
+    max-width: 70px;
+    max-height: 70px;
+  }
+
+}
+
+
+/* =========================================================
+   MONITOR GRANDE
+   1800px+
+========================================================= */
+
+@media (min-width: 1800px) {
+
+  .menu-page {
+    padding: 30px 60px;
+  }
+
+
+  .menu-grid {
+    max-width: 1350px;
+
+    grid-template-columns: repeat(6, 170px);
+
+    grid-auto-rows: 160px;
+
+    justify-content: center;
+
+    gap: 22px;
+  }
+
+
+  .menu-grid > * {
+    height: 160px !important;
+    min-height: 160px !important;
+    max-height: 160px !important;
+  }
+
+
+  .menu-grid svg {
+    width: 72px !important;
+    height: 72px !important;
+
+    max-width: 72px;
+    max-height: 72px;
+  }
+
+}
